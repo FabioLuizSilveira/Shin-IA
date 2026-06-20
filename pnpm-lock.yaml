@@ -39,6 +39,15 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  packages/database:
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/domain:
     devDependencies:
       '@shina/typescript-config':
