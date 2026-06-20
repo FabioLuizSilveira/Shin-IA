@@ -23,23 +23,27 @@ _Nothing in progress._
 - [x] Validate `pnpm typecheck` — zero errors ✅
 - [x] Validate `pnpm build` — clean emit ✅
 
-## Milestone 3 — Next (ready to plan)
+## Milestone 3 — Database ▶ Next
 
-- [ ] Create Supabase project
-- [ ] Define core schema
-- [ ] Write initial migration
-- [ ] Generate TypeScript types from schema
-- [ ] Create `packages/db` with Supabase client
+### Planning ✅ (2026-06-20)
 
----
+- [x] Write `docs/DATABASE.md` — 22 tables, column mapping, all aggregates
+- [x] Write `docs/RLS_POLICIES.md` — JWT strategy, policy matrix, security invariants
+- [x] Write `docs/MIGRATION_GUIDE.md` — 21 migration files, FK graph, ON DELETE table, triggers, risk register
+- [x] Write `supabase/docs/SCHEMA_PLAN.md` — schema layout, VO mapping rules, aggregate→table mapping, pre-implementation checklist
+- [x] Lock all 10 design decisions (2026-06-20)
 
-## Milestone 3 (Blocked — M2 must complete first)
+### Implementation (pending)
 
-- [ ] Create Supabase project
-- [ ] Define core schema
-- [ ] Write initial migration
-- [ ] Generate TypeScript types from schema
-- [ ] Create `packages/db` with Supabase client
+- [ ] Create Supabase project (local via CLI or cloud)
+- [ ] Run `supabase link` to connect CLI
+- [ ] Implement M3 Auth Hook — JWT `tenant_id` claim injection
+- [ ] Scaffold `packages/db` (`package.json`, `tsconfig.json`)
+- [ ] Write 21 migration files per `MIGRATION_GUIDE.md` order
+- [ ] Write `supabase/seed.sql` (dev-only seed data)
+- [ ] Run `supabase db reset` — validate migrations apply cleanly
+- [ ] Run `supabase gen types typescript` → `packages/db/src/supabase.types.ts`
+- [ ] Validate RLS policies in local Supabase stack
 
 ---
 

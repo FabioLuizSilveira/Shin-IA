@@ -1,22 +1,22 @@
 # SCHEMA_PLAN.md — Supabase Schema Plan
 
 Detailed schema plan for Milestone 3. Companion to `docs/DATABASE.md`.
-No SQL has been written. This document is the source of truth for migration authorship.
+**All 10 design decisions locked (2026-06-20). No SQL has been written yet.**
 
 ---
 
 ## Schema Layout
 
 All business tables live in the `public` schema (Supabase default).  
-Event outbox lives in `public.domain_events`.  
+Event outbox lives in the separate `events` schema (Decision #10).  
 Auth tables remain in the `auth` schema (managed by Supabase, never touched).
 
 ```
 public/
-  tenants
-  branches
-  persons
-  organizations
+  tenants             (includes default_currency — Decision #9)
+  branches            (adjacency list, parent_id self-ref — Decision #8)
+  persons             (includes auth_user_id — Decision #7)
+  organizations       (flat address columns + metadata JSONB — Decision #4)
   asset_types
   assets
   resources
@@ -26,13 +26,15 @@ public/
   contracts
   billing_accounts
   invoices
-  invoice_line_items
-  notifications
+  invoice_line_items  (separate table — Decision #5)
+  notifications       (person_id FK + recipient_external_ref — Decision #3)
   workflow_definitions
-  workflow_steps
+  workflow_steps      (separate table — Decision #6)
   rule_sets
-  rule_set_rules
-  domain_events
+  rule_set_rules      (separate table — Decision #6)
+
+events/
+  domain_events       (outbox — separate schema, Decision #10)
 ```
 
 ---
@@ -44,12 +46,12 @@ public/
 | `pgcrypto`  | `gen_random_uuid()` for seeded UUIDs |
 | `uuid-ossp` | `uuid_generate_v4()` (fallback)      |
 
-Optional (decision pending):
+Not required for MVP (locked):
 
-| Extension | Purpose                               | Decision                                 |
-| --------- | ------------------------------------- | ---------------------------------------- |
-| `ltree`   | Materialized path for `branches` tree | Required if tree depth > 3 levels common |
-| `postgis` | Coordinates for tracking/geofence     | M4+ only                                 |
+| Extension | Purpose                               | Status                                                                                                      |
+| --------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `ltree`   | Materialized path for `branches` tree | **Not required** — adjacency list approved (Decision #8); revisit post-MVP if deep tree queries become slow |
+| `postgis` | Coordinates for tracking/geofence     | M4+ only                                                                                                    |
 
 ---
 
@@ -61,8 +63,10 @@ These rules must be applied consistently across all migrations:
 
 ```
 {field}_amount   NUMERIC(19,4) NOT NULL
-{field}_currency TEXT NOT NULL DEFAULT 'BRL'
+{field}_currency TEXT NOT NULL
 ```
+
+Currency is **not** hardcoded as `DEFAULT 'BRL'` on individual columns (Decision #9). The application reads `tenants.default_currency` at write time and passes the value explicitly. The tenant-level default is `DEFAULT 'BRL'` on `tenants.default_currency` only.
 
 Example: `value_amount`, `value_currency` on `contracts`.
 
@@ -91,7 +95,7 @@ CHECK constraint: `{field} ~* '^[^\s@]+@[^\s@]+\.[^\s@]+$'`
 {field}_country_code TEXT
 ```
 
-### Address → flat columns
+### Address → flat columns + metadata (Decision #4)
 
 ```
 address_street        TEXT
@@ -101,7 +105,10 @@ address_city          TEXT NOT NULL  (when address is required)
 address_state         TEXT NOT NULL
 address_country       TEXT NOT NULL DEFAULT 'BR'
 address_postal_code   TEXT
+metadata              JSONB NOT NULL DEFAULT '{}'
 ```
+
+`metadata` captures additional address context (complement, reference point, etc.) without requiring schema changes.
 
 ### JSONB columns (attributes, metadata, steps, rules)
 
@@ -139,38 +146,40 @@ Cross-cutting: `domain_events` (not an aggregate — event outbox)
 
 ## Unique Constraints Summary
 
-| Table           | Constraint     | Columns                                                        |
-| --------------- | -------------- | -------------------------------------------------------------- |
-| `tenants`       | UNIQUE         | `slug`                                                         |
-| `branches`      | UNIQUE         | `(tenant_id, code)`                                            |
-| `persons`       | UNIQUE         | `(tenant_id, email)`                                           |
-| `persons`       | UNIQUE PARTIAL | `(tenant_id, document)` WHERE `document IS NOT NULL`           |
-| `organizations` | UNIQUE         | `(tenant_id, document)`                                        |
-| `assets`        | UNIQUE PARTIAL | `(tenant_id, serial_number)` WHERE `serial_number IS NOT NULL` |
-| `capabilities`  | UNIQUE         | `(tenant_id, key)`                                             |
-| `domain_events` | UNIQUE         | `id` (eventId from domain)                                     |
+| Table                  | Constraint     | Columns                                                        |
+| ---------------------- | -------------- | -------------------------------------------------------------- |
+| `tenants`              | UNIQUE         | `slug`                                                         |
+| `branches`             | UNIQUE         | `(tenant_id, code)`                                            |
+| `persons`              | UNIQUE         | `(tenant_id, email)`                                           |
+| `persons`              | UNIQUE PARTIAL | `(tenant_id, document)` WHERE `document IS NOT NULL`           |
+| `organizations`        | UNIQUE         | `(tenant_id, document)`                                        |
+| `assets`               | UNIQUE PARTIAL | `(tenant_id, serial_number)` WHERE `serial_number IS NOT NULL` |
+| `capabilities`         | UNIQUE         | `(tenant_id, key)`                                             |
+| `persons`              | UNIQUE         | `auth_user_id` WHERE `auth_user_id IS NOT NULL` (partial)      |
+| `events.domain_events` | UNIQUE         | `id` (eventId from domain)                                     |
 
 ---
 
 ## CHECK Constraints Summary
 
-| Table                  | Column                | Check                                     |
-| ---------------------- | --------------------- | ----------------------------------------- |
-| `tenants`              | `slug`                | `slug ~* '^[a-z0-9-]+$'`                  |
-| `persons`              | `email`               | email regex                               |
-| `organizations`        | `email`               | email regex (nullable)                    |
-| `contracts`            | `period`              | `period_starts_at < period_ends_at`       |
-| `contracts`            | `value_amount`        | `value_amount >= 0`                       |
-| `operations`           | `schedule`            | `scheduled_starts_at < scheduled_ends_at` |
-| `allocations`          | `period`              | `period_starts_at < period_ends_at`       |
-| `billing_accounts`     | `credit_limit_amount` | `credit_limit_amount >= 0`                |
-| `billing_accounts`     | `balance_amount`      | `balance_amount >= 0`                     |
-| `invoices`             | `total_amount`        | `total_amount >= 0`                       |
-| `invoice_line_items`   | `quantity`            | `quantity > 0`                            |
-| `invoice_line_items`   | `unit_price_amount`   | `unit_price_amount >= 0`                  |
-| `capabilities`         | `key`                 | `key ~* '^[a-z][a-z0-9._-]*$'`            |
-| `workflow_definitions` | `version`             | `version > 0`                             |
-| `rule_set_rules`       | `priority`            | `priority >= 0`                           |
+| Table                  | Column                | Check                                                                 |
+| ---------------------- | --------------------- | --------------------------------------------------------------------- |
+| `tenants`              | `slug`                | `slug ~* '^[a-z0-9-]+$'`                                              |
+| `persons`              | `email`               | email regex                                                           |
+| `organizations`        | `email`               | email regex (nullable)                                                |
+| `contracts`            | `period`              | `period_starts_at < period_ends_at`                                   |
+| `contracts`            | `value_amount`        | `value_amount >= 0`                                                   |
+| `operations`           | `schedule`            | `scheduled_starts_at < scheduled_ends_at`                             |
+| `allocations`          | `period`              | `period_starts_at < period_ends_at`                                   |
+| `billing_accounts`     | `credit_limit_amount` | `credit_limit_amount >= 0`                                            |
+| `billing_accounts`     | `balance_amount`      | `balance_amount >= 0`                                                 |
+| `invoices`             | `total_amount`        | `total_amount >= 0`                                                   |
+| `invoice_line_items`   | `quantity`            | `quantity > 0`                                                        |
+| `invoice_line_items`   | `unit_price_amount`   | `unit_price_amount >= 0`                                              |
+| `capabilities`         | `key`                 | `key ~* '^[a-z][a-z0-9._-]*$'`                                        |
+| `workflow_definitions` | `version`             | `version > 0`                                                         |
+| `rule_set_rules`       | `priority`            | `priority >= 0`                                                       |
+| `notifications`        | recipient             | `CHECK (person_id IS NOT NULL OR recipient_external_ref IS NOT NULL)` |
 
 ---
 
@@ -207,9 +216,9 @@ Policy: {table}_tenant_isolation_update
 
 ---
 
-## Domain Events — Outbox Pattern
+## Domain Events — Outbox Pattern (Schema `events`)
 
-The `domain_events` table implements the Transactional Outbox pattern:
+The `events.domain_events` table implements the Transactional Outbox pattern (Decision #10 — separate schema):
 
 1. Application writes domain event + business row in the **same transaction**
 2. A background worker polls `domain_events WHERE published_at IS NULL`
@@ -226,7 +235,7 @@ The `payload` column stores the full `DomainEvent<P>` interface serialized as JS
 
 ### Realtime
 
-- `domain_events` should be added to Supabase Realtime publication for real-time event streaming (M4+).
+- `events.domain_events` should be added to a Supabase Realtime publication for real-time event streaming (M4+). Note: Realtime publications typically track `public` schema; `events` schema publication must be configured explicitly.
 - `notifications` can be added to Realtime for in-app notifications.
 
 ### Storage
@@ -264,7 +273,17 @@ supabase/
 
 Before the first migration file is created, confirm:
 
-- [ ] All 10 open decisions in `MIGRATION_GUIDE.md` are resolved
+- [x] All 10 design decisions resolved (locked 2026-06-20)
+- [x] ID generation: domain-generated UUIDs, no `DEFAULT gen_random_uuid()` on PKs
+- [x] RLS strategy: JWT claim `tenant_id` via Auth Hook
+- [x] Notification recipient: `person_id UUID NULL FK` + `recipient_external_ref TEXT NULL`
+- [x] Organization address: flat columns + `metadata JSONB`
+- [x] Invoice line items: separate table
+- [x] Workflow steps / rule set rules: separate tables
+- [x] Person ↔ Auth user: `persons.auth_user_id UUID NULL UNIQUE`
+- [x] Branch tree: adjacency list (MVP); `ltree` deferred
+- [x] Currency: `tenants.default_currency TEXT NOT NULL DEFAULT 'BRL'`
+- [x] Domain events: `events.domain_events` (separate schema)
 - [ ] Supabase project created (local via CLI or cloud project)
 - [ ] `supabase link` run to connect CLI to project
 - [ ] Auth hook for `tenant_id` JWT claim designed and tested

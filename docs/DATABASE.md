@@ -1,19 +1,20 @@
 # DATABASE.md — Shinã Platform
 
-Database architecture planning for Milestone 3. No SQL has been written yet.
+Database architecture planning for Milestone 3. **All 10 design decisions locked (2026-06-20). No SQL has been written yet.**
 
 ---
 
 ## Technology
 
-| Concern       | Choice                                                   | Reason                                   |
-| ------------- | -------------------------------------------------------- | ---------------------------------------- |
-| Database      | PostgreSQL 15+ (via Supabase)                            | Native JSONB, RLS, extensions, real-time |
-| ID type       | `UUID` (`gen_random_uuid()`)                             | Domain generates IDs; DB accepts them    |
-| Timestamps    | `TIMESTAMPTZ`                                            | All timestamps timezone-aware            |
-| Money         | `NUMERIC(19,4)` + `TEXT` (currency)                      | Avoids float precision errors            |
-| Enums         | PostgreSQL native `ENUM` types                           | Type safety at DB level                  |
-| JSONB columns | For embedded arrays (steps, rules, attributes, metadata) | Domain objects without FK overhead       |
+| Concern       | Choice                                  | Reason                                                                                                                     |
+| ------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Database      | PostgreSQL 15+ (via Supabase)           | Native JSONB, RLS, extensions, real-time                                                                                   |
+| ID type       | `UUID` — no DB default on PK columns    | Domain generates IDs via `crypto.randomUUID()`; DB accepts them at insert. No `DEFAULT gen_random_uuid()` on primary keys. |
+| Timestamps    | `TIMESTAMPTZ`                           | All timestamps timezone-aware                                                                                              |
+| Money         | `NUMERIC(19,4)` + `TEXT` (currency)     | Avoids float precision errors; currency from tenant config                                                                 |
+| Enums         | PostgreSQL native `ENUM` types          | Type safety at DB level                                                                                                    |
+| JSONB columns | For attributes, metadata, event payload | Domain objects without FK overhead                                                                                         |
+| Event schema  | Separate PostgreSQL schema `events`     | `events.domain_events` isolated from business tables                                                                       |
 
 ---
 
@@ -80,11 +81,11 @@ RLS policies enforce that authenticated users can only read/write rows belonging
 | `rule_sets`            | RuleSet                           |
 | `rule_set_rules`       | RuleSet (child entity)            |
 
-### Cross-cutting
+### Cross-cutting (schema `events`)
 
-| Table           | Purpose                                  |
-| --------------- | ---------------------------------------- |
-| `domain_events` | Outbox pattern — persisted domain events |
+| Table                  | Purpose                                  |
+| ---------------------- | ---------------------------------------- |
+| `events.domain_events` | Outbox pattern — persisted domain events |
 
 ---
 
@@ -92,15 +93,16 @@ RLS policies enforce that authenticated users can only read/write rows belonging
 
 ### `tenants`
 
-| Column       | Type                                 | Notes                                     |
-| ------------ | ------------------------------------ | ----------------------------------------- |
-| `id`         | `UUID PK`                            | Domain-generated                          |
-| `name`       | `TEXT NOT NULL`                      |                                           |
-| `slug`       | `TEXT NOT NULL UNIQUE`               | Lowercase alphanumeric + hyphens          |
-| `plan`       | `tenant_plan ENUM`                   | starter / professional / enterprise       |
-| `status`     | `tenant_status ENUM`                 | trialing / active / suspended / cancelled |
-| `created_at` | `TIMESTAMPTZ NOT NULL DEFAULT now()` |                                           |
-| `updated_at` | `TIMESTAMPTZ NOT NULL DEFAULT now()` |                                           |
+| Column             | Type                                 | Notes                                           |
+| ------------------ | ------------------------------------ | ----------------------------------------------- |
+| `id`               | `UUID PK`                            | Domain-generated; no DB default                 |
+| `name`             | `TEXT NOT NULL`                      |                                                 |
+| `slug`             | `TEXT NOT NULL UNIQUE`               | Lowercase alphanumeric + hyphens                |
+| `plan`             | `tenant_plan ENUM`                   | starter / professional / enterprise             |
+| `status`           | `tenant_status ENUM`                 | trialing / active / suspended / cancelled       |
+| `default_currency` | `TEXT NOT NULL DEFAULT 'BRL'`        | ISO 4217; used as default for all Money columns |
+| `created_at`       | `TIMESTAMPTZ NOT NULL DEFAULT now()` |                                                 |
+| `updated_at`       | `TIMESTAMPTZ NOT NULL DEFAULT now()` |                                                 |
 
 ### `branches`
 
@@ -118,42 +120,44 @@ RLS policies enforce that authenticated users can only read/write rows belonging
 
 ### `persons`
 
-| Column               | Type                      | Notes                                 |
-| -------------------- | ------------------------- | ------------------------------------- |
-| `id`                 | `UUID PK`                 |                                       |
-| `tenant_id`          | `UUID NOT NULL → tenants` |                                       |
-| `first_name`         | `TEXT NOT NULL`           |                                       |
-| `last_name`          | `TEXT NOT NULL`           |                                       |
-| `email`              | `TEXT NOT NULL`           | CHECK email regex; UNIQUE per tenant  |
-| `phone`              | `TEXT`                    |                                       |
-| `phone_country_code` | `TEXT`                    |                                       |
-| `document`           | `TEXT`                    | CPF/RG; UNIQUE per tenant if not null |
-| `status`             | `person_status ENUM`      | active / inactive / blocked           |
-| `created_at`         | `TIMESTAMPTZ NOT NULL`    |                                       |
-| `updated_at`         | `TIMESTAMPTZ NOT NULL`    |                                       |
+| Column               | Type                      | Notes                                            |
+| -------------------- | ------------------------- | ------------------------------------------------ |
+| `id`                 | `UUID PK`                 | Domain-generated; no DB default                  |
+| `tenant_id`          | `UUID NOT NULL → tenants` |                                                  |
+| `auth_user_id`       | `UUID UNIQUE`             | FK → `auth.users(id)`; NULL if not a system user |
+| `first_name`         | `TEXT NOT NULL`           |                                                  |
+| `last_name`          | `TEXT NOT NULL`           |                                                  |
+| `email`              | `TEXT NOT NULL`           | CHECK email regex; UNIQUE per tenant             |
+| `phone`              | `TEXT`                    |                                                  |
+| `phone_country_code` | `TEXT`                    |                                                  |
+| `document`           | `TEXT`                    | CPF/RG; UNIQUE per tenant if not null            |
+| `status`             | `person_status ENUM`      | active / inactive / blocked                      |
+| `created_at`         | `TIMESTAMPTZ NOT NULL`    |                                                  |
+| `updated_at`         | `TIMESTAMPTZ NOT NULL`    |                                                  |
 
 ### `organizations`
 
-| Column                 | Type                            | Notes                       |
-| ---------------------- | ------------------------------- | --------------------------- |
-| `id`                   | `UUID PK`                       |                             |
-| `tenant_id`            | `UUID NOT NULL → tenants`       |                             |
-| `name`                 | `TEXT NOT NULL`                 |                             |
-| `trade_name`           | `TEXT`                          |                             |
-| `document`             | `TEXT NOT NULL`                 | CNPJ/CPF; UNIQUE per tenant |
-| `type`                 | `organization_type ENUM`        |                             |
-| `email`                | `TEXT`                          |                             |
-| `phone`                | `TEXT`                          |                             |
-| `address_street`       | `TEXT`                          | Flattened VO                |
-| `address_number`       | `TEXT`                          |                             |
-| `address_neighborhood` | `TEXT`                          |                             |
-| `address_city`         | `TEXT NOT NULL`                 |                             |
-| `address_state`        | `TEXT NOT NULL`                 |                             |
-| `address_country`      | `TEXT NOT NULL`                 | ISO 3166-1 alpha-2          |
-| `address_postal_code`  | `TEXT`                          |                             |
-| `active`               | `BOOLEAN NOT NULL DEFAULT true` |                             |
-| `created_at`           | `TIMESTAMPTZ NOT NULL`          |                             |
-| `updated_at`           | `TIMESTAMPTZ NOT NULL`          |                             |
+| Column                 | Type                            | Notes                                            |
+| ---------------------- | ------------------------------- | ------------------------------------------------ |
+| `id`                   | `UUID PK`                       |                                                  |
+| `tenant_id`            | `UUID NOT NULL → tenants`       |                                                  |
+| `name`                 | `TEXT NOT NULL`                 |                                                  |
+| `trade_name`           | `TEXT`                          |                                                  |
+| `document`             | `TEXT NOT NULL`                 | CNPJ/CPF; UNIQUE per tenant                      |
+| `type`                 | `organization_type ENUM`        |                                                  |
+| `email`                | `TEXT`                          |                                                  |
+| `phone`                | `TEXT`                          |                                                  |
+| `address_street`       | `TEXT`                          | Flattened VO                                     |
+| `address_number`       | `TEXT`                          |                                                  |
+| `address_neighborhood` | `TEXT`                          |                                                  |
+| `address_city`         | `TEXT NOT NULL`                 |                                                  |
+| `address_state`        | `TEXT NOT NULL`                 |                                                  |
+| `address_country`      | `TEXT NOT NULL`                 | ISO 3166-1 alpha-2                               |
+| `address_postal_code`  | `TEXT`                          |                                                  |
+| `metadata`             | `JSONB NOT NULL DEFAULT '{}'`   | Extensible key-value for org-specific attributes |
+| `active`               | `BOOLEAN NOT NULL DEFAULT true` |                                                  |
+| `created_at`           | `TIMESTAMPTZ NOT NULL`          |                                                  |
+| `updated_at`           | `TIMESTAMPTZ NOT NULL`          |                                                  |
 
 ### `asset_types`
 
@@ -244,80 +248,83 @@ RLS policies enforce that authenticated users can only read/write rows belonging
 
 ### `contracts`
 
-| Column             | Type                            | Notes          |
-| ------------------ | ------------------------------- | -------------- |
-| `id`               | `UUID PK`                       |                |
-| `tenant_id`        | `UUID NOT NULL → tenants`       |                |
-| `organization_id`  | `UUID NOT NULL → organizations` |                |
-| `type`             | `contract_type ENUM NOT NULL`   |                |
-| `status`           | `contract_status ENUM NOT NULL` |                |
-| `value_amount`     | `NUMERIC(19,4) NOT NULL`        | Money.amount   |
-| `value_currency`   | `TEXT NOT NULL DEFAULT 'BRL'`   | Money.currency |
-| `period_starts_at` | `TIMESTAMPTZ NOT NULL`          |                |
-| `period_ends_at`   | `TIMESTAMPTZ NOT NULL`          |                |
-| `created_at`       | `TIMESTAMPTZ NOT NULL`          |                |
-| `updated_at`       | `TIMESTAMPTZ NOT NULL`          |                |
+| Column             | Type                            | Notes                                                            |
+| ------------------ | ------------------------------- | ---------------------------------------------------------------- |
+| `id`               | `UUID PK`                       |                                                                  |
+| `tenant_id`        | `UUID NOT NULL → tenants`       |                                                                  |
+| `organization_id`  | `UUID NOT NULL → organizations` |                                                                  |
+| `type`             | `contract_type ENUM NOT NULL`   |                                                                  |
+| `status`           | `contract_status ENUM NOT NULL` |                                                                  |
+| `value_amount`     | `NUMERIC(19,4) NOT NULL`        | Money.amount                                                     |
+| `value_currency`   | `TEXT NOT NULL`                 | Money.currency; application sets from `tenants.default_currency` |
+| `period_starts_at` | `TIMESTAMPTZ NOT NULL`          |                                                                  |
+| `period_ends_at`   | `TIMESTAMPTZ NOT NULL`          |                                                                  |
+| `created_at`       | `TIMESTAMPTZ NOT NULL`          |                                                                  |
+| `updated_at`       | `TIMESTAMPTZ NOT NULL`          |                                                                  |
 
 ### `billing_accounts`
 
-| Column                  | Type                                   | Notes |
-| ----------------------- | -------------------------------------- | ----- |
-| `id`                    | `UUID PK`                              |       |
-| `tenant_id`             | `UUID NOT NULL → tenants`              |       |
-| `organization_id`       | `UUID NOT NULL → organizations`        |       |
-| `cycle`                 | `billing_cycle ENUM NOT NULL`          |       |
-| `status`                | `billing_account_status ENUM NOT NULL` |       |
-| `credit_limit_amount`   | `NUMERIC(19,4) NOT NULL`               |       |
-| `credit_limit_currency` | `TEXT NOT NULL DEFAULT 'BRL'`          |       |
-| `balance_amount`        | `NUMERIC(19,4) NOT NULL DEFAULT 0`     |       |
-| `balance_currency`      | `TEXT NOT NULL DEFAULT 'BRL'`          |       |
-| `created_at`            | `TIMESTAMPTZ NOT NULL`                 |       |
-| `updated_at`            | `TIMESTAMPTZ NOT NULL`                 |       |
+| Column                  | Type                                   | Notes                           |
+| ----------------------- | -------------------------------------- | ------------------------------- |
+| `id`                    | `UUID PK`                              |                                 |
+| `tenant_id`             | `UUID NOT NULL → tenants`              |                                 |
+| `organization_id`       | `UUID NOT NULL → organizations`        |                                 |
+| `cycle`                 | `billing_cycle ENUM NOT NULL`          |                                 |
+| `status`                | `billing_account_status ENUM NOT NULL` |                                 |
+| `credit_limit_amount`   | `NUMERIC(19,4) NOT NULL`               |                                 |
+| `credit_limit_currency` | `TEXT NOT NULL`                        | From `tenants.default_currency` |
+| `balance_amount`        | `NUMERIC(19,4) NOT NULL DEFAULT 0`     |                                 |
+| `balance_currency`      | `TEXT NOT NULL`                        | From `tenants.default_currency` |
+| `created_at`            | `TIMESTAMPTZ NOT NULL`                 |                                 |
+| `updated_at`            | `TIMESTAMPTZ NOT NULL`                 |                                 |
 
 ### `invoices`
 
-| Column               | Type                               | Notes                    |
-| -------------------- | ---------------------------------- | ------------------------ |
-| `id`                 | `UUID PK`                          |                          |
-| `tenant_id`          | `UUID NOT NULL → tenants`          |                          |
-| `billing_account_id` | `UUID NOT NULL → billing_accounts` |                          |
-| `status`             | `invoice_status ENUM NOT NULL`     |                          |
-| `total_amount`       | `NUMERIC(19,4) NOT NULL`           | Computed from line items |
-| `total_currency`     | `TEXT NOT NULL DEFAULT 'BRL'`      |                          |
-| `due_date`           | `DATE NOT NULL`                    |                          |
-| `paid_at`            | `TIMESTAMPTZ`                      |                          |
-| `created_at`         | `TIMESTAMPTZ NOT NULL`             |                          |
-| `updated_at`         | `TIMESTAMPTZ NOT NULL`             |                          |
+| Column               | Type                               | Notes                           |
+| -------------------- | ---------------------------------- | ------------------------------- |
+| `id`                 | `UUID PK`                          |                                 |
+| `tenant_id`          | `UUID NOT NULL → tenants`          |                                 |
+| `billing_account_id` | `UUID NOT NULL → billing_accounts` |                                 |
+| `status`             | `invoice_status ENUM NOT NULL`     |                                 |
+| `total_amount`       | `NUMERIC(19,4) NOT NULL`           | Computed from line items        |
+| `total_currency`     | `TEXT NOT NULL`                    | From `tenants.default_currency` |
+| `due_date`           | `DATE NOT NULL`                    |                                 |
+| `paid_at`            | `TIMESTAMPTZ`                      |                                 |
+| `created_at`         | `TIMESTAMPTZ NOT NULL`             |                                 |
+| `updated_at`         | `TIMESTAMPTZ NOT NULL`             |                                 |
 
 ### `invoice_line_items`
 
-| Column                | Type                         | Notes                    |
-| --------------------- | ---------------------------- | ------------------------ |
-| `id`                  | `UUID PK`                    |                          |
-| `invoice_id`          | `UUID NOT NULL → invoices`   |                          |
-| `tenant_id`           | `UUID NOT NULL → tenants`    | Denormalized for RLS     |
-| `description`         | `TEXT NOT NULL`              |                          |
-| `quantity`            | `INTEGER NOT NULL CHECK > 0` |                          |
-| `unit_price_amount`   | `NUMERIC(19,4) NOT NULL`     |                          |
-| `unit_price_currency` | `TEXT NOT NULL`              |                          |
-| `sort_order`          | `INTEGER NOT NULL DEFAULT 0` | Preserve insertion order |
+| Column                | Type                         | Notes                           |
+| --------------------- | ---------------------------- | ------------------------------- |
+| `id`                  | `UUID PK`                    |                                 |
+| `invoice_id`          | `UUID NOT NULL → invoices`   |                                 |
+| `tenant_id`           | `UUID NOT NULL → tenants`    | Denormalized for RLS            |
+| `description`         | `TEXT NOT NULL`              |                                 |
+| `quantity`            | `INTEGER NOT NULL CHECK > 0` |                                 |
+| `unit_price_amount`   | `NUMERIC(19,4) NOT NULL`     |                                 |
+| `unit_price_currency` | `TEXT NOT NULL`              | From `tenants.default_currency` |
+| `sort_order`          | `INTEGER NOT NULL DEFAULT 0` | Preserve insertion order        |
 
 ### `notifications`
 
-| Column         | Type                                  | Notes                                        |
-| -------------- | ------------------------------------- | -------------------------------------------- |
-| `id`           | `UUID PK`                             |                                              |
-| `tenant_id`    | `UUID NOT NULL → tenants`             |                                              |
-| `recipient_id` | `TEXT NOT NULL`                       | Untyped string in domain; see open decisions |
-| `channel`      | `notification_channel ENUM NOT NULL`  |                                              |
-| `priority`     | `notification_priority ENUM NOT NULL` |                                              |
-| `subject`      | `TEXT NOT NULL`                       |                                              |
-| `body`         | `TEXT NOT NULL`                       |                                              |
-| `status`       | `notification_status ENUM NOT NULL`   |                                              |
-| `sent_at`      | `TIMESTAMPTZ`                         |                                              |
-| `read_at`      | `TIMESTAMPTZ`                         |                                              |
-| `created_at`   | `TIMESTAMPTZ NOT NULL`                |                                              |
-| `updated_at`   | `TIMESTAMPTZ NOT NULL`                |                                              |
+`person_id` and `recipient_external_ref` are mutually optional but at least one must be non-null (enforced by CHECK constraint).
+
+| Column                   | Type                                  | Notes                                                                    |
+| ------------------------ | ------------------------------------- | ------------------------------------------------------------------------ |
+| `id`                     | `UUID PK`                             | Domain-generated; no DB default                                          |
+| `tenant_id`              | `UUID NOT NULL → tenants`             |                                                                          |
+| `person_id`              | `UUID → persons`                      | NULL for external recipients (webhooks, emails outside the system)       |
+| `recipient_external_ref` | `TEXT`                                | Email address, webhook URL, phone number, etc. for non-person recipients |
+| `channel`                | `notification_channel ENUM NOT NULL`  |                                                                          |
+| `priority`               | `notification_priority ENUM NOT NULL` |                                                                          |
+| `subject`                | `TEXT NOT NULL`                       |                                                                          |
+| `body`                   | `TEXT NOT NULL`                       |                                                                          |
+| `status`                 | `notification_status ENUM NOT NULL`   |                                                                          |
+| `sent_at`                | `TIMESTAMPTZ`                         |                                                                          |
+| `read_at`                | `TIMESTAMPTZ`                         |                                                                          |
+| `created_at`             | `TIMESTAMPTZ NOT NULL`                |                                                                          |
+| `updated_at`             | `TIMESTAMPTZ NOT NULL`                |                                                                          |
 
 ### `workflow_definitions`
 
@@ -367,19 +374,21 @@ RLS policies enforce that authenticated users can only read/write rows belonging
 | `action`      | `TEXT NOT NULL`              |                      |
 | `priority`    | `INTEGER NOT NULL DEFAULT 0` |                      |
 
-### `domain_events` (outbox)
+### `events.domain_events` (outbox — separate schema)
 
-| Column           | Type                         | Notes                          |
-| ---------------- | ---------------------------- | ------------------------------ |
-| `id`             | `UUID PK`                    | `eventId` from DomainEvent     |
-| `event_type`     | `TEXT NOT NULL`              | e.g. `tenant.created`          |
-| `aggregate_id`   | `UUID NOT NULL`              |                                |
-| `aggregate_type` | `TEXT NOT NULL`              |                                |
-| `tenant_id`      | `UUID`                       | NULL for platform-level events |
-| `version`        | `INTEGER NOT NULL DEFAULT 1` |                                |
-| `payload`        | `JSONB NOT NULL`             | Full event payload             |
-| `occurred_at`    | `TIMESTAMPTZ NOT NULL`       |                                |
-| `published_at`   | `TIMESTAMPTZ`                | NULL = not yet dispatched      |
+Lives in the `events` PostgreSQL schema, isolated from `public` business tables. Access requires `USAGE` grant on the `events` schema for the `authenticated` and `service_role` roles.
+
+| Column           | Type                         | Notes                                     |
+| ---------------- | ---------------------------- | ----------------------------------------- |
+| `id`             | `UUID PK`                    | `eventId` from DomainEvent; no DB default |
+| `event_type`     | `TEXT NOT NULL`              | e.g. `tenant.created`                     |
+| `aggregate_id`   | `UUID NOT NULL`              |                                           |
+| `aggregate_type` | `TEXT NOT NULL`              |                                           |
+| `tenant_id`      | `UUID`                       | NULL for platform-level events            |
+| `version`        | `INTEGER NOT NULL DEFAULT 1` |                                           |
+| `payload`        | `JSONB NOT NULL`             | Full event payload                        |
+| `occurred_at`    | `TIMESTAMPTZ NOT NULL`       |                                           |
+| `published_at`   | `TIMESTAMPTZ`                | NULL = not yet dispatched                 |
 
 ---
 
@@ -415,26 +424,26 @@ rule_set_status:       draft, active, inactive
 
 ## Proposed Indexes
 
-| Table           | Index                                             | Type                                              | Reason                           |
-| --------------- | ------------------------------------------------- | ------------------------------------------------- | -------------------------------- |
-| `tenants`       | `slug`                                            | UNIQUE                                            | Lookup by slug                   |
-| `branches`      | `(tenant_id, code)`                               | UNIQUE                                            | Code unique per tenant           |
-| `branches`      | `parent_id`                                       | BTREE                                             | Tree traversal                   |
-| `branches`      | `tenant_id`                                       | BTREE                                             | Tenant filter                    |
-| `persons`       | `(tenant_id, email)`                              | UNIQUE                                            | Email unique per tenant          |
-| `persons`       | `(tenant_id, document)`                           | UNIQUE (partial: WHERE document IS NOT NULL)      | Doc unique per tenant            |
-| `organizations` | `(tenant_id, document)`                           | UNIQUE                                            | CNPJ unique per tenant           |
-| `assets`        | `(tenant_id, serial_number)`                      | UNIQUE (partial: WHERE serial_number IS NOT NULL) |                                  |
-| `capabilities`  | `(tenant_id, key)`                                | UNIQUE                                            | Capability key unique per tenant |
-| `operations`    | `(tenant_id, status)`                             | BTREE                                             | Status filter                    |
-| `operations`    | `(resource_id, scheduled_starts_at)`              | BTREE                                             | Schedule queries                 |
-| `allocations`   | `(resource_id, period_starts_at, period_ends_at)` | BTREE                                             | Overlap detection                |
-| `allocations`   | `(asset_id, period_starts_at, period_ends_at)`    | BTREE                                             | Overlap detection                |
-| `invoices`      | `(billing_account_id, status)`                    | BTREE                                             | Account billing queries          |
-| `domain_events` | `(aggregate_id, event_type)`                      | BTREE                                             | Event replay                     |
-| `domain_events` | `published_at`                                    | BTREE (partial: WHERE published_at IS NULL)       | Outbox polling                   |
-| `domain_events` | `tenant_id`                                       | BTREE                                             | Tenant event stream              |
-| `notifications` | `(tenant_id, status)`                             | BTREE                                             | Pending notifications            |
+| Table                  | Index                                             | Type                                              | Reason                           |
+| ---------------------- | ------------------------------------------------- | ------------------------------------------------- | -------------------------------- |
+| `tenants`              | `slug`                                            | UNIQUE                                            | Lookup by slug                   |
+| `branches`             | `(tenant_id, code)`                               | UNIQUE                                            | Code unique per tenant           |
+| `branches`             | `parent_id`                                       | BTREE                                             | Tree traversal                   |
+| `branches`             | `tenant_id`                                       | BTREE                                             | Tenant filter                    |
+| `persons`              | `(tenant_id, email)`                              | UNIQUE                                            | Email unique per tenant          |
+| `persons`              | `(tenant_id, document)`                           | UNIQUE (partial: WHERE document IS NOT NULL)      | Doc unique per tenant            |
+| `organizations`        | `(tenant_id, document)`                           | UNIQUE                                            | CNPJ unique per tenant           |
+| `assets`               | `(tenant_id, serial_number)`                      | UNIQUE (partial: WHERE serial_number IS NOT NULL) |                                  |
+| `capabilities`         | `(tenant_id, key)`                                | UNIQUE                                            | Capability key unique per tenant |
+| `operations`           | `(tenant_id, status)`                             | BTREE                                             | Status filter                    |
+| `operations`           | `(resource_id, scheduled_starts_at)`              | BTREE                                             | Schedule queries                 |
+| `allocations`          | `(resource_id, period_starts_at, period_ends_at)` | BTREE                                             | Overlap detection                |
+| `allocations`          | `(asset_id, period_starts_at, period_ends_at)`    | BTREE                                             | Overlap detection                |
+| `invoices`             | `(billing_account_id, status)`                    | BTREE                                             | Account billing queries          |
+| `events.domain_events` | `(aggregate_id, event_type)`                      | BTREE                                             | Event replay                     |
+| `events.domain_events` | `published_at`                                    | BTREE (partial: WHERE published_at IS NULL)       | Outbox polling                   |
+| `events.domain_events` | `tenant_id`                                       | BTREE                                             | Tenant event stream              |
+| `notifications`        | `(tenant_id, status)`                             | BTREE                                             | Pending notifications            |
 
 ---
 
@@ -455,6 +464,27 @@ No `deleted_at` columns. Domain uses explicit status fields (`active: false`, `s
 
 ---
 
-## Open Decisions Before Implementation
+## Currency Convention
 
-See `MIGRATION_GUIDE.md` section "Decisions Required".
+All Money columns (`*_amount` / `*_currency`) follow this rule:
+
+- The `*_amount` column stores the numeric value.
+- The `*_currency` column stores the ISO 4217 currency code (e.g. `BRL`, `USD`, `EUR`).
+- The database has **no hardcoded `DEFAULT 'BRL'`** on individual Money columns.
+- The application layer reads `tenants.default_currency` and fills the currency column at write time.
+- This allows a tenant to switch their base currency without a schema migration.
+
+## Design Decisions — Locked (2026-06-20)
+
+| #   | Decision                        | Outcome                                                                                               |
+| --- | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 1   | ID generation                   | Domain generates UUID; no `DEFAULT gen_random_uuid()` on PKs                                          |
+| 2   | RLS strategy                    | JWT claim `tenant_id` via Supabase Auth hook                                                          |
+| 3   | Notification recipient          | `person_id UUID NULL FK + recipient_external_ref TEXT NULL`; CHECK ensures at least one is set        |
+| 4   | Organization address            | Flat columns + `metadata JSONB` for extensions                                                        |
+| 5   | Invoice line items              | Separate table `invoice_line_items`                                                                   |
+| 6   | Workflow steps / rule set rules | Separate tables (FK + self-ref enabled)                                                               |
+| 7   | Person ↔ Auth user              | `persons.auth_user_id UUID NULL UNIQUE` → `auth.users`                                                |
+| 8   | Branch tree                     | Adjacency list (MVP); `ltree` deferred to post-MVP if needed                                          |
+| 9   | Currency                        | Configurable per tenant via `tenants.default_currency`; application fills Money columns at write time |
+| 10  | Domain events schema            | Separate PostgreSQL schema `events`; table is `events.domain_events`                                  |

@@ -1,6 +1,6 @@
 # MIGRATION_GUIDE.md — Database Migration Strategy
 
-Planning guide for Milestone 3 migrations. No SQL has been written yet.
+Planning guide for Milestone 3 migrations. **All 10 design decisions locked (2026-06-20). No SQL has been written yet.**
 
 ---
 
@@ -16,30 +16,32 @@ Migrations run in lexicographic order. They are applied once and never modified 
 
 ```
 supabase/migrations/
-  20260001000000_extensions.sql          — pgcrypto, uuid-ossp
-  20260002000000_enum_types.sql          — all 23 PostgreSQL ENUM types
-  20260003000000_tenants.sql             — tenants table + RLS
-  20260004000000_branches.sql            — branches table + RLS + self-ref FK
-  20260005000000_persons.sql             — persons table + RLS
-  20260006000000_organizations.sql       — organizations table + RLS
-  20260007000000_asset_types.sql         — asset_types table + RLS
-  20260008000000_assets.sql              — assets table + RLS
-  20260009000000_resources.sql           — resources table + RLS
-  20260010000000_capabilities.sql        — capabilities table + RLS
-  20260011000000_operations.sql          — operations table + RLS
-  20260012000000_allocations.sql         — allocations table + RLS
-  20260013000000_contracts.sql           — contracts table + RLS
-  20260014000000_billing_accounts.sql    — billing_accounts table + RLS
-  20260015000000_invoices.sql            — invoices + invoice_line_items + RLS
-  20260016000000_notifications.sql       — notifications table + RLS
-  20260017000000_workflow_definitions.sql — workflow_definitions + workflow_steps + RLS
-  20260018000000_rule_sets.sql           — rule_sets + rule_set_rules + RLS
-  20260019000000_domain_events.sql       — domain_events outbox + RLS
-  20260020000000_indexes.sql             — all non-unique indexes (cross-table)
-  20260021000000_triggers.sql            — updated_at auto-update trigger + invariant triggers
+  20260001000000_extensions.sql           — pgcrypto, uuid-ossp
+  20260002000000_enum_types.sql           — all 23 PostgreSQL ENUM types
+  20260003000000_tenants.sql              — tenants table (+ default_currency) + RLS
+  20260004000000_branches.sql             — branches table + RLS + self-ref FK (adjacency list)
+  20260005000000_persons.sql              — persons table (+ auth_user_id) + RLS
+  20260006000000_organizations.sql        — organizations table (+ metadata JSONB) + RLS
+  20260007000000_asset_types.sql          — asset_types table + RLS
+  20260008000000_assets.sql               — assets table + RLS
+  20260009000000_resources.sql            — resources table + RLS
+  20260010000000_capabilities.sql         — capabilities table + RLS
+  20260011000000_operations.sql           — operations table + RLS
+  20260012000000_allocations.sql          — allocations table + RLS
+  20260013000000_contracts.sql            — contracts table + RLS
+  20260014000000_billing_accounts.sql     — billing_accounts table + RLS
+  20260015000000_invoices.sql             — invoices + invoice_line_items (separate table) + RLS
+  20260016000000_notifications.sql        — notifications (person_id FK + recipient_external_ref) + RLS
+  20260017000000_workflow_definitions.sql — workflow_definitions + workflow_steps (separate table) + RLS
+  20260018000000_rule_sets.sql            — rule_sets + rule_set_rules (separate table) + RLS
+  20260019000000_events_schema.sql        — CREATE SCHEMA events; events.domain_events + RLS
+  20260020000000_indexes.sql              — all non-unique indexes (cross-table)
+  20260021000000_triggers.sql             — updated_at auto-update trigger + invariant triggers
 ```
 
 Total: **21 migration files**
+
+> **Decision #10 impact**: M019 creates the `events` schema before the table. The `events.domain_events` table lives in the `events` schema, not `public`. The migration must also grant `USAGE ON SCHEMA events` to the `authenticated` and `service_role` roles.
 
 ---
 
@@ -71,6 +73,8 @@ extensions
 
 No circular FKs. `branches.parent_id` is a deferred self-reference (nullable, root branches have `NULL`).
 
+`events.domain_events` has no FK to `public.tenants` — it is append-only and must not block tenant deletion.
+
 ---
 
 ## Migration Content Checklist
@@ -89,27 +93,29 @@ Each migration file must contain (in order):
 
 ## `ON DELETE` Behavior per FK
 
-| FK                                                             | Behavior | Reason                              |
-| -------------------------------------------------------------- | -------- | ----------------------------------- |
-| `branches.tenant_id → tenants`                                 | RESTRICT | Cannot delete tenant with branches  |
-| `branches.parent_id → branches`                                | SET NULL | Orphan to root if parent removed    |
-| `persons.tenant_id → tenants`                                  | RESTRICT |                                     |
-| `organizations.tenant_id → tenants`                            | RESTRICT |                                     |
-| `asset_types.tenant_id → tenants`                              | RESTRICT |                                     |
-| `assets.branch_id → branches`                                  | RESTRICT | Cannot delete branch with assets    |
-| `assets.asset_type_id → asset_types`                           | RESTRICT |                                     |
-| `resources.branch_id → branches`                               | RESTRICT |                                     |
-| `resources.person_id → persons`                                | SET NULL | Person can be removed from resource |
-| `operations.resource_id → resources`                           | RESTRICT |                                     |
-| `allocations.resource_id → resources`                          | RESTRICT |                                     |
-| `allocations.asset_id → assets`                                | RESTRICT |                                     |
-| `contracts.organization_id → organizations`                    | RESTRICT |                                     |
-| `billing_accounts.organization_id → organizations`             | RESTRICT |                                     |
-| `invoices.billing_account_id → billing_accounts`               | RESTRICT |                                     |
-| `invoice_line_items.invoice_id → invoices`                     | CASCADE  | Line items are part of invoice      |
-| `workflow_steps.workflow_definition_id → workflow_definitions` | CASCADE  | Steps owned by definition           |
-| `workflow_steps.next_step_id → workflow_steps`                 | SET NULL | Allow removing step reference       |
-| `rule_set_rules.rule_set_id → rule_sets`                       | CASCADE  | Rules owned by rule set             |
+| FK                                                             | Behavior | Reason                                |
+| -------------------------------------------------------------- | -------- | ------------------------------------- |
+| `branches.tenant_id → tenants`                                 | RESTRICT | Cannot delete tenant with branches    |
+| `branches.parent_id → branches`                                | SET NULL | Orphan to root if parent removed      |
+| `persons.tenant_id → tenants`                                  | RESTRICT |                                       |
+| `organizations.tenant_id → tenants`                            | RESTRICT |                                       |
+| `asset_types.tenant_id → tenants`                              | RESTRICT |                                       |
+| `assets.branch_id → branches`                                  | RESTRICT | Cannot delete branch with assets      |
+| `assets.asset_type_id → asset_types`                           | RESTRICT |                                       |
+| `resources.branch_id → branches`                               | RESTRICT |                                       |
+| `resources.person_id → persons`                                | SET NULL | Person can be removed from resource   |
+| `operations.resource_id → resources`                           | RESTRICT |                                       |
+| `allocations.resource_id → resources`                          | RESTRICT |                                       |
+| `allocations.asset_id → assets`                                | RESTRICT |                                       |
+| `contracts.organization_id → organizations`                    | RESTRICT |                                       |
+| `billing_accounts.organization_id → organizations`             | RESTRICT |                                       |
+| `invoices.billing_account_id → billing_accounts`               | RESTRICT |                                       |
+| `invoice_line_items.invoice_id → invoices`                     | CASCADE  | Line items are part of invoice        |
+| `workflow_steps.workflow_definition_id → workflow_definitions` | CASCADE  | Steps owned by definition             |
+| `workflow_steps.next_step_id → workflow_steps`                 | SET NULL | Allow removing step reference         |
+| `rule_set_rules.rule_set_id → rule_sets`                       | CASCADE  | Rules owned by rule set               |
+| `persons.auth_user_id → auth.users`                            | SET NULL | Person stays when Auth user deleted   |
+| `notifications.person_id → persons`                            | SET NULL | Notification kept when person removed |
 
 ---
 
@@ -146,22 +152,22 @@ Seed data only runs in local dev (`supabase db reset`), never in production.
 
 ---
 
-## Decisions Required Before Writing SQL
+## Decisions — All Locked (2026-06-20)
 
-These questions must be answered before any `.sql` file is created:
+All design questions are resolved. Implementation may begin.
 
-| #   | Question                                                                                                                                                                                   | Impact                       |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
-| 1   | **ID generation**: Domain generates UUIDs via `crypto.randomUUID()`. DB should accept them, not generate them. Confirm `id UUID PK` columns have no `DEFAULT gen_random_uuid()`.           | Column definition            |
-| 2   | **JWT claim for `tenant_id`**: Use `auth.jwt() ->> 'tenant_id'` or a `user_profiles` lookup?                                                                                               | All RLS policies             |
-| 3   | **`Notification.recipient_id` type**: Currently an untyped string in domain. Should it be a FK to `persons.id` or remain generic (to support webhooks, external emails)?                   | `notifications` table schema |
-| 4   | **`organization.address`**: Flat columns (as proposed in `DATABASE.md`) or JSONB? Flat columns are queryable but add 7 columns per org. JSONB is flexible but no column-level constraints. | `organizations` table        |
-| 5   | **`invoice_line_items`**: Separate table (as proposed) vs JSONB array on `invoices`. Separate table enables indexed queries on line item descriptions; JSONB is simpler.                   | `invoices` schema            |
-| 6   | **`workflow_steps` / `rule_set_rules`**: Separate tables (as proposed, enables next_step self-ref FK) vs JSONB. Steps need the self-ref for chaining; JSONB would lose that.               | Schema choice                |
-| 7   | **Person ↔ Supabase Auth user**: Are all `persons` also Auth users? Or only some? This determines whether to add `auth_user_id UUID → auth.users` on `persons`.                            | `persons` table + RLS        |
-| 8   | **`branches` tree depth**: Unlimited adjacency list (as proposed) or use `ltree` extension for materialized paths? `ltree` enables fast subtree queries but adds schema complexity.        | `branches` table + indexes   |
-| 9   | **Currency**: Is `BRL` always the default or should the default come from the tenant's configuration?                                                                                      | All Money columns            |
-| 10  | **Domain Events outbox**: Should `domain_events` be in the same Supabase database, or a separate PostgreSQL schema (e.g., `events.domain_events`)?                                         | `domain_events` migration    |
+| #   | Question                        | Decision                                                                                                               |
+| --- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 1   | ID generation                   | Domain generates UUIDs; no `DEFAULT gen_random_uuid()` on any PK                                                       |
+| 2   | RLS JWT strategy                | JWT claim `tenant_id` via Supabase Auth Hook                                                                           |
+| 3   | Notification recipient          | `person_id UUID NULL FK` + `recipient_external_ref TEXT NULL`; CHECK requires at least one non-null                    |
+| 4   | Organization address            | Flat columns (7 columns) + `metadata JSONB NOT NULL DEFAULT '{}'`                                                      |
+| 5   | Invoice line items              | Separate table `invoice_line_items`                                                                                    |
+| 6   | Workflow steps / rule set rules | Separate tables (enables self-ref FK on steps, ordered rules)                                                          |
+| 7   | Person ↔ Auth user              | `persons.auth_user_id UUID NULL UNIQUE`; not all persons are Auth users                                                |
+| 8   | Branch tree                     | Adjacency list (`parent_id` self-ref, NULL = root); `ltree` deferred to post-MVP                                       |
+| 9   | Currency                        | Configurable per tenant via `tenants.default_currency TEXT NOT NULL DEFAULT 'BRL'`; application reads it at write time |
+| 10  | Domain events schema            | Separate PostgreSQL schema `events`; table is `events.domain_events`                                                   |
 
 ---
 

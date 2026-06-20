@@ -1,6 +1,6 @@
 # RLS_POLICIES.md — Row-Level Security Strategy
 
-Planned RLS policies for Milestone 3. No SQL has been written yet.
+Planned RLS policies for Milestone 3. **All design decisions locked (2026-06-20). No SQL has been written yet.**
 
 ---
 
@@ -10,9 +10,17 @@ Shinã uses Supabase's built-in RLS (Row-Level Security) to enforce multi-tenanc
 
 ---
 
-## Authentication Model
+## Authentication Model — Locked
 
-Supabase Auth provides JWTs with the following custom claims (to be configured via a Supabase Edge Function or Auth hook):
+RLS uses **JWT claim `tenant_id`** (Decision #2, locked 2026-06-20). The lookup-based fallback is not used.
+
+Supabase Auth injects `tenant_id` into the JWT via a **Supabase Auth Hook** configured in `auth.users.raw_app_meta_data`. All RLS policies read the claim as:
+
+```
+(auth.jwt() ->> 'tenant_id')::UUID
+```
+
+Supabase Auth provides JWTs with the following custom claims:
 
 ```json
 {
@@ -23,12 +31,7 @@ Supabase Auth provides JWTs with the following custom claims (to be configured v
 }
 ```
 
-Two paths to `tenant_id`:
-
-1. **JWT claim** (preferred): `(auth.jwt() ->> 'tenant_id')::UUID`
-2. **User profile lookup** (fallback): join against a `user_profiles` table that maps `auth.uid()` → `tenant_id`
-
-Decision required: which approach to use. JWT claims are faster (no extra query) but require Auth hook setup.
+The Auth hook sets `tenant_id` at sign-in by reading the `persons.auth_user_id` link (Decision #7) to find which tenant the signing-in user belongs to.
 
 ---
 
@@ -87,16 +90,16 @@ Strategy: **Denormalized `tenant_id`** — these tables include a `tenant_id` co
 
 ---
 
-### `domain_events` (outbox)
+### `events.domain_events` (outbox — schema `events`)
 
-| Operation | Policy                              | Condition                                                             |
-| --------- | ----------------------------------- | --------------------------------------------------------------------- |
-| SELECT    | Tenant-scoped                       | `tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR tenant_id IS NULL` |
-| INSERT    | Application only (via service role) | Deny for `authenticated`                                              |
-| UPDATE    | Never                               | Block all                                                             |
-| DELETE    | Never                               | Block all                                                             |
+Lives in the `events` schema. The `authenticated` role needs `USAGE` on the `events` schema and a SELECT-only policy.
 
-Events are immutable. Only the service layer writes them.
+| Operation | Policy            | Condition                                                               |
+| --------- | ----------------- | ----------------------------------------------------------------------- |
+| SELECT    | Tenant-scoped     | `tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR tenant_id IS NULL`   |
+| INSERT    | Service role only | Deny for `authenticated` — events written via application service layer |
+| UPDATE    | Never             | Block all — events are immutable                                        |
+| DELETE    | Never             | Block all — events are immutable                                        |
 
 ---
 
@@ -145,13 +148,13 @@ Platform-level operations (creating tenants, billing override, impersonation) al
 
 ---
 
-## Open Decisions
+## Decisions Locked (2026-06-20)
 
-1. **JWT claim population**: How is `tenant_id` injected into the Supabase JWT? Options:
-   - Supabase Auth Hook (`auth.users` metadata)
-   - Edge Function middleware
-   - Custom claim in `app_metadata`
+All RLS design decisions are resolved. No open items remain.
 
-2. **Person ↔ auth.users link**: If a `Person` is also a Supabase Auth user, we need a `user_profiles` table or `auth.users.raw_user_meta_data`. This affects how `recipient_id` in `notifications` resolves.
-
-3. **RLS on `invoice_line_items` INSERT**: Should the application be allowed to insert line items directly, or only through the invoice aggregate (service role)? Leaning toward service role to preserve aggregate invariants.
+| Decision                    | Resolution                                                                                                |
+| --------------------------- | --------------------------------------------------------------------------------------------------------- |
+| JWT claim population        | Supabase Auth Hook writing `tenant_id` to `raw_app_meta_data`; read as `auth.jwt() ->> 'tenant_id'`       |
+| Person ↔ auth.users link    | `persons.auth_user_id UUID NULL UNIQUE` — Auth hook reads this to find the tenant at sign-in              |
+| `invoice_line_items` INSERT | Service role only; `authenticated` users cannot write line items directly — aggregate invariant preserved |
+| Notification recipient      | `person_id FK NULL + recipient_external_ref TEXT NULL`; CHECK ensures at least one non-null               |
