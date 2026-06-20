@@ -6,18 +6,30 @@ Active task list. Items are ordered by priority within each section.
 
 ## In Progress
 
-_Nothing in progress — awaiting Milestone 2 sign-off._
+_Nothing in progress._
 
 ---
 
-## Milestone 2 — Next (ready to start)
+## Milestone 2 — Core Domain ✅ (2026-06-20)
 
-- [ ] Scaffold `apps/web` with Next.js 15
-- [ ] Create `packages/ui` with shadcn/ui
-- [ ] Create `packages/utils`
-- [ ] Create `packages/types`
-- [ ] Configure path aliases
-- [ ] Add Storybook (optional)
+- [x] Create `packages/domain` (`@shina/domain`)
+- [x] Implement shared kernel (AggregateRoot, Entity, DomainEvent, DomainError, createEvent)
+- [x] Implement Value Objects: Money, DateRange, Email, Phone, Coordinates, Address
+- [x] Implement 16 aggregates: Tenant, Branch, Person, Organization, Asset, AssetType, Resource, Capability, Operation, Allocation, Contract, BillingAccount, Invoice, Notification, WorkflowDefinition, RuleSet
+- [x] Implement all enums per aggregate context
+- [x] Implement domain events per aggregate
+- [x] Create per-context barrel exports
+- [x] Create root `src/index.ts`
+- [x] Validate `pnpm typecheck` — zero errors ✅
+- [x] Validate `pnpm build` — clean emit ✅
+
+## Milestone 3 — Next (ready to plan)
+
+- [ ] Create Supabase project
+- [ ] Define core schema
+- [ ] Write initial migration
+- [ ] Generate TypeScript types from schema
+- [ ] Create `packages/db` with Supabase client
 
 ---
 
