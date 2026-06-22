@@ -1,6 +1,6 @@
 # Architecture — Shinã Platform
 
-> Last updated: 2026-06-20 (Milestone 1.1 — Documentation Alignment)
+> Last updated: 2026-06-22 (Gate 2 — Integration Engine Foundation added)
 
 ---
 
@@ -31,7 +31,13 @@ Shinã Platform is a multi-tenant SaaS system for fleet and mobility management.
 ┌──────▼───────────▼───────────▼───────────▼───────────▼──────────┐
 │                         Engine Layer                            │
 │  Workflow · Rule · Resource · Operation · Notification          │
-│  Reporting · AI · Config                                        │
+│  Reporting · AI · Config · Integration                          │
+└──────────────────────────────────────┬──────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼──────────────────────────┐
+│                   Integration Engine                            │
+│  REST APIs · Webhooks · API Keys · OAuth · External IAM         │
+│  Sync Jobs · Field Mapping · Retry Policy · Audit Log           │
 └─────────────────────────────────────────────────────────────────┘
        │
 ┌──────▼───────────────────────────────────────────────────────────┐
@@ -140,6 +146,16 @@ Manages tenant-level and platform-level runtime configuration without deployment
 
 ---
 
+### Integration Engine
+
+Connects the Shinã platform to external systems through a uniform abstraction layer. Manages credentials, data synchronisation, webhook delivery and reception, and maintains an immutable audit trail of all external interactions.
+
+**Responsibilities:** Provider registry · REST endpoint invocation · Outbound and inbound webhooks · API key lifecycle · OAuth 2.0 client credentials · External IAM (SAML, OIDC, LDAP) · Sync jobs · Bidirectional field mapping · Configurable retry policies · Integration audit log
+
+**Detailed specification:** [`INTEGRATION_ENGINE.md`](INTEGRATION_ENGINE.md)
+
+---
+
 ## IAM — Identity and Access Management
 
 The platform uses a two-tier IAM model separating platform operators from tenant users. Both tiers support RBAC, ABAC, Delegated Access, Impersonation, MFA, and Approval Workflows.
@@ -242,3 +258,5 @@ Studios are operator-facing configuration interfaces (web modules) that configur
 | 2026-06-20 | Commission Engine separated from Billing Engine                     | Different bounded contexts: Billing = tenant subscription; Commission = commercial incentives |
 | 2026-06-20 | Tracking as first-class context, not sub-feature of Resource Engine | Volume and real-time requirements warrant dedicated infrastructure                            |
 | 2026-06-20 | Two-tier IAM (Platform + Tenant)                                    | Platform operators and tenant users have fundamentally different access models                |
+| 2026-06-22 | Integration Engine as a dedicated engine, not embedded in API layer | Cross-cutting concern; shared by all other engines for outbound and inbound external comms    |
+| 2026-06-22 | IntegrationAuditLog is write-only at the repository interface level | Compliance and non-repudiation; immutability enforced before reaching the DB layer            |
