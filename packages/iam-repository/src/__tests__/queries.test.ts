@@ -42,11 +42,8 @@ describe("IAM Query Helpers", () => {
     });
 
     it("should handle empty user roles", async () => {
-      mockDb.from = vi.fn().mockReturnThis();
-      mockDb.select = vi.fn().mockReturnThis();
-      mockDb.eq = vi.fn().mockReturnThis();
-      mockDb.is = vi.fn().mockResolvedValue({ data: [], error: null });
-
+      // getActiveUserRoles calls findActiveByUserId which ends with .or()
+      mockDb.or = vi.fn().mockResolvedValue({ data: [], error: null });
       const queries = new PlatformQueries({ db: mockDb });
       const permissions = await queries.getUserPermissions("user-123");
       expect(permissions).toEqual([]);
@@ -71,11 +68,9 @@ describe("IAM Query Helpers", () => {
     });
 
     it("should handle branch scopes", async () => {
+      // findByBranch ends with .is("deleted_at", null) as terminal call
+      mockDb.is = vi.fn().mockResolvedValue({ data: [], error: null });
       const queries = new TenantQueries({ db: mockDb });
-      mockDb.from = vi.fn().mockReturnThis();
-      mockDb.select = vi.fn().mockReturnThis();
-      mockDb.eq = vi.fn().mockResolvedValue({ data: [], error: null });
-
       await queries.getUserRolesByBranch("branch-123");
       expect(mockDb.from).toHaveBeenCalled();
     });
