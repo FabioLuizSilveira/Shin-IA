@@ -184,7 +184,7 @@ describe("OperationLifecycle", () => {
 
   describe("transition", () => {
     it("transitions from draft to pending_approval", async () => {
-      const op = await lifecycle.transition({
+      await lifecycle.transition({
         operationId: "op-1",
         toStatus: "pending_approval",
         actorId: "user-1",
