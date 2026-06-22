@@ -67,6 +67,34 @@ importers:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.43)(@vitest/ui@1.6.1)
 
+  packages/authorization:
+    dependencies:
+      '@shina/iam-domain':
+        specifier: workspace:*
+        version: link:../iam-domain
+      '@shina/iam-repository':
+        specifier: workspace:*
+        version: link:../iam-repository
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@supabase/supabase-js':
+        specifier: ^2.38.0
+        version: 2.108.2
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      '@vitest/ui':
+        specifier: ^1.0.0
+        version: 1.6.1(vitest@1.6.1)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^1.0.0
+        version: 1.6.1(@types/node@20.19.43)(@vitest/ui@1.6.1)
+
   packages/database:
     devDependencies:
       '@shina/typescript-config':
