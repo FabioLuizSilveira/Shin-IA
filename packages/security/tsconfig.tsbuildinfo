@@ -1,0 +1,1 @@
+{"root":["./src/audit.ts","./src/iam.ts","./src/index.ts","./src/owasp.ts","./src/rls.ts","./src/threat-model.ts","./src/types.ts","./src/__tests__/audit.test.ts","./src/__tests__/iam.test.ts","./src/__tests__/owasp.test.ts","./src/__tests__/rls.test.ts","./src/__tests__/threat-model.test.ts"],"version":"5.9.3"}

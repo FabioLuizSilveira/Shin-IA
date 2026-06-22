@@ -300,7 +300,52 @@ importers:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.43)(@vitest/ui@1.6.1)
 
+  packages/marketplace:
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@vitest/coverage-v8':
+        specifier: ^1.6.0
+        version: 1.6.1(vitest@1.6.1)
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)
+
+  packages/mobile-runtime:
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@vitest/coverage-v8':
+        specifier: ^1.6.0
+        version: 1.6.1(vitest@1.6.1)
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)
+
   packages/notification-engine:
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@vitest/coverage-v8':
+        specifier: ^1.6.0
+        version: 1.6.1(vitest@1.6.1)
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)
+
+  packages/observability-runtime:
     devDependencies:
       '@shina/typescript-config':
         specifier: workspace:*
@@ -393,6 +438,21 @@ importers:
       vitest:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.43)(@vitest/ui@1.6.1)
+
+  packages/security:
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@vitest/coverage-v8':
+        specifier: ^1.6.0
+        version: 1.6.1(vitest@1.6.1)
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)
 
   packages/studio:
     devDependencies:
