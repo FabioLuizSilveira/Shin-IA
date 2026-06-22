@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface BaseRepositoryDeps {
-  db: SupabaseClient;
+  db: SupabaseClient<any, any, any>;
 }
 
 export abstract class BaseRepository<T, Row> {
@@ -28,7 +29,8 @@ export abstract class BaseRepository<T, Row> {
   }
 
   async findAll(limit?: number, offset?: number): Promise<T[]> {
-    let query = this.db.from(this.getTableName()).select("*").is("deleted_at", null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query: any = this.db.from(this.getTableName()).select("*").is("deleted_at", null);
 
     if (limit) query = query.limit(limit);
     if (offset) query = query.offset(offset);
@@ -40,7 +42,12 @@ export abstract class BaseRepository<T, Row> {
 
   async create(entity: T): Promise<T> {
     const row = this.toRow(entity);
-    const { data, error } = await this.db.from(this.getTableName()).insert([row]).select().single();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (this.db as any)
+      .from(this.getTableName())
+      .insert([row])
+      .select()
+      .single();
 
     if (error || !data) throw error || new Error("Creation failed");
     return this.toDomain(data as Row);
@@ -48,7 +55,8 @@ export abstract class BaseRepository<T, Row> {
 
   async update(entity: T): Promise<T> {
     const row = this.toRow(entity);
-    const { data, error } = await this.db
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (this.db as any)
       .from(this.getTableName())
       .update(row)
       .eq("id", (row as any).id)

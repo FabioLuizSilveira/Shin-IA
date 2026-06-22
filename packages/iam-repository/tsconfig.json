@@ -1,11 +1,17 @@
 {
-  "extends": "@shina/typescript-config/tsconfig.json",
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@shina/typescript-config/base",
   "compilerOptions": {
+    "lib": ["ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "allowImportingTsExtensions": true,
-    "outDir": "./dist"
+    "outDir": "dist",
+    "rootDir": "src",
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
   "include": ["src"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["node_modules", "dist"]
 }

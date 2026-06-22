@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { PlatformQueries, TenantQueries, DelegationQueries } from "../queries/index.js";
 
 describe("IAM Query Helpers", () => {
-  let mockDb: SupabaseClient;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockDb: any;
 
   beforeEach(() => {
     mockDb = {
@@ -22,7 +22,7 @@ describe("IAM Query Helpers", () => {
       lt: vi.fn().mockReturnThis(),
       gt: vi.fn().mockReturnThis(),
       or: vi.fn().mockResolvedValue({ data: [], error: null }),
-    } as any;
+    };
   });
 
   describe("PlatformQueries", () => {

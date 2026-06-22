@@ -1,8 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PlatformRoleRow, PlatformPermissionRow } from "@shina/iam-domain";
+import type { PlatformPermissionRow } from "@shina/iam-domain";
 import {
   PlatformRoleRepository,
-  PlatformPermissionRepository,
   PlatformRolePermissionRepository,
   PlatformUserRoleRepository,
 } from "../repositories/index.js";
@@ -13,13 +12,11 @@ export interface PlatformQueriesDeps {
 
 export class PlatformQueries {
   private roleRepo: PlatformRoleRepository;
-  private permissionRepo: PlatformPermissionRepository;
   private rolePermissionRepo: PlatformRolePermissionRepository;
   private userRoleRepo: PlatformUserRoleRepository;
 
   constructor(deps: PlatformQueriesDeps) {
     this.roleRepo = new PlatformRoleRepository({ db: deps.db });
-    this.permissionRepo = new PlatformPermissionRepository({ db: deps.db });
     this.rolePermissionRepo = new PlatformRolePermissionRepository({ db: deps.db });
     this.userRoleRepo = new PlatformUserRoleRepository({ db: deps.db });
   }

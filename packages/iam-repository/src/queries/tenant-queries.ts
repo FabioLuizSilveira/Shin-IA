@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TenantPermissionRow } from "@shina/iam-domain";
 import {
   TenantRoleRepository,
-  TenantPermissionRepository,
   TenantRolePermissionRepository,
   TenantUserRoleRepository,
 } from "../repositories/index.js";
@@ -13,13 +12,11 @@ export interface TenantQueriesDeps {
 
 export class TenantQueries {
   private roleRepo: TenantRoleRepository;
-  private permissionRepo: TenantPermissionRepository;
   private rolePermissionRepo: TenantRolePermissionRepository;
   private userRoleRepo: TenantUserRoleRepository;
 
   constructor(deps: TenantQueriesDeps) {
     this.roleRepo = new TenantRoleRepository({ db: deps.db });
-    this.permissionRepo = new TenantPermissionRepository({ db: deps.db });
     this.rolePermissionRepo = new TenantRolePermissionRepository({ db: deps.db });
     this.userRoleRepo = new TenantUserRoleRepository({ db: deps.db });
   }

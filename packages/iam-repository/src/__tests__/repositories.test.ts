@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   PlatformRoleRepository,
   TenantRoleRepository,
@@ -8,7 +7,8 @@ import {
 } from "../repositories/index.js";
 
 describe("IAM Repositories", () => {
-  let mockDb: SupabaseClient;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockDb: any;
 
   beforeEach(() => {
     mockDb = {
@@ -23,7 +23,7 @@ describe("IAM Repositories", () => {
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
       offset: vi.fn().mockReturnThis(),
-    } as any;
+    };
   });
 
   describe("PlatformRoleRepository", () => {
