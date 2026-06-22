@@ -8,3 +8,4 @@ export { AuthorizationService, type AuthorizationServiceDeps } from "./authoriza
 export * from "./rbac/index.js";
 export * from "./abac/index.js";
 export * from "./delegated-access/index.js";
+export * from "./impersonation/index.js";
