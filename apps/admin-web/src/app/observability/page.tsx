@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -5,7 +8,12 @@ import { ActivityTimeline } from "@/components/ui/activity-timeline";
 import { ChartContainer } from "@/components/ui/chart-container";
 import { Activity, Clock, AlertTriangle, Zap } from "lucide-react";
 
-export const dynamic = "force-dynamic";
+type PlatformMetrics = {
+  totalTenants: number;
+  activeTenants: number;
+  totalRevenue: number;
+  activeOperations: number;
+};
 
 const EVENTS = [
   {
@@ -55,6 +63,33 @@ const SERVICES = [
 ];
 
 export default function ObservabilityPage() {
+  const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchMetrics = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/metrics");
+      if (res.ok) {
+        const json = (await res.json()) as PlatformMetrics;
+        setMetrics(json);
+      }
+    } catch {
+      // silently keep null state
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchMetrics();
+  }, [fetchMetrics]);
+
+  const activeTenantRate =
+    metrics && metrics.totalTenants > 0
+      ? ((metrics.activeTenants / metrics.totalTenants) * 100).toFixed(1) + "%"
+      : "—";
+
   return (
     <AppShell title="Observabilidade">
       <SectionHeader
@@ -64,33 +99,33 @@ export default function ObservabilityPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard
-          title="Uptime"
-          value="99.97%"
-          change={0.02}
+          title="Tenants Ativos"
+          value={loading ? "—" : String(metrics?.activeTenants ?? 0)}
+          changeLabel={`de ${metrics?.totalTenants ?? 0} total`}
           trend="up"
           icon={<Activity className="w-5 h-5" />}
         />
         <MetricCard
-          title="P99 Latência"
-          value="87ms"
-          change={-12}
-          changeLabel="vs. ontem"
+          title="Taxa de Ativação"
+          value={loading ? "—" : activeTenantRate}
           trend="up"
           icon={<Clock className="w-5 h-5" />}
         />
         <MetricCard
-          title="Taxa de Erro"
-          value="0.03%"
-          change={-0.01}
-          changeLabel="vs. ontem"
+          title="Operações Ativas"
+          value={loading ? "—" : String(metrics?.activeOperations ?? 0)}
           trend="up"
           icon={<AlertTriangle className="w-5 h-5" />}
         />
         <MetricCard
-          title="Req/min"
-          value="2.840"
-          change={18}
-          changeLabel="vs. hora anterior"
+          title="Receita Total"
+          value={
+            loading
+              ? "—"
+              : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+                  metrics?.totalRevenue ?? 0,
+                )
+          }
           trend="up"
           icon={<Zap className="w-5 h-5" />}
         />

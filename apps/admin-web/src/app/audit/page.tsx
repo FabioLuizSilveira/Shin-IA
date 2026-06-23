@@ -1,66 +1,68 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-export const dynamic = "force-dynamic";
+type AuditRow = {
+  id: string;
+  tenant: string;
+  action: string;
+  resource: string;
+  status: string;
+  time: string;
+};
 
-const AUDIT_EVENTS = [
-  {
-    id: "EVT-001",
-    user: "admin@shina.com.br",
-    action: "tenant.create",
-    resource: "Transportes Silva Ltda",
-    ip: "187.22.4.12",
-    time: "22/06/2026 14:32",
-  },
-  {
-    id: "EVT-002",
-    user: "admin@shina.com.br",
-    action: "billing.invoice.send",
-    resource: "INV-001",
-    ip: "187.22.4.12",
-    time: "22/06/2026 14:15",
-  },
-  {
-    id: "EVT-003",
-    user: "sistema",
-    action: "auth.login.failed",
-    resource: "abc123@empresa.com",
-    ip: "200.100.50.8",
-    time: "22/06/2026 13:47",
-  },
-  {
-    id: "EVT-004",
-    user: "admin@shina.com.br",
-    action: "tenant.plan.upgrade",
-    resource: "Norte Transportes",
-    ip: "187.22.4.12",
-    time: "22/06/2026 12:00",
-  },
-  {
-    id: "EVT-005",
-    user: "sistema",
-    action: "backup.completed",
-    resource: "db-primary-20260622",
-    ip: "10.0.0.1",
-    time: "22/06/2026 10:00",
-  },
-  {
-    id: "EVT-006",
-    user: "admin@shina.com.br",
-    action: "user.permission.grant",
-    resource: "joao@frota.com.br",
-    ip: "187.22.4.12",
-    time: "22/06/2026 09:30",
-  },
-];
+function statusToUi(status: string): "active" | "inactive" | "pending" | "warning" | "error" {
+  switch (status) {
+    case "completed":
+    case "active":
+    case "paid":
+      return "active";
+    case "failed":
+    case "terminated":
+    case "overdue":
+      return "error";
+    case "cancelled":
+    case "suspended":
+      return "warning";
+    case "pending":
+    case "in_progress":
+    case "issued":
+      return "pending";
+    default:
+      return "inactive";
+  }
+}
 
-type AuditRow = (typeof AUDIT_EVENTS)[number];
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    completed: "Concluído",
+    active: "Ativo",
+    paid: "Pago",
+    failed: "Falhou",
+    terminated: "Encerrado",
+    overdue: "Vencido",
+    cancelled: "Cancelado",
+    suspended: "Suspenso",
+    pending: "Pendente",
+    in_progress: "Em andamento",
+    issued: "Emitido",
+  };
+  return labels[status] ?? status;
+}
 
 const COLUMNS = [
-  { key: "id", label: "ID" },
-  { key: "user", label: "Usuário" },
+  {
+    key: "id",
+    label: "ID",
+    render: (row: AuditRow) => (
+      <span className="font-mono text-xs text-slate-500">{row.id.slice(0, 8).toUpperCase()}</span>
+    ),
+  },
+  { key: "tenant", label: "Tenant" },
   {
     key: "action",
     label: "Ação",
@@ -71,28 +73,50 @@ const COLUMNS = [
     ),
   },
   { key: "resource", label: "Recurso" },
-  { key: "ip", label: "IP" },
-  { key: "time", label: "Data/Hora" },
   {
     key: "status",
-    label: "Resultado",
-    render: (_row: AuditRow) => (
-      <StatusBadge
-        status={_row.action.includes("failed") ? "error" : "active"}
-        label={_row.action.includes("failed") ? "Falhou" : "Sucesso"}
-      />
+    label: "Status",
+    render: (row: AuditRow) => (
+      <StatusBadge status={statusToUi(row.status)} label={statusLabel(row.status)} />
     ),
   },
+  { key: "time", label: "Data/Hora" },
 ];
 
 export default function AuditPage() {
+  const [events, setEvents] = useState<AuditRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchEvents = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/audit");
+      if (res.ok) {
+        const json = (await res.json()) as { data: AuditRow[] };
+        setEvents(json.data ?? []);
+      }
+    } catch {
+      // silently keep empty state
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchEvents();
+  }, [fetchEvents]);
+
   return (
     <AppShell title="Auditoria">
       <SectionHeader
         title="Log de Auditoria"
         description="Trilha imutável de todos os eventos da plataforma."
       />
-      <DataTable columns={COLUMNS} data={AUDIT_EVENTS} />
+      <DataTable
+        columns={COLUMNS as Parameters<typeof DataTable>[0]["columns"]}
+        data={events as Parameters<typeof DataTable>[0]["data"]}
+        loading={loading}
+      />
     </AppShell>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -78,68 +78,55 @@ type TimelineItem = {
   type: "info" | "success" | "warning" | "error";
 };
 
-function operationsToTimeline(ops: Operation[]): TimelineItem[] {
-  return ops.slice(0, 5).map((op) => {
-    const isCompleted = op.status === "completed";
-    const isInProgress = op.status === "in_progress";
-    return {
-      time: new Date(op.scheduled_starts_at).toLocaleTimeString("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      title: `Operação ${op.type} ${isCompleted ? "concluída" : isInProgress ? "em andamento" : "pendente"}`,
-      description: op.resource_name ? `Recurso: ${op.resource_name}` : "Sem recurso associado",
-      type: isCompleted
-        ? ("success" as const)
-        : isInProgress
-          ? ("info" as const)
-          : ("warning" as const),
-    };
-  });
-}
-
 export default function DashboardPage() {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [activityItems, setActivityItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchAll() {
-      setLoading(true);
-      try {
-        const [opsRes, assetsRes, contractsRes, analyticsRes] = await Promise.all([
-          fetch("/api/operations"),
-          fetch("/api/assets"),
-          fetch("/api/contracts"),
-          fetch("/api/analytics"),
-        ]);
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [opsRes, assetsRes, contractsRes, analyticsRes, actRes] = await Promise.all([
+        fetch("/api/operations"),
+        fetch("/api/assets"),
+        fetch("/api/contracts"),
+        fetch("/api/analytics"),
+        fetch("/api/activity"),
+      ]);
 
-        if (opsRes.ok) {
-          const json = (await opsRes.json()) as { data: Operation[] };
-          setOperations(json.data ?? []);
-        }
-        if (assetsRes.ok) {
-          const json = (await assetsRes.json()) as { data: Asset[] };
-          setAssets(json.data ?? []);
-        }
-        if (contractsRes.ok) {
-          const json = (await contractsRes.json()) as { data: Contract[] };
-          setContracts(json.data ?? []);
-        }
-        if (analyticsRes.ok) {
-          const json = (await analyticsRes.json()) as { data: AnalyticsData };
-          setAnalytics(json.data);
-        }
-      } catch {
-        // silently keep empty state
-      } finally {
-        setLoading(false);
+      if (opsRes.ok) {
+        const json = (await opsRes.json()) as { data: Operation[] };
+        setOperations(json.data ?? []);
       }
+      if (assetsRes.ok) {
+        const json = (await assetsRes.json()) as { data: Asset[] };
+        setAssets(json.data ?? []);
+      }
+      if (contractsRes.ok) {
+        const json = (await contractsRes.json()) as { data: Contract[] };
+        setContracts(json.data ?? []);
+      }
+      if (analyticsRes.ok) {
+        const json = (await analyticsRes.json()) as { data: AnalyticsData };
+        setAnalytics(json.data);
+      }
+      if (actRes.ok) {
+        const actJson = (await actRes.json()) as { data: TimelineItem[] };
+        setActivityItems(actJson.data ?? []);
+      }
+    } catch {
+      // silently keep empty state
+    } finally {
+      setLoading(false);
     }
-    void fetchAll();
   }, []);
+
+  useEffect(() => {
+    void fetchAll();
+  }, [fetchAll]);
 
   const today = new Date().toLocaleDateString("pt-BR", {
     weekday: "long",
@@ -161,8 +148,6 @@ export default function DashboardPage() {
     rawStatus: op.status,
     date: new Date(op.scheduled_starts_at).toLocaleDateString("pt-BR"),
   }));
-
-  const timeline = operationsToTimeline(operations);
 
   return (
     <AppShell title="Dashboard">
@@ -312,8 +297,8 @@ export default function DashboardPage() {
                 <div key={i} className="h-10 bg-slate-100 rounded" />
               ))}
             </div>
-          ) : timeline.length > 0 ? (
-            <ActivityTimeline items={timeline} />
+          ) : activityItems.length > 0 ? (
+            <ActivityTimeline items={activityItems} />
           ) : (
             <p className="text-slate-400 text-sm p-4">Nenhuma atividade recente.</p>
           )}
