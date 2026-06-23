@@ -1,22 +1,21 @@
 -- Shinã Platform — Demo Seed Data
 -- Idempotent: uses ON CONFLICT DO NOTHING with fixed UUIDs
--- Apply via: supabase db reset  OR  supabase db seed
 
 -- Demo tenant
 INSERT INTO tenants (id, name, slug, plan, status) VALUES
   ('10000000-0000-0000-0000-000000000001', 'Acme Logística', 'acme-logistica', 'professional', 'active')
 ON CONFLICT (id) DO NOTHING;
 
--- Demo branch (root)
-INSERT INTO branches (id, tenant_id, name, scope_mode) VALUES
-  ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Sede São Paulo', 'root')
+-- Demo branch (root) — requires: code NOT NULL
+INSERT INTO branches (id, tenant_id, name, code, scope_mode) VALUES
+  ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Sede São Paulo', 'SP-001', 'root')
 ON CONFLICT (id) DO NOTHING;
 
--- Demo organizations (clients/suppliers)
-INSERT INTO organizations (id, tenant_id, name, type, email) VALUES
-  ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Transportadora Silva', 'customer', 'contato@silva.com.br'),
-  ('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'Distribuidora Norte', 'customer', 'norte@distribuidora.com.br'),
-  ('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'Frota Express', 'partner', 'parceiro@frotaexpress.com.br')
+-- Demo organizations — requires: document, address_city, address_state NOT NULL
+INSERT INTO organizations (id, tenant_id, name, document, type, email, address_city, address_state, address_country) VALUES
+  ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Transportadora Silva', '12.345.678/0001-90', 'customer', 'contato@silva.com.br', 'São Paulo', 'SP', 'BR'),
+  ('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'Distribuidora Norte', '98.765.432/0001-10', 'customer', 'norte@distribuidora.com.br', 'Manaus', 'AM', 'BR'),
+  ('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'Frota Express', '11.222.333/0001-44', 'partner', 'parceiro@frotaexpress.com.br', 'Campinas', 'SP', 'BR')
 ON CONFLICT (id) DO NOTHING;
 
 -- Demo asset_types
