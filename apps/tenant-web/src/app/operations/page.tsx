@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { OperationDetail } from "@/components/ui/operation-detail";
 import { Zap, User, Plus } from "lucide-react";
 import type { Operation, OperationStatus, OperationType, Resource } from "@/types/domain";
 
@@ -68,13 +69,14 @@ export default function OperationsPage() {
   const [activeFilter, setActiveFilter] = useState("Todas");
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedOpId, setSelectedOpId] = useState<string | null>(null);
 
   const [formType, setFormType] = useState<OperationType>("delivery");
   const [formResource, setFormResource] = useState("");
   const [formStart, setFormStart] = useState("");
   const [formEnd, setFormEnd] = useState("");
 
-  async function fetchOperations() {
+  const fetchOperations = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/operations");
@@ -86,7 +88,7 @@ export default function OperationsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   async function fetchResources() {
     try {
@@ -102,7 +104,7 @@ export default function OperationsPage() {
   useEffect(() => {
     void fetchOperations();
     void fetchResources();
-  }, []);
+  }, [fetchOperations]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -324,12 +326,27 @@ export default function OperationsPage() {
                       minute: "2-digit",
                     })}
                   </span>
+                  <button
+                    onClick={() => setSelectedOpId(op.id)}
+                    className="text-xs font-medium text-shina-blue hover:text-blue-700 transition-colors"
+                  >
+                    Detalhes →
+                  </button>
                 </div>
               </div>
             ))
           )}
         </div>
       )}
+
+      <OperationDetail
+        operationId={selectedOpId}
+        onClose={() => setSelectedOpId(null)}
+        onStatusChange={() => {
+          setSelectedOpId(null);
+          void fetchOperations();
+        }}
+      />
     </AppShell>
   );
 }

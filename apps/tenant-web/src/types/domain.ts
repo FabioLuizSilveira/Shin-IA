@@ -23,6 +23,24 @@ export interface Operation {
   resource_type?: string;
 }
 
+export interface OperationDetail {
+  id: string;
+  type: OperationType;
+  status: OperationStatus;
+  scheduled_starts_at: string;
+  scheduled_ends_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  metadata: Record<string, unknown>;
+  resources: {
+    id: string;
+    name: string;
+    type: string;
+    status: string;
+  } | null;
+}
+
 export type AssetCategory = "vehicle" | "equipment" | "tool" | "property" | "technology";
 export type AssetStatus = "available" | "in_use" | "maintenance" | "decommissioned";
 

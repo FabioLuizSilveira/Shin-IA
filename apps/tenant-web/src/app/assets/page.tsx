@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -58,7 +58,7 @@ export default function AssetsPage() {
   const [formCategory, setFormCategory] = useState<AssetCategory>("vehicle");
   const [formAssetType, setFormAssetType] = useState("");
 
-  async function fetchAssets() {
+  const fetchAssets = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/assets");
@@ -70,7 +70,7 @@ export default function AssetsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   async function fetchAssetTypes() {
     try {
@@ -86,7 +86,7 @@ export default function AssetsPage() {
   useEffect(() => {
     void fetchAssets();
     void fetchAssetTypes();
-  }, []);
+  }, [fetchAssets]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -116,6 +116,19 @@ export default function AssetsPage() {
       alert(e instanceof Error ? e.message : "Erro ao criar ativo");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleStatusChange(assetId: string, newStatus: string) {
+    try {
+      await fetch(`/api/assets/${assetId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      await fetchAssets();
+    } catch {
+      // silently ignore
     }
   }
 
@@ -299,6 +312,16 @@ export default function AssetsPage() {
                     {asset.type_name ?? CATEGORY_LABELS[asset.category]} ·{" "}
                     {CATEGORY_LABELS[asset.category]}
                   </p>
+                  <select
+                    value={asset.status}
+                    onChange={(e) => void handleStatusChange(asset.id, e.target.value)}
+                    className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-shina-blue"
+                  >
+                    <option value="available">Disponível</option>
+                    <option value="in_use">Em uso</option>
+                    <option value="maintenance">Manutenção</option>
+                    <option value="decommissioned">Desativado</option>
+                  </select>
                 </div>
               </div>
             ))
