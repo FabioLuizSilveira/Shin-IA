@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
+import { CommandMenu } from "@/components/ui/command-menu";
 
 interface AppShellProps {
   children: ReactNode;
@@ -15,6 +16,7 @@ export function AppShell({ children, title }: AppShellProps) {
         <Topbar title={title} />
         <main className="flex-1 bg-slate-50 p-6 overflow-auto">{children}</main>
       </div>
+      <CommandMenu />
     </div>
   );
 }
