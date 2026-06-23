@@ -106,13 +106,25 @@ export interface ContractDetail {
 }
 
 export type ResourceType = "human" | "vehicle" | "equipment" | "virtual";
-export type ResourceStatus = "available" | "busy" | "offline" | "suspended";
+export type ResourceStatus = "available" | "busy" | "offline" | "maintenance";
 
 export interface Resource {
   id: string;
   name: string;
   type: ResourceType;
   status: ResourceStatus;
+  branch_id: string;
+  created_at: string;
+}
+
+export interface ResourceDetail extends Resource {
+  recent_operations: {
+    id: string;
+    type: string;
+    status: string;
+    scheduled_starts_at: string;
+    scheduled_ends_at: string;
+  }[];
 }
 
 export interface AssetType {

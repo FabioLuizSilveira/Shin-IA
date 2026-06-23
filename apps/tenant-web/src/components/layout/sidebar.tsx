@@ -13,12 +13,14 @@ import {
   LogOut,
   BarChart2,
   Users,
+  Users2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/operations", label: "Operações", icon: Zap },
+  { href: "/resources", label: "Recursos", icon: Users2 },
   { href: "/assets", label: "Frota & Ativos", icon: Truck },
   { href: "/crm", label: "Clientes & Parceiros", icon: Users },
   { href: "/contracts", label: "Contratos", icon: FileText },
