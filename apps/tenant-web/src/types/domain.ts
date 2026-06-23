@@ -76,3 +76,40 @@ export interface AssetType {
   name: string;
   category: AssetCategory;
 }
+
+export interface AnalyticsData {
+  operations: {
+    total: number;
+    byStatus: {
+      pending: number;
+      in_progress: number;
+      completed: number;
+      cancelled: number;
+      failed: number;
+    };
+    completionRate: number;
+  };
+  assets: {
+    total: number;
+    byStatus: {
+      available: number;
+      in_use: number;
+      maintenance: number;
+      decommissioned: number;
+    };
+    byCategory: Record<string, number>;
+    utilizationRate: number;
+  };
+  contracts: {
+    total: number;
+    byStatus: {
+      draft: number;
+      active: number;
+      expired: number;
+      terminated: number;
+    };
+    totalRevenue: number;
+    avgContractValue: number;
+    activeCount: number;
+  };
+}

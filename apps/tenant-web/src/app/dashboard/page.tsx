@@ -8,8 +8,11 @@ import { ActivityTimeline } from "@/components/ui/activity-timeline";
 import { ChartContainer } from "@/components/ui/chart-container";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { DonutChart } from "@/components/ui/donut-chart";
+import { BarChart } from "@/components/ui/bar-chart";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { FileText, Truck, DollarSign, Zap } from "lucide-react";
-import type { Operation, OperationStatus, Asset, Contract } from "@/types/domain";
+import type { Operation, OperationStatus, Asset, Contract, AnalyticsData } from "@/types/domain";
 
 function opStatusToUi(status: OperationStatus): "active" | "inactive" | "pending" | "warning" {
   switch (status) {
@@ -99,16 +102,18 @@ export default function DashboardPage() {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchAll() {
       setLoading(true);
       try {
-        const [opsRes, assetsRes, contractsRes] = await Promise.all([
+        const [opsRes, assetsRes, contractsRes, analyticsRes] = await Promise.all([
           fetch("/api/operations"),
           fetch("/api/assets"),
           fetch("/api/contracts"),
+          fetch("/api/analytics"),
         ]);
 
         if (opsRes.ok) {
@@ -122,6 +127,10 @@ export default function DashboardPage() {
         if (contractsRes.ok) {
           const json = (await contractsRes.json()) as { data: Contract[] };
           setContracts(json.data ?? []);
+        }
+        if (analyticsRes.ok) {
+          const json = (await analyticsRes.json()) as { data: AnalyticsData };
+          setAnalytics(json.data);
         }
       } catch {
         // silently keep empty state
@@ -195,6 +204,101 @@ export default function DashboardPage() {
           trend="up"
           icon={<Zap className="w-5 h-5" />}
         />
+      </div>
+
+      {/* Analytics row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">Status das Operações</h3>
+          {analytics ? (
+            <DonutChart
+              data={[
+                {
+                  label: "Em andamento",
+                  value: analytics.operations.byStatus.in_progress,
+                  color: "#2563EB",
+                },
+                {
+                  label: "Pendentes",
+                  value: analytics.operations.byStatus.pending,
+                  color: "#F59E0B",
+                },
+                {
+                  label: "Concluídas",
+                  value: analytics.operations.byStatus.completed,
+                  color: "#10B981",
+                },
+                {
+                  label: "Canceladas",
+                  value: analytics.operations.byStatus.cancelled,
+                  color: "#EF4444",
+                },
+              ].filter((d) => d.value > 0)}
+              centerValue={analytics.operations.total}
+              centerLabel="Total"
+            />
+          ) : (
+            <div className="h-24 bg-slate-50 rounded-lg animate-pulse" />
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">Status da Frota</h3>
+          {analytics ? (
+            <BarChart
+              data={[
+                {
+                  label: "Disponível",
+                  value: analytics.assets.byStatus.available,
+                  color: "#10B981",
+                },
+                { label: "Em uso", value: analytics.assets.byStatus.in_use, color: "#2563EB" },
+                {
+                  label: "Manutenção",
+                  value: analytics.assets.byStatus.maintenance,
+                  color: "#F59E0B",
+                },
+                {
+                  label: "Inativo",
+                  value: analytics.assets.byStatus.decommissioned,
+                  color: "#94A3B8",
+                },
+              ]}
+            />
+          ) : (
+            <div className="h-24 bg-slate-50 rounded-lg animate-pulse" />
+          )}
+        </div>
+      </div>
+
+      {/* Contract & rate summary */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+        <h3 className="text-sm font-semibold text-slate-900 mb-4">Contratos Ativos</h3>
+        {analytics ? (
+          <div className="space-y-3">
+            <ProgressBar
+              label="Taxa de conclusão de operações"
+              value={analytics.operations.completionRate}
+              max={100}
+              color="#10B981"
+            />
+            <ProgressBar
+              label="Taxa de utilização da frota"
+              value={analytics.assets.utilizationRate}
+              max={100}
+              color="#2563EB"
+            />
+            <ProgressBar
+              label="Contratos ativos vs total"
+              value={analytics.contracts.activeCount}
+              max={analytics.contracts.total || 1}
+              color="#06B6D4"
+              showPercent={false}
+            />
+          </div>
+        ) : (
+          <div className="h-20 bg-slate-50 rounded-lg animate-pulse" />
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

@@ -6,8 +6,25 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { DonutChart } from "@/components/ui/donut-chart";
+import { BarChart } from "@/components/ui/bar-chart";
 import { Building2, Users, DollarSign, TrendingDown, Plus } from "lucide-react";
 import type { Tenant, TenantPlan, TenantStatus } from "@/types/domain";
+
+interface AdminAnalyticsData {
+  total: number;
+  byStatus: {
+    active: number;
+    trialing: number;
+    suspended: number;
+    cancelled: number;
+  };
+  byPlan: {
+    starter: number;
+    professional: number;
+    enterprise: number;
+  };
+}
 
 function tenantStatusToUi(status: TenantStatus): "active" | "inactive" | "pending" | "warning" {
   switch (status) {
@@ -87,6 +104,7 @@ const COLUMNS = [
 
 export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [analytics, setAnalytics] = useState<AdminAnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -95,14 +113,21 @@ export default function TenantsPage() {
   const [formSlug, setFormSlug] = useState("");
   const [formPlan, setFormPlan] = useState<TenantPlan>("starter");
 
-  async function fetchTenants() {
+  async function fetchAll() {
     setLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch("/api/tenants");
-      if (!res.ok) throw new Error("Falha ao carregar tenants");
-      const json = (await res.json()) as { data: Tenant[] };
+      const [tenantsRes, analyticsRes] = await Promise.all([
+        fetch("/api/tenants"),
+        fetch("/api/analytics"),
+      ]);
+      if (!tenantsRes.ok) throw new Error("Falha ao carregar tenants");
+      const json = (await tenantsRes.json()) as { data: Tenant[] };
       setTenants(json.data ?? []);
+      if (analyticsRes.ok) {
+        const aJson = (await analyticsRes.json()) as { data: AdminAnalyticsData };
+        setAnalytics(aJson.data);
+      }
     } catch (e) {
       setFetchError(e instanceof Error ? e.message : "Erro desconhecido");
     } finally {
@@ -111,7 +136,7 @@ export default function TenantsPage() {
   }
 
   useEffect(() => {
-    void fetchTenants();
+    void fetchAll();
   }, []);
 
   function handleNameChange(name: string) {
@@ -136,7 +161,7 @@ export default function TenantsPage() {
       setFormName("");
       setFormSlug("");
       setFormPlan("starter");
-      await fetchTenants();
+      await fetchAll();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Erro ao criar tenant");
     } finally {
@@ -261,6 +286,42 @@ export default function TenantsPage() {
           trend="down"
           icon={<TrendingDown className="w-5 h-5" />}
         />
+      </div>
+
+      {/* Analytics charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">Tenants por Status</h3>
+          {analytics ? (
+            <DonutChart
+              data={[
+                { label: "Ativos", value: analytics.byStatus.active, color: "#10B981" },
+                { label: "Em Trial", value: analytics.byStatus.trialing, color: "#2563EB" },
+                { label: "Suspensos", value: analytics.byStatus.suspended, color: "#F59E0B" },
+                { label: "Cancelados", value: analytics.byStatus.cancelled, color: "#94A3B8" },
+              ].filter((d) => d.value > 0)}
+              centerValue={analytics.total}
+              centerLabel="Total"
+            />
+          ) : (
+            <div className="h-24 bg-slate-50 rounded-lg animate-pulse" />
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">Tenants por Plano</h3>
+          {analytics ? (
+            <BarChart
+              data={[
+                { label: "Starter", value: analytics.byPlan.starter, color: "#06B6D4" },
+                { label: "Pro", value: analytics.byPlan.professional, color: "#2563EB" },
+                { label: "Enterprise", value: analytics.byPlan.enterprise, color: "#7C3AED" },
+              ]}
+            />
+          ) : (
+            <div className="h-24 bg-slate-50 rounded-lg animate-pulse" />
+          )}
+        </div>
       </div>
 
       {fetchError && (
