@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { OperationDetail } from "@/components/ui/operation-detail";
+import { ExportButton } from "@/components/ui/export-button";
 import { Zap, User, Plus } from "lucide-react";
 import type { Operation, OperationStatus, OperationType, Resource } from "@/types/domain";
 
@@ -146,13 +147,16 @@ export default function OperationsPage() {
         description="Gestão em tempo real de todas as operações logísticas."
         action={
           !showForm ? (
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0"
-            >
-              <Plus className="w-4 h-4" />
-              Nova Operação
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportButton entity="operations" />
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0"
+              >
+                <Plus className="w-4 h-4" />
+                Nova Operação
+              </button>
+            </div>
           ) : undefined
         }
       />

@@ -7,6 +7,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { MetricCard } from "@/components/ui/metric-card";
 import { ContractDetail } from "@/components/ui/contract-detail";
+import { ExportButton } from "@/components/ui/export-button";
 import { FileText, DollarSign, Plus } from "lucide-react";
 import type { Contract, ContractStatus, ContractType, Organization } from "@/types/domain";
 
@@ -194,13 +195,16 @@ export default function ContractsPage() {
         description="Gerencie contratos de locação e prestação de serviços."
         action={
           !showForm ? (
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0"
-            >
-              <Plus className="w-4 h-4" />
-              Novo Contrato
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportButton entity="contracts" />
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0"
+              >
+                <Plus className="w-4 h-4" />
+                Novo Contrato
+              </button>
+            </div>
           ) : undefined
         }
       />

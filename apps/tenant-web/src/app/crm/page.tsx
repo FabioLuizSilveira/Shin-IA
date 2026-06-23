@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
+import { ExportButton } from "@/components/ui/export-button";
 import { Plus, MapPin, Mail, Building2 } from "lucide-react";
 import type { Organization, OrganizationType } from "@/types/domain";
 
@@ -109,13 +110,16 @@ export default function CrmPage() {
         description="Gerencie clientes, fornecedores e parceiros de negócio."
         action={
           !showForm ? (
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0"
-            >
-              <Plus className="w-4 h-4" />
-              Nova Organização
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportButton entity="organizations" />
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0"
+              >
+                <Plus className="w-4 h-4" />
+                Nova Organização
+              </button>
+            </div>
           ) : undefined
         }
       />

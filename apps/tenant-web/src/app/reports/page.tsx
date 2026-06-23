@@ -7,6 +7,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { BarChart } from "@/components/ui/bar-chart";
 import { DonutChart } from "@/components/ui/donut-chart";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { ExportButton } from "@/components/ui/export-button";
 import { FileText, TrendingUp, Truck, Zap } from "lucide-react";
 import type { AnalyticsData } from "@/types/domain";
 
@@ -41,12 +42,6 @@ export default function ReportsPage() {
       <SectionHeader
         title="Relatórios"
         description="Visão consolidada das métricas operacionais e financeiras."
-        action={
-          <button className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0">
-            <FileText className="w-4 h-4" />
-            Exportar
-          </button>
-        }
       />
 
       {/* Summary metrics */}
@@ -187,7 +182,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Category breakdown */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
+      <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6">
         <h3 className="text-sm font-semibold text-slate-900 mb-4">Ativos por Categoria</h3>
         {analytics ? (
           <BarChart
@@ -201,6 +196,22 @@ export default function ReportsPage() {
         ) : (
           <div className="h-40 bg-slate-50 rounded-lg animate-pulse" />
         )}
+      </div>
+
+      {/* Export section */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <h3 className="font-semibold text-slate-900 mb-1">Exportar Dados</h3>
+        <p className="text-sm text-slate-500 mb-4">
+          Baixe os dados em formato CSV para análise externa
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <ExportButton entity="operations" label="Operações" />
+          <ExportButton entity="assets" label="Ativos" />
+          <ExportButton entity="contracts" label="Contratos" />
+          <ExportButton entity="invoices" label="Faturas" />
+          <ExportButton entity="resources" label="Recursos" />
+          <ExportButton entity="organizations" label="Organizações" />
+        </div>
       </div>
     </AppShell>
   );

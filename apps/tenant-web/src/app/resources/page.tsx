@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { User2, Truck, Wrench, Cpu, Users2, Plus, X } from "lucide-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { ResourceDetail } from "@/components/ui/resource-detail";
+import { ExportButton } from "@/components/ui/export-button";
 import type { Resource, ResourceType, ResourceStatus } from "@/types/domain";
 
 const typeLabels: Record<ResourceType, string> = {
@@ -123,15 +124,18 @@ export default function ResourcesPage() {
             Gerencie pessoas, veículos, equipamentos e recursos virtuais.
           </p>
         </div>
-        {!showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0"
-          >
-            <Plus className="w-4 h-4" />
-            Novo Recurso
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <ExportButton entity="resources" />
+          {!showForm && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0"
+            >
+              <Plus className="w-4 h-4" />
+              Novo Recurso
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Metric cards */}

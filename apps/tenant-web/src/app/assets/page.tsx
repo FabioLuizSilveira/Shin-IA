@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { MetricCard } from "@/components/ui/metric-card";
+import { ExportButton } from "@/components/ui/export-button";
 import { Truck, Plus } from "lucide-react";
 import type { Asset, AssetCategory, AssetStatus, AssetType } from "@/types/domain";
 
@@ -143,13 +144,16 @@ export default function AssetsPage() {
         description="Gerencie toda sua frota em um único lugar."
         action={
           !showForm ? (
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0"
-            >
-              <Plus className="w-4 h-4" />
-              Novo Ativo
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportButton entity="assets" />
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0"
+              >
+                <Plus className="w-4 h-4" />
+                Novo Ativo
+              </button>
+            </div>
           ) : undefined
         }
       />

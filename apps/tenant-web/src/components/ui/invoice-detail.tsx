@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Calendar, DollarSign, Building2, Receipt } from "lucide-react";
+import { X, Calendar, DollarSign, Building2, Receipt, Printer } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { InvoiceDetail as InvoiceDetailData, InvoiceStatus } from "@/types/domain";
 
@@ -147,12 +147,25 @@ export function InvoiceDetail({ invoiceId, onClose, onStatusChange }: InvoiceDet
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h2 className="text-base font-semibold text-slate-900">Detalhe da Fatura</h2>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer border-0 bg-transparent"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {invoiceId && (
+              <a
+                href={`/financial/invoices/${invoiceId}/print`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <Printer className="w-4 h-4" />
+                Imprimir
+              </a>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer border-0 bg-transparent"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}

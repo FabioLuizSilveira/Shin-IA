@@ -7,6 +7,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { InvoiceDetail } from "@/components/ui/invoice-detail";
+import { ExportButton } from "@/components/ui/export-button";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { DollarSign, TrendingUp, AlertTriangle, CheckCircle, Plus, X } from "lucide-react";
 import type {
@@ -335,13 +336,16 @@ export default function FinancialPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-semibold text-slate-900">Faturas</h3>
-            <button
-              onClick={() => setShowNewInvoice(!showNewInvoice)}
-              className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-colors cursor-pointer border-0"
-            >
-              {showNewInvoice ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-              {showNewInvoice ? "Cancelar" : "Nova Fatura"}
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportButton entity="invoices" />
+              <button
+                onClick={() => setShowNewInvoice(!showNewInvoice)}
+                className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-colors cursor-pointer border-0"
+              >
+                {showNewInvoice ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                {showNewInvoice ? "Cancelar" : "Nova Fatura"}
+              </button>
+            </div>
           </div>
 
           {showNewInvoice && (
