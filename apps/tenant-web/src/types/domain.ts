@@ -157,3 +157,49 @@ export interface AnalyticsData {
     activeCount: number;
   };
 }
+
+export type BillingCycle = "monthly" | "quarterly" | "annual" | "one_time";
+export type BillingAccountStatus = "active" | "suspended" | "closed";
+export type InvoiceStatus = "draft" | "issued" | "paid" | "overdue" | "cancelled" | "voided";
+
+export interface BillingAccount {
+  id: string;
+  organization_id: string;
+  cycle: BillingCycle;
+  status: BillingAccountStatus;
+  credit_limit_amount: number;
+  credit_limit_currency: string;
+  balance_amount: number;
+  balance_currency: string;
+  created_at: string;
+  organizations?: { id: string; name: string; type: string };
+}
+
+export interface Invoice {
+  id: string;
+  billing_account_id: string;
+  status: InvoiceStatus;
+  total_amount: number;
+  total_currency: string;
+  due_date: string;
+  paid_at?: string;
+  created_at: string;
+  billing_accounts?: {
+    id: string;
+    cycle: BillingCycle;
+    organizations?: { id: string; name: string };
+  };
+}
+
+export interface InvoiceLineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unit_price_amount: number;
+  unit_price_currency: string;
+  sort_order: number;
+}
+
+export interface InvoiceDetail extends Invoice {
+  invoice_line_items: InvoiceLineItem[];
+}

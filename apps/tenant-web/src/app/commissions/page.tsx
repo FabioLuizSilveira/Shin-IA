@@ -1,132 +1,170 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { MetricCard } from "@/components/ui/metric-card";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Award, DollarSign } from "lucide-react";
+import { Award, DollarSign, TrendingUp } from "lucide-react";
+import type { Contract, ContractStatus } from "@/types/domain";
 
-export const dynamic = "force-dynamic";
+const brl = (v: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 
-const COMMISSIONS = [
-  {
-    id: "COM-001",
-    operator: "João Silva",
-    role: "Motorista",
-    ops: 8,
-    gross: "R$ 33.600",
-    rate: "8%",
-    commission: "R$ 2.688",
-    status: "active" as const,
-  },
-  {
-    id: "COM-002",
-    operator: "Maria Santos",
-    role: "Operadora",
-    ops: 6,
-    gross: "R$ 24.800",
-    rate: "6%",
-    commission: "R$ 1.488",
-    status: "pending" as const,
-  },
-  {
-    id: "COM-003",
-    operator: "Carlos Ferreira",
-    role: "Motorista",
-    ops: 10,
-    gross: "R$ 42.000",
-    rate: "8%",
-    commission: "R$ 3.360",
-    status: "pending" as const,
-  },
-  {
-    id: "COM-004",
-    operator: "Ana Lima",
-    role: "Supervisora",
-    ops: 14,
-    gross: "R$ 66.400",
-    rate: "4%",
-    commission: "R$ 2.656",
-    status: "active" as const,
-  },
-  {
-    id: "COM-005",
-    operator: "Pedro Costa",
-    role: "Motorista",
-    ops: 5,
-    gross: "R$ 20.100",
-    rate: "8%",
-    commission: "R$ 1.608",
-    status: "error" as const,
-  },
-];
+const COMMISSION_RATE = 0.05;
 
-type CommissionRow = (typeof COMMISSIONS)[number];
+const contractStatusLabel: Record<ContractStatus, string> = {
+  active: "Ativo",
+  draft: "Rascunho",
+  expired: "Expirado",
+  terminated: "Rescindido",
+  suspended: "Suspenso",
+};
 
-const COLUMNS = [
-  { key: "id", label: "ID" },
-  { key: "operator", label: "Colaborador" },
-  { key: "role", label: "Função" },
-  { key: "ops", label: "Operações" },
-  { key: "gross", label: "Valor Bruto" },
-  { key: "rate", label: "Taxa" },
-  {
-    key: "commission",
-    label: "Comissão",
-    render: (row: CommissionRow) => (
-      <span className="font-semibold text-emerald-600">{row.commission}</span>
-    ),
-  },
-  {
-    key: "status",
-    label: "Status",
-    render: (row: CommissionRow) => (
-      <StatusBadge
-        status={row.status}
-        label={
-          row.status === "active" ? "Pago" : row.status === "pending" ? "Pendente" : "Contestado"
-        }
-      />
-    ),
-  },
-];
+function contractStatusToUi(
+  status: ContractStatus,
+): "active" | "inactive" | "pending" | "warning" | "error" {
+  switch (status) {
+    case "active":
+      return "active";
+    case "draft":
+      return "pending";
+    case "suspended":
+      return "warning";
+    case "expired":
+    case "terminated":
+      return "inactive";
+    default:
+      return "inactive";
+  }
+}
+
+interface CommissionRow extends Record<string, unknown> {
+  id: string;
+  org_name: string;
+  contract_type: string;
+  status: ContractStatus;
+  value_amount: number;
+  commission: number;
+}
 
 export default function CommissionsPage() {
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/contracts")
+      .then((r) => r.json())
+      .then((j: { data: Contract[] }) => setContracts(j.data ?? []))
+      .catch(() => setContracts([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const activeContracts = contracts.filter((c) => c.status === "active");
+  const totalBase = activeContracts.reduce((s, c) => s + Number(c.value_amount), 0);
+  const totalCommission = totalBase * COMMISSION_RATE;
+  const paidCommission = contracts
+    .filter((c) => c.status === "active")
+    .reduce((s, c) => s + Number(c.value_amount) * COMMISSION_RATE, 0);
+  const pendingCount = contracts.filter((c) => c.status === "draft").length;
+
+  const rows: CommissionRow[] = contracts.map((c) => ({
+    id: c.id,
+    org_name: c.organization_name ?? "—",
+    contract_type: c.type,
+    status: c.status,
+    value_amount: Number(c.value_amount),
+    commission: Number(c.value_amount) * COMMISSION_RATE,
+  }));
+
+  const contractTypeLabel: Record<string, string> = {
+    service: "Serviço",
+    rental: "Locação",
+    lease: "Arrendamento",
+    subscription: "Assinatura",
+    one_time: "Avulso",
+  };
+
+  const columns = [
+    {
+      key: "id",
+      label: "Contrato",
+      render: (row: CommissionRow) => (
+        <span className="font-mono text-xs text-slate-500">
+          {String(row.id).slice(0, 8).toUpperCase()}
+        </span>
+      ),
+    },
+    { key: "org_name", label: "Organização" },
+    {
+      key: "contract_type",
+      label: "Tipo",
+      render: (row: CommissionRow) => (
+        <span className="text-slate-700">
+          {contractTypeLabel[String(row.contract_type)] ?? String(row.contract_type)}
+        </span>
+      ),
+    },
+    {
+      key: "value_amount",
+      label: "Valor Base",
+      render: (row: CommissionRow) => (
+        <span className="text-slate-700">{brl(Number(row.value_amount))}</span>
+      ),
+    },
+    {
+      key: "commission",
+      label: `Comissão (${COMMISSION_RATE * 100}%)`,
+      render: (row: CommissionRow) => (
+        <span className="font-semibold text-emerald-600">{brl(Number(row.commission))}</span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row: CommissionRow) => (
+        <StatusBadge
+          status={contractStatusToUi(row.status as ContractStatus)}
+          label={contractStatusLabel[row.status as ContractStatus]}
+        />
+      ),
+    },
+  ];
+
   return (
     <AppShell title="Comissões">
       <SectionHeader
         title="Comissões"
-        description="Gestão e pagamento de comissões para motoristas e operadores."
+        description="Comissões calculadas automaticamente sobre contratos ativos (5%)."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <MetricCard
-          title="Total a Pagar"
-          value="R$ 7.512"
-          change={8}
+          title="Total Comissões"
+          value={brl(totalCommission)}
           trend="up"
           icon={<DollarSign className="w-5 h-5" />}
         />
         <MetricCard
-          title="Pendentes"
-          value="2"
-          trend="neutral"
-          icon={<Award className="w-5 h-5" />}
-        />
-        <MetricCard
-          title="Pagos este mês"
-          value="R$ 5.344"
+          title="Pagas (Contratos Ativos)"
+          value={brl(paidCommission)}
           trend="up"
-          icon={<Award className="w-5 h-5" />}
+          icon={<TrendingUp className="w-5 h-5" />}
         />
         <MetricCard
-          title="Contestações"
-          value="1"
-          trend="down"
+          title="Pendentes"
+          value={pendingCount}
+          trend="neutral"
           icon={<Award className="w-5 h-5" />}
         />
       </div>
 
-      <DataTable columns={COLUMNS} data={COMMISSIONS} />
+      <DataTable
+        columns={columns as Parameters<typeof DataTable>[0]["columns"]}
+        data={rows as unknown as Record<string, unknown>[]}
+        loading={loading}
+      />
     </AppShell>
   );
 }

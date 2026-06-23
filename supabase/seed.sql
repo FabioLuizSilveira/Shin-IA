@@ -64,3 +64,27 @@ INSERT INTO notifications (id, tenant_id, recipient_external_ref, channel, prior
   ('90000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'demo-user', 'in_app', 'critical', 'Manutenção programada', 'Empilhadeira GHI-9012 precisa de manutenção urgente.', 'pending', now() - interval '2 hours'),
   ('90000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001', 'demo-user', 'in_app', 'normal', 'Recurso alocado', 'João Motorista foi alocado para a operação de pickup.', 'read', now() - interval '4 hours')
 ON CONFLICT (id) DO NOTHING;
+
+-- Demo billing_accounts
+INSERT INTO billing_accounts (id, tenant_id, organization_id, cycle, status, credit_limit_amount, credit_limit_currency, balance_amount, balance_currency) VALUES
+  ('a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'monthly', 'active', 50000.00, 'BRL', 12500.00, 'BRL'),
+  ('a0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000002', 'quarterly', 'active', 25000.00, 'BRL', 0.00, 'BRL'),
+  ('a0000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000003', 'monthly', 'suspended', 10000.00, 'BRL', 3200.00, 'BRL')
+ON CONFLICT (id) DO NOTHING;
+
+-- Demo invoices
+INSERT INTO invoices (id, tenant_id, billing_account_id, status, total_amount, total_currency, due_date, paid_at) VALUES
+  ('b0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'paid', 45000.00, 'BRL', (current_date - interval '5 days')::date, now() - interval '3 days'),
+  ('b0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'issued', 12500.00, 'BRL', (current_date + interval '10 days')::date, null),
+  ('b0000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 'overdue', 8900.00, 'BRL', (current_date - interval '15 days')::date, null),
+  ('b0000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000003', 'draft', 3200.00, 'BRL', (current_date + interval '30 days')::date, null)
+ON CONFLICT (id) DO NOTHING;
+
+-- Demo invoice_line_items
+INSERT INTO invoice_line_items (id, invoice_id, tenant_id, description, quantity, unit_price_amount, unit_price_currency, sort_order) VALUES
+  ('c0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Serviço de Logística - Novembro', 1, 45000.00, 'BRL', 0),
+  ('c0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'Locação de Frota - Dezembro', 1, 10000.00, 'BRL', 0),
+  ('c0000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'Taxa de Gestão', 1, 2500.00, 'BRL', 1),
+  ('c0000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'Assinatura Trimestral', 1, 8900.00, 'BRL', 0),
+  ('c0000000-0000-0000-0000-000000000005', 'b0000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'Serviços Avulsos', 2, 1600.00, 'BRL', 0)
+ON CONFLICT (id) DO NOTHING;
