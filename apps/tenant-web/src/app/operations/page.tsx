@@ -1,95 +1,245 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Zap, MapPin, User } from "lucide-react";
+import { Zap, User, Plus } from "lucide-react";
+import type { Operation, OperationStatus, OperationType, Resource } from "@/types/domain";
 
-const OPERATIONS = [
-  {
-    id: "OP-0042",
-    name: "Entrega São Paulo — Centro",
-    asset: "ABC-1234",
-    assetName: "Scania R450",
-    operator: "João Silva",
-    status: "active" as const,
-    time: "08:30",
-    value: "R$ 4.200",
-    origin: "Curitiba",
-    dest: "São Paulo",
-  },
-  {
-    id: "OP-0043",
-    name: "Coleta Porto Alegre",
-    asset: "MNO-2233",
-    assetName: "Volvo FH 540",
-    operator: "Carlos Ferreira",
-    status: "pending" as const,
-    time: "10:00",
-    value: "R$ 3.800",
-    origin: "Porto Alegre",
-    dest: "Curitiba",
-  },
-  {
-    id: "OP-0044",
-    name: "Transporte Industrial ABC",
-    asset: "PQR-4455",
-    assetName: "Mercedes Actros",
-    operator: "Maria Santos",
-    status: "pending" as const,
-    time: "14:00",
-    value: "R$ 7.100",
-    origin: "Joinville",
-    dest: "Blumenau",
-  },
-  {
-    id: "OP-0040",
-    name: "Entrega Urgente Florianópolis",
-    asset: "GHI-9012",
-    assetName: "Scania P320",
-    operator: "Pedro Costa",
-    status: "inactive" as const,
-    time: "ontem",
-    value: "R$ 2.900",
-    origin: "Curitiba",
-    dest: "Florianópolis",
-  },
-  {
-    id: "OP-0039",
-    name: "Rota Balneário Camboriú",
-    asset: "JKL-3456",
-    assetName: "Volvo FH 460",
-    operator: "Ana Lima",
-    status: "inactive" as const,
-    time: "ontem",
-    value: "R$ 5.600",
-    origin: "Porto Alegre",
-    dest: "Balneário Camboriú",
-  },
-];
+function opStatusToUi(status: OperationStatus): "active" | "inactive" | "pending" | "warning" {
+  switch (status) {
+    case "in_progress":
+      return "active";
+    case "pending":
+      return "pending";
+    case "completed":
+      return "inactive";
+    case "cancelled":
+    case "failed":
+      return "warning";
+    default:
+      return "inactive";
+  }
+}
 
-const FILTERS = ["Todas", "Em rota", "Pendentes", "Concluídas"];
+function opStatusLabel(status: OperationStatus): string {
+  switch (status) {
+    case "in_progress":
+      return "Em andamento";
+    case "pending":
+      return "Pendente";
+    case "completed":
+      return "Concluída";
+    case "cancelled":
+      return "Cancelada";
+    case "failed":
+      return "Falhou";
+    default:
+      return status;
+  }
+}
 
-const filterFn = (op: (typeof OPERATIONS)[number], filter: string) => {
+function opTypeLabel(type: OperationType): string {
+  const labels: Record<OperationType, string> = {
+    delivery: "Entrega",
+    pickup: "Coleta",
+    maintenance: "Manutenção",
+    inspection: "Inspeção",
+    transfer: "Transferência",
+  };
+  return labels[type] ?? type;
+}
+
+const FILTERS = ["Todas", "Em andamento", "Pendentes", "Concluídas"];
+
+function filterFn(op: Operation, filter: string): boolean {
   if (filter === "Todas") return true;
-  if (filter === "Em rota") return op.status === "active";
+  if (filter === "Em andamento") return op.status === "in_progress";
   if (filter === "Pendentes") return op.status === "pending";
-  if (filter === "Concluídas") return op.status === "inactive";
+  if (filter === "Concluídas") return op.status === "completed";
   return true;
-};
+}
 
 export default function OperationsPage() {
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("Todas");
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const filtered = OPERATIONS.filter((op) => filterFn(op, activeFilter));
+  const [formType, setFormType] = useState<OperationType>("delivery");
+  const [formResource, setFormResource] = useState("");
+  const [formStart, setFormStart] = useState("");
+  const [formEnd, setFormEnd] = useState("");
+
+  async function fetchOperations() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/operations");
+      if (!res.ok) throw new Error("Falha ao carregar operações");
+      const json = (await res.json()) as { data: Operation[] };
+      setOperations(json.data ?? []);
+    } catch {
+      // keep empty state
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchResources() {
+    try {
+      const res = await fetch("/api/resources");
+      if (!res.ok) return;
+      const json = (await res.json()) as { data: Resource[] };
+      setResources(json.data ?? []);
+    } catch {
+      // keep empty
+    }
+  }
+
+  useEffect(() => {
+    void fetchOperations();
+    void fetchResources();
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/operations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: formType,
+          resource_id: formResource,
+          scheduled_starts_at: new Date(formStart).toISOString(),
+          scheduled_ends_at: new Date(formEnd).toISOString(),
+        }),
+      });
+      if (!res.ok) {
+        const json = (await res.json()) as { error?: string };
+        throw new Error(json.error ?? "Falha ao criar operação");
+      }
+      setShowForm(false);
+      setFormType("delivery");
+      setFormResource("");
+      setFormStart("");
+      setFormEnd("");
+      await fetchOperations();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erro ao criar operação");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const filtered = operations.filter((op) => filterFn(op, activeFilter));
 
   return (
     <AppShell title="Operações">
       <SectionHeader
         title="Operações"
         description="Gestão em tempo real de todas as operações logísticas."
+        action={
+          !showForm ? (
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer border-0"
+            >
+              <Plus className="w-4 h-4" />
+              Nova Operação
+            </button>
+          ) : undefined
+        }
       />
+
+      {showForm && (
+        <form
+          onSubmit={(e) => void handleSubmit(e)}
+          className="bg-white rounded-xl border border-slate-200 p-6 mb-6 shadow-sm"
+        >
+          <h3 className="text-base font-semibold text-slate-900 mb-4">Nova Operação</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Tipo <span className="text-red-500">*</span>
+              </label>
+              <select
+                required
+                value={formType}
+                onChange={(e) => setFormType(e.target.value as OperationType)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-shina-blue/30 focus:border-shina-blue bg-white"
+              >
+                <option value="delivery">Entrega</option>
+                <option value="pickup">Coleta</option>
+                <option value="maintenance">Manutenção</option>
+                <option value="inspection">Inspeção</option>
+                <option value="transfer">Transferência</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Recurso <span className="text-red-500">*</span>
+              </label>
+              <select
+                required
+                value={formResource}
+                onChange={(e) => setFormResource(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-shina-blue/30 focus:border-shina-blue bg-white"
+              >
+                <option value="">Selecione um recurso</option>
+                {resources.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Data início <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                required
+                value={formStart}
+                onChange={(e) => setFormStart(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-shina-blue/30 focus:border-shina-blue"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Data fim <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                required
+                value={formEnd}
+                onChange={(e) => setFormEnd(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-shina-blue/30 focus:border-shina-blue"
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2 bg-shina-blue text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 transition-colors cursor-pointer border-0"
+            >
+              {submitting ? "Salvando..." : "Salvar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="px-4 py-2 text-slate-600 rounded-lg text-sm bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer border-0"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Filter pills */}
       <div className="flex gap-2 mb-6 flex-wrap">
@@ -108,56 +258,78 @@ export default function OperationsPage() {
         ))}
       </div>
 
-      {/* Operation cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((op) => (
-          <div
-            key={op.id}
-            className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow duration-200"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <p className="text-xs font-mono text-slate-400 mb-0.5">{op.id}</p>
-                <p className="text-sm font-semibold text-slate-900">{op.name}</p>
-              </div>
-              <StatusBadge
-                status={op.status}
-                label={
-                  op.status === "active"
-                    ? "Em rota"
-                    : op.status === "pending"
-                      ? "Pendente"
-                      : "Concluída"
-                }
-              />
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 animate-pulse"
+            >
+              <div className="h-4 bg-slate-100 rounded mb-3 w-3/4" />
+              <div className="h-3 bg-slate-100 rounded mb-2 w-1/2" />
+              <div className="h-3 bg-slate-100 rounded mb-2 w-2/3" />
             </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.length === 0 ? (
+            <p className="text-slate-400 text-sm col-span-3 py-8 text-center">
+              Nenhuma operação encontrada.
+            </p>
+          ) : (
+            filtered.map((op) => (
+              <div
+                key={op.id}
+                className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow duration-200"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-xs font-mono text-slate-400 mb-0.5">
+                      {op.id.slice(0, 8).toUpperCase()}
+                    </p>
+                    <p className="text-sm font-semibold text-slate-900">{opTypeLabel(op.type)}</p>
+                  </div>
+                  <StatusBadge status={opStatusToUi(op.status)} label={opStatusLabel(op.status)} />
+                </div>
 
-            <div className="space-y-2 mb-4">
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <Zap className="w-3.5 h-3.5 text-slate-400" />
-                <span>
-                  {op.assetName} — {op.asset}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <User className="w-3.5 h-3.5 text-slate-400" />
-                <span>{op.operator}</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                <span>
-                  {op.origin} → {op.dest}
-                </span>
-              </div>
-            </div>
+                <div className="space-y-2 mb-4">
+                  {op.resource_name && (
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <User className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{op.resource_name}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <Zap className="w-3.5 h-3.5 text-slate-400" />
+                    <span>
+                      Início:{" "}
+                      {new Date(op.scheduled_starts_at).toLocaleString("pt-BR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-              <span className="text-sm font-semibold text-slate-800">{op.value}</span>
-              <span className="text-xs text-slate-400">{op.time}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+                <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                  <span className="text-xs text-slate-400">
+                    Fim:{" "}
+                    {new Date(op.scheduled_ends_at).toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </AppShell>
   );
 }
