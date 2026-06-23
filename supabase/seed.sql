@@ -55,3 +55,12 @@ INSERT INTO contracts (id, tenant_id, organization_id, type, status, value_amoun
   ('80000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000002', 'rental', 'active', 12500.00, 'BRL', now() - interval '60 days', now() + interval '120 days'),
   ('80000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000003', 'subscription', 'draft', 8900.00, 'BRL', now(), now() + interval '365 days')
 ON CONFLICT (id) DO NOTHING;
+
+-- Demo in_app notifications (use ON CONFLICT DO NOTHING)
+INSERT INTO notifications (id, tenant_id, recipient_external_ref, channel, priority, subject, body, status, created_at) VALUES
+  ('90000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'demo-user', 'in_app', 'high', 'Operação atrasada', 'A operação de entrega #DEL-001 está com 30 minutos de atraso.', 'pending', now() - interval '5 minutes'),
+  ('90000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'demo-user', 'in_app', 'normal', 'Novo contrato assinado', 'Transportadora Silva assinou o contrato de serviço no valor de R$ 45.000.', 'pending', now() - interval '1 hour'),
+  ('90000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'demo-user', 'in_app', 'low', 'Ativo disponível', 'Caminhão ABC-1234 está disponível para nova operação.', 'read', now() - interval '3 hours'),
+  ('90000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'demo-user', 'in_app', 'critical', 'Manutenção programada', 'Empilhadeira GHI-9012 precisa de manutenção urgente.', 'pending', now() - interval '2 hours'),
+  ('90000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001', 'demo-user', 'in_app', 'normal', 'Recurso alocado', 'João Motorista foi alocado para a operação de pickup.', 'read', now() - interval '4 hours')
+ON CONFLICT (id) DO NOTHING;

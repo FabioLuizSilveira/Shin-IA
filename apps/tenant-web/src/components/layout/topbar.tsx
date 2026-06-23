@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
-import { Search, Bell } from "lucide-react";
+import { Search } from "lucide-react";
+import { NotificationBell } from "@/components/ui/notification-dropdown";
 
 interface TopbarProps {
   title: string;
@@ -14,12 +15,7 @@ export function Topbar({ title }: TopbarProps) {
         <button className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer bg-transparent border-0">
           <Search className="w-4 h-4" />
         </button>
-        <div className="relative">
-          <button className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer bg-transparent border-0">
-            <Bell className="w-4 h-4" />
-          </button>
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-shina-blue rounded-full" />
-        </div>
+        <NotificationBell />
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-shina-blue to-shina-cyan flex items-center justify-center text-white text-xs font-bold ml-1">
           T
         </div>

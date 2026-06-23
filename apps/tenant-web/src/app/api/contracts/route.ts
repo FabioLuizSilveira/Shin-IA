@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTenantId } from "@/lib/auth/get-tenant-id";
+import { createNotification } from "@/lib/notifications/create-notification";
 import type { Contract, ContractType } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
@@ -124,6 +125,13 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  await createNotification({
+    tenantId,
+    subject: "Novo contrato cadastrado",
+    body: `Contrato do tipo "${type}" no valor de R$ ${Number(value_amount).toLocaleString("pt-BR")} foi criado.`,
+    priority: "high",
+  });
 
   return NextResponse.json({ data }, { status: 201 });
 }

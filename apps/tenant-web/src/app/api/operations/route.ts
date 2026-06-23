@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTenantId } from "@/lib/auth/get-tenant-id";
+import { createNotification } from "@/lib/notifications/create-notification";
 import type { Operation, OperationType } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
@@ -121,6 +122,13 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  await createNotification({
+    tenantId,
+    subject: "Nova operação criada",
+    body: `Operação do tipo "${type}" foi criada com sucesso.`,
+    priority: "normal",
+  });
 
   return NextResponse.json({ data }, { status: 201 });
 }
