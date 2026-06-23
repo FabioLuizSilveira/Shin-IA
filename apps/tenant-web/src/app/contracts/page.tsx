@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { MetricCard } from "@/components/ui/metric-card";
+import { ContractDetail } from "@/components/ui/contract-detail";
 import { FileText, DollarSign, Plus } from "lucide-react";
 import type { Contract, ContractStatus, ContractType, Organization } from "@/types/domain";
 
@@ -62,37 +63,13 @@ type ContractRow = Contract & {
   endFormatted: string;
 };
 
-const COLUMNS = [
-  { key: "id", label: "Contrato", render: (row: ContractRow) => row.id.slice(0, 8).toUpperCase() },
-  { key: "organization_name", label: "Cliente" },
-  { key: "typeLabel", label: "Tipo" },
-  { key: "valueFormatted", label: "Valor" },
-  {
-    key: "uiStatus",
-    label: "Status",
-    render: (row: ContractRow) => (
-      <StatusBadge status={row.uiStatus} label={contractStatusLabel(row.status)} />
-    ),
-  },
-  { key: "startFormatted", label: "Início" },
-  { key: "endFormatted", label: "Fim" },
-  {
-    key: "actions",
-    label: "",
-    render: (_row: ContractRow) => (
-      <button className="text-xs text-shina-blue hover:text-blue-700 font-medium bg-transparent border-0 cursor-pointer">
-        Ver →
-      </button>
-    ),
-  },
-];
-
 export default function ContractsPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
 
   const [formOrg, setFormOrg] = useState("");
   const [formType, setFormType] = useState<ContractType>("service");
@@ -101,7 +78,7 @@ export default function ContractsPage() {
   const [formStart, setFormStart] = useState("");
   const [formEnd, setFormEnd] = useState("");
 
-  async function fetchContracts() {
+  const fetchContracts = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/contracts");
@@ -113,7 +90,7 @@ export default function ContractsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   async function fetchOrganizations() {
     try {
@@ -129,7 +106,7 @@ export default function ContractsPage() {
   useEffect(() => {
     void fetchContracts();
     void fetchOrganizations();
-  }, []);
+  }, [fetchContracts]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -158,8 +135,8 @@ export default function ContractsPage() {
       setFormStart("");
       setFormEnd("");
       await fetchContracts();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Erro ao criar contrato");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao criar contrato");
     } finally {
       setSubmitting(false);
     }
@@ -177,6 +154,38 @@ export default function ContractsPage() {
   const activeContracts = contracts.filter((c) => c.status === "active");
   const totalValue = activeContracts.reduce((sum, c) => sum + c.value_amount, 0);
   const draftCount = contracts.filter((c) => c.status === "draft").length;
+
+  const COLUMNS = [
+    {
+      key: "id",
+      label: "Contrato",
+      render: (row: ContractRow) => row.id.slice(0, 8).toUpperCase(),
+    },
+    { key: "organization_name", label: "Cliente" },
+    { key: "typeLabel", label: "Tipo" },
+    { key: "valueFormatted", label: "Valor" },
+    {
+      key: "uiStatus",
+      label: "Status",
+      render: (row: ContractRow) => (
+        <StatusBadge status={row.uiStatus} label={contractStatusLabel(row.status)} />
+      ),
+    },
+    { key: "startFormatted", label: "Início" },
+    { key: "endFormatted", label: "Fim" },
+    {
+      key: "actions",
+      label: "",
+      render: (row: ContractRow) => (
+        <button
+          onClick={() => setSelectedContractId(row.id)}
+          className="text-xs text-shina-blue hover:text-blue-700 font-medium bg-transparent border-0 cursor-pointer"
+        >
+          Detalhes →
+        </button>
+      ),
+    },
+  ];
 
   return (
     <AppShell title="Contratos">
@@ -325,6 +334,12 @@ export default function ContractsPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data={tableData as any}
         loading={loading}
+      />
+
+      <ContractDetail
+        contractId={selectedContractId}
+        onClose={() => setSelectedContractId(null)}
+        onStatusChange={() => void fetchContracts()}
       />
     </AppShell>
   );

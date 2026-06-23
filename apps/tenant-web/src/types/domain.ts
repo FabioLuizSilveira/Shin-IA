@@ -75,8 +75,34 @@ export type OrganizationType = "customer" | "supplier" | "partner" | "internal";
 export interface Organization {
   id: string;
   name: string;
+  trade_name?: string;
+  document: string;
   type: OrganizationType;
   email?: string;
+  phone?: string;
+  address_city: string;
+  address_state: string;
+  address_country: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface ContractDetail {
+  id: string;
+  type: ContractType;
+  status: ContractStatus;
+  value_amount: number;
+  value_currency: string;
+  period_starts_at: string;
+  period_ends_at: string;
+  created_at: string;
+  organizations: {
+    id: string;
+    name: string;
+    type: OrganizationType;
+    document: string;
+    email?: string;
+  } | null;
 }
 
 export type ResourceType = "human" | "vehicle" | "equipment" | "virtual";

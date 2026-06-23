@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   BarChart2,
+  Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/operations", label: "Operações", icon: Zap },
   { href: "/assets", label: "Frota & Ativos", icon: Truck },
+  { href: "/crm", label: "Clientes & Parceiros", icon: Users },
   { href: "/contracts", label: "Contratos", icon: FileText },
   { href: "/financial", label: "Financeiro", icon: DollarSign },
   { href: "/reports", label: "Relatórios", icon: BarChart2 },
