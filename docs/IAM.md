@@ -5,6 +5,12 @@
 This document specifies the complete IAM model for the Shinã Platform. IAM governs who can do what, on which resources, under what conditions.
 
 See also:
+
+- [`PLATFORM_IAM.md`](PLATFORM_IAM.md) — Platform operator roles (11 roles)
+- [`TENANT_IAM.md`](TENANT_IAM.md) — Tenant user roles (10 roles)
+- [`AUTHORIZATION_MODEL.md`](AUTHORIZATION_MODEL.md) — RBAC, ABAC, Delegated Access, Impersonation, MFA, Approval Workflows
+- [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md) — Complete Role × Permission matrix
+- [`APPROVAL_WORKFLOWS.md`](APPROVAL_WORKFLOWS.md) — Approval workflow specifications
 - [`PERMISSIONS_MATRIX.md`](PERMISSIONS_MATRIX.md) — per-feature permission matrix
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — system-level IAM overview
 
@@ -39,19 +45,28 @@ The platform separates identity and access into two distinct tiers that do not o
 
 Platform IAM governs access to the platform itself. It is operated exclusively by Shinã Platform administrators and is invisible to tenant users.
 
-### Platform Roles
+### Platform Roles (11 Total)
 
-| Role | Description |
-|------|-------------|
-| `platform:super_admin` | Full platform access. Can manage all tenants, operators, and platform config |
-| `platform:admin` | Manage tenants, billing, and platform config. Cannot access tenant data |
-| `platform:support` | Read-only access to tenant data for support purposes. Can initiate impersonation with justification |
-| `platform:billing` | Manage platform billing, subscriptions, and invoices |
-| `platform:readonly` | Audit read-only access to platform audit logs and tenant metadata |
+Platform IAM defines 11 distinct operator roles with granular permission sets. See [`PLATFORM_IAM.md`](PLATFORM_IAM.md) for detailed role responsibilities.
+
+| Role                | Tier        |
+| ------------------- | ----------- |
+| Platform Owner      | Executive   |
+| Platform Admin      | Management  |
+| Platform Commercial | Specialist  |
+| Platform Finance    | Specialist  |
+| Platform Billing    | Operational |
+| Platform Support N1 | Operational |
+| Platform Support N2 | Specialist  |
+| Platform Support N3 | Senior      |
+| Platform Auditor    | Audit       |
+| Platform Developer  | Engineering |
+| Platform AI Manager | Specialist  |
 
 ### Platform Policies
 
 Platform policies are evaluated before tenant IAM. A platform policy can:
+
 - **Allow** a platform operator to access a tenant's resources
 - **Deny** a tenant from accessing a specific engine or capability
 - **Override** tenant-level settings for compliance or emergency purposes
@@ -95,20 +110,27 @@ Decision: ALLOW / DENY
 
 A **Role** is a named collection of permissions. Roles are assigned to users and can be created, cloned, and archived by tenant administrators.
 
-### System Roles (non-deletable)
+### System Roles (10 Total — non-deletable)
 
-| Role | Description |
-|------|-------------|
-| `tenant:owner` | Full access to all tenant resources and configuration |
-| `tenant:admin` | Full operational access; cannot modify IAM settings |
-| `tenant:manager` | Manage users and operational entities within branch scope |
-| `tenant:operator` | Execute operations; read-only IAM |
-| `tenant:viewer` | Read-only across all resources within branch scope |
-| `tenant:driver` | Mobile app access; own profile and assigned trips only |
+Tenant IAM defines 10 distinct user roles from organizational leadership to field operators. See [`TENANT_IAM.md`](TENANT_IAM.md) for detailed role responsibilities.
+
+| Role               | Category           |
+| ------------------ | ------------------ |
+| Tenant Owner       | Leadership         |
+| Tenant Admin       | Administration     |
+| Fleet Manager      | Operations         |
+| Operations Manager | Operations         |
+| Commercial Manager | Commercial         |
+| Financial Manager  | Finance            |
+| Supervisor         | Leadership (Field) |
+| Operator           | Operational Staff  |
+| Driver             | Field              |
+| Customer           | External           |
 
 ### Custom Roles
 
 Tenant administrators can create custom roles with arbitrary permission sets. Custom roles:
+
 - Must have a unique name within the tenant
 - Inherit no permissions by default
 - Can be cloned from system or other custom roles
@@ -127,6 +149,7 @@ A **Permission** is the atomic unit of access control. It represents the ability
 ```
 
 Examples:
+
 - `assets:read`
 - `assets:write`
 - `commission.plans:create`
@@ -135,17 +158,17 @@ Examples:
 
 ### Permission Categories
 
-| Category | Resource Prefix | Examples |
-|----------|----------------|---------|
-| Asset Management | `assets:` | read, write, delete, assign |
-| Fleet Operations | `operations:` | read, create, dispatch, close |
-| Tracking | `tracking.*:` | read, configure, acknowledge |
-| Commission | `commission.*:` | read, create, approve, settle |
-| Billing | `billing.*:` | read, manage |
-| IAM | `iam.*:` | read, manage, assign |
-| Config | `config:` | read, write |
-| Reports | `reports:` | read, export, create |
-| Studio | `studio.*:` | access, configure |
+| Category         | Resource Prefix | Examples                      |
+| ---------------- | --------------- | ----------------------------- |
+| Asset Management | `assets:`       | read, write, delete, assign   |
+| Fleet Operations | `operations:`   | read, create, dispatch, close |
+| Tracking         | `tracking.*:`   | read, configure, acknowledge  |
+| Commission       | `commission.*:` | read, create, approve, settle |
+| Billing          | `billing.*:`    | read, manage                  |
+| IAM              | `iam.*:`        | read, manage, assign          |
+| Config           | `config:`       | read, write                   |
+| Reports          | `reports:`      | read, export, create          |
+| Studio           | `studio.*:`     | access, configure             |
 
 ---
 
@@ -160,13 +183,13 @@ type Policy = {
   id: string;
   name: string;
   effect: "allow" | "deny";
-  resources: string[];          // e.g. ["assets:*", "tracking.*:read"]
+  resources: string[]; // e.g. ["assets:*", "tracking.*:read"]
   conditions: PolicyCondition[];
-  priority: number;             // Higher = evaluated first; Deny overrides Allow at same priority
+  priority: number; // Higher = evaluated first; Deny overrides Allow at same priority
 };
 
 type PolicyCondition = {
-  attribute: string;            // e.g. "user.branch", "resource.ownerId", "time.hour"
+  attribute: string; // e.g. "user.branch", "resource.ownerId", "time.hour"
   operator: "eq" | "neq" | "in" | "not_in" | "gt" | "lt" | "contains";
   value: unknown;
 };
@@ -187,6 +210,7 @@ ABAC extends RBAC by evaluating **attributes** of the requesting user, the resou
 ### Available Attributes
 
 **User attributes:**
+
 - `user.id`
 - `user.roles`
 - `user.branchId`
@@ -196,6 +220,7 @@ ABAC extends RBAC by evaluating **attributes** of the requesting user, the resou
 - `user.tags`
 
 **Resource attributes:**
+
 - `resource.tenantId`
 - `resource.branchId`
 - `resource.ownerId`
@@ -204,6 +229,7 @@ ABAC extends RBAC by evaluating **attributes** of the requesting user, the resou
 - `resource.capabilities`
 
 **Environment attributes:**
+
 - `time.hour` — 0–23 (server UTC)
 - `time.dayOfWeek` — 0–6
 - `request.ipAddress`
@@ -211,12 +237,12 @@ ABAC extends RBAC by evaluating **attributes** of the requesting user, the resou
 
 ### ABAC Use Cases
 
-| Use Case | Policy Example |
-|----------|---------------|
-| Branch managers see only own-branch assets | `user.branchScope contains resource.branchId` |
+| Use Case                                             | Policy Example                                                                    |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Branch managers see only own-branch assets           | `user.branchScope contains resource.branchId`                                     |
 | Commission approvers can only approve, not calculate | Role: `commission.transactions:approve`; deny `commission.transactions:calculate` |
-| Reports available only during business hours | `time.hour >= 8 AND time.hour <= 18` |
-| Sensitive data requires MFA session | `session.mfaVerified = true` |
+| Reports available only during business hours         | `time.hour >= 8 AND time.hour <= 18`                                              |
+| Sensitive data requires MFA session                  | `session.mfaVerified = true`                                                      |
 
 ---
 
@@ -240,16 +266,17 @@ Tenant Root
 
 ### Scope Modes
 
-| Mode | Access |
-|------|--------|
-| `root` | Access to all branches (tenant-wide) |
-| `branch` | Access to assigned branch only |
+| Mode                  | Access                                            |
+| --------------------- | ------------------------------------------------- |
+| `root`                | Access to all branches (tenant-wide)              |
+| `branch`              | Access to assigned branch only                    |
 | `branch_and_children` | Access to assigned branch and all its descendants |
-| `custom` | Explicit list of branch IDs |
+| `custom`              | Explicit list of branch IDs                       |
 
 ### Branch Scope Resolution
 
 A user's effective scope is the **intersection** of:
+
 1. Their assigned branch scope mode
 2. Their role permissions
 3. Any active ABAC policies
@@ -305,12 +332,12 @@ Capabilities are configured in the [Access Control Studio](TENANT_STUDIO.md#acce
 
 MFA is configurable at tenant level:
 
-| Level | Behavior |
-|-------|---------|
-| `disabled` | MFA not required (not recommended) |
-| `optional` | Users can enroll but not required |
+| Level                 | Behavior                                |
+| --------------------- | --------------------------------------- |
+| `disabled`            | MFA not required (not recommended)      |
+| `optional`            | Users can enroll but not required       |
 | `required_for_admins` | Required for roles with IAM permissions |
-| `required_for_all` | Required for all users |
+| `required_for_all`    | Required for all users                  |
 
 ### Supported MFA Methods
 
@@ -337,14 +364,14 @@ Approval workflows intercept sensitive operations and require one or more approv
 
 ### Configurable Approvals
 
-| Operation | Default | Configurable |
-|-----------|---------|-------------|
-| Commission settlement (above threshold) | 1 approver | Yes — threshold and approver count |
-| Commission transaction rejection | 1 approver | Yes |
-| Role assignment to privileged roles | 1 approver | No |
-| Delegation creation | None | Yes |
-| Bulk data export | None | Yes |
-| Impersonation (platform) | 1 platform admin | No |
+| Operation                               | Default          | Configurable                       |
+| --------------------------------------- | ---------------- | ---------------------------------- |
+| Commission settlement (above threshold) | 1 approver       | Yes — threshold and approver count |
+| Commission transaction rejection        | 1 approver       | Yes                                |
+| Role assignment to privileged roles     | 1 approver       | No                                 |
+| Delegation creation                     | None             | Yes                                |
+| Bulk data export                        | None             | Yes                                |
+| Impersonation (platform)                | 1 platform admin | No                                 |
 
 ### Approval Escalation
 

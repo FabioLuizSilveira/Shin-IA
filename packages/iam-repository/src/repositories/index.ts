@@ -1,0 +1,13 @@
+export { BaseRepository, type BaseRepositoryDeps } from "./base.repository.js";
+export { PlatformRoleRepository } from "./platform-role.repository.js";
+export { PlatformPermissionRepository } from "./platform-permission.repository.js";
+export { PlatformRolePermissionRepository } from "./platform-role-permission.repository.js";
+export { PlatformUserRoleRepository } from "./platform-user-role.repository.js";
+export { TenantRoleRepository } from "./tenant-role.repository.js";
+export { TenantPermissionRepository } from "./tenant-permission.repository.js";
+export { TenantRolePermissionRepository } from "./tenant-role-permission.repository.js";
+export { TenantUserRoleRepository } from "./tenant-user-role.repository.js";
+export { DelegatedAccessRepository } from "./delegated-access.repository.js";
+export { ImpersonationSessionRepository } from "./impersonation-session.repository.js";
+export { ApprovalRequestRepository } from "./approval-request.repository.js";
+export { ApprovalStepRepository } from "./approval-step.repository.js";

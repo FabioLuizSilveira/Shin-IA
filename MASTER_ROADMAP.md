@@ -20,15 +20,17 @@ Shinã Platform is a multi-tenant fleet and mobility intelligence platform. It p
 
 ## Milestone Overview
 
-| Milestone | Status | Theme |
-|-----------|--------|-------|
-| M1 — Foundation | ✅ Complete | Monorepo, tooling, CI/CD |
-| M1.1 — Doc Alignment | ✅ Complete | Architecture, IAM, Tracking, Commission documented |
-| M2 — Application Shells | ⬜ Next | Next.js web app, shared packages |
-| M3 — Data Layer | ⬜ | Supabase schema, migrations, RLS |
-| M4 — Authentication | ⬜ | Auth flows, session management |
-| M5 — Core Engines | ⬜ | First engine implementations |
-| M6 — Launch | ⬜ | Polish, performance, E2E tests |
+| Milestone             | Status      | Theme                                                                            |
+| --------------------- | ----------- | -------------------------------------------------------------------------------- |
+| M1 — Foundation       | ✅ Complete | Monorepo, tooling, CI/CD                                                         |
+| M1.1 — Doc Alignment  | ✅ Complete | Architecture, IAM, Tracking, Commission documented                               |
+| M2 — Core Domain      | ✅ Complete | Domain model, aggregates, value objects                                          |
+| M3 — Data Layer       | ✅ Complete | 21 migrations, schema validation, TypeScript types                               |
+| M3.1 — DB Validation  | ✅ Complete | PostgreSQL validation, RLS testing, schema export                                |
+| M4.0 — IAM Design     | ✅ Complete | Platform IAM (11 roles) · Tenant IAM (10 roles) · RBAC/ABAC · Approval Workflows |
+| M4.1 — Authentication | ⬜ Next     | Auth flows, session management, MFA                                              |
+| M5 — Core Engines     | ⬜          | First engine implementations                                                     |
+| M6 — Launch           | ⬜          | Polish, performance, E2E tests                                                   |
 
 ---
 
@@ -92,7 +94,32 @@ Shinã Platform is a multi-tenant fleet and mobility intelligence platform. It p
 
 ---
 
-## M4: Authentication
+## M4.0: IAM Design (Complete)
+
+**Theme:** Complete identity and access management specification — no code, documentation only.
+
+### Deliverables
+
+- **Platform IAM (11 roles):** Owner, Admin, Commercial, Finance, Billing, Support N1/N2/N3, Auditor, Developer, AI Manager
+- **Tenant IAM (10 roles):** Owner, Admin, Fleet Manager, Operations Manager, Commercial Manager, Financial Manager, Supervisor, Operator, Driver, Customer
+- **RBAC + ABAC:** Role × Permission matrix, branch scope, capability scope, ABAC conditions
+- **Delegated Access:** Time-bounded permission delegation with audit trail
+- **Impersonation:** Platform support workflows with secondary confirmation and immutable logging
+- **Approval Workflows:** 7 configurable approval workflows (settlements, invoices, config changes, access grants, etc.)
+- **MFA Policy:** Multi-factor authentication requirements per role tier
+- **Session Policy:** Session duration, inactivity timeouts, concurrent session limits
+
+### Documentation Files Created
+
+- `docs/PLATFORM_IAM.md` — 11 platform operator roles
+- `docs/TENANT_IAM.md` — 10 tenant user roles
+- `docs/AUTHORIZATION_MODEL.md` — RBAC/ABAC engine, delegated access, impersonation, MFA, approval workflows
+- `docs/ACCESS_MATRIX.md` — 100 permissions across 21 roles
+- `docs/APPROVAL_WORKFLOWS.md` — 7 approval workflow specifications
+
+---
+
+## M4.1: Authentication
 
 **Theme:** Users can securely authenticate and maintain sessions.
 
@@ -174,14 +201,14 @@ Shinã Platform is a multi-tenant fleet and mobility intelligence platform. It p
 
 ## Domain Capability Targets by Milestone
 
-| Domain | M2 | M3 | M4 | M5 | M6 |
-|--------|----|----|----|----|-----|
-| **Tracking & Telematics** | — | Schema ✓ | — | Full ✓ | Hardened |
-| **Commission Management** | — | Schema ✓ | — | Full ✓ | + Payroll webhook |
-| **IAM Enterprise** | — | Schema ✓ | Auth ✓ | Full ✓ | + SSO |
-| **Billing Engine** | — | Schema ✓ | — | Basic ✓ | + NF-e |
-| **Blueprints** | — | — | — | Mobility + Truck ✓ | All blueprints |
-| **Studios** | — | — | — | Access Control + Commercial ✓ | All studios |
+| Domain                    | M2  | M3       | M4     | M5                            | M6                |
+| ------------------------- | --- | -------- | ------ | ----------------------------- | ----------------- |
+| **Tracking & Telematics** | —   | Schema ✓ | —      | Full ✓                        | Hardened          |
+| **Commission Management** | —   | Schema ✓ | —      | Full ✓                        | + Payroll webhook |
+| **IAM Enterprise**        | —   | Schema ✓ | Auth ✓ | Full ✓                        | + SSO             |
+| **Billing Engine**        | —   | Schema ✓ | —      | Basic ✓                       | + NF-e            |
+| **Blueprints**            | —   | —        | —      | Mobility + Truck ✓            | All blueprints    |
+| **Studios**               | —   | —        | —      | Access Control + Commercial ✓ | All studios       |
 
 ---
 
@@ -189,21 +216,21 @@ Shinã Platform is a multi-tenant fleet and mobility intelligence platform. It p
 
 Items identified but not scheduled for M1–M6:
 
-| Item | Notes |
-|------|-------|
-| Mobile application (React Native / Expo) | After M5 web is stable |
-| Satellite tracking fallback | Hardware dependency |
-| AI Engine — route optimization | After M5 data is accumulated |
-| AI Engine — predictive maintenance | After M5 telemetry data |
-| Public REST API (third-party integrations) | Post-launch |
-| Multi-currency billing | International expansion |
-| White-label / OEM mode | Enterprise tier feature |
-| Reporting Engine — custom report builder | Post-launch |
+| Item                                       | Notes                        |
+| ------------------------------------------ | ---------------------------- |
+| Mobile application (React Native / Expo)   | After M5 web is stable       |
+| Satellite tracking fallback                | Hardware dependency          |
+| AI Engine — route optimization             | After M5 data is accumulated |
+| AI Engine — predictive maintenance         | After M5 telemetry data      |
+| Public REST API (third-party integrations) | Post-launch                  |
+| Multi-currency billing                     | International expansion      |
+| White-label / OEM mode                     | Enterprise tier feature      |
+| Reporting Engine — custom report builder   | Post-launch                  |
 
 ---
 
 ## Change Log
 
-| Date | Change | Author |
-|------|--------|--------|
+| Date       | Change                                                                                                                           | Author                       |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | 2026-06-20 | Initial MASTER_ROADMAP.md created; incorporated Tracking & Telematics, Commission Management, IAM Enterprise as M3–M5 objectives | Documentation Alignment M1.1 |
