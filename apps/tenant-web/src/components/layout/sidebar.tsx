@@ -15,11 +15,14 @@ import {
   Users,
   Users2,
   Sparkles,
+  Map,
+  Shield,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/map", label: "Mapa da Frota", icon: Map },
   { href: "/operations", label: "Operações", icon: Zap },
   { href: "/resources", label: "Recursos", icon: Users2 },
   { href: "/assets", label: "Frota & Ativos", icon: Truck },
@@ -28,6 +31,7 @@ const NAV_ITEMS = [
   { href: "/financial", label: "Financeiro", icon: DollarSign },
   { href: "/reports", label: "Relatórios", icon: BarChart2 },
   { href: "/commissions", label: "Comissões", icon: Award },
+  { href: "/studio/access", label: "Controle de Acesso", icon: Shield },
   { href: "/ai", label: "AI Center", icon: Sparkles },
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
