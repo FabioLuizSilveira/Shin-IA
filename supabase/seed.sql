@@ -49,6 +49,20 @@ INSERT INTO operations (id, tenant_id, branch_id, resource_id, type, status, sch
   ('70000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', 'inspection', 'pending', now() + interval '1 day', now() + interval '1 day 3 hours')
 ON CONFLICT (id) DO NOTHING;
 
+-- More operations spread across the current month for calendar view
+INSERT INTO operations (id, tenant_id, branch_id, resource_id, type, status, scheduled_starts_at, scheduled_ends_at) VALUES
+  ('70000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000002', 'transfer', 'pending', date_trunc('month', current_date) + interval '2 days', date_trunc('month', current_date) + interval '2 days 3 hours'),
+  ('70000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000003', 'delivery', 'completed', date_trunc('month', current_date) + interval '5 days', date_trunc('month', current_date) + interval '5 days 4 hours'),
+  ('70000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', 'pickup', 'completed', date_trunc('month', current_date) + interval '8 days', date_trunc('month', current_date) + interval '8 days 2 hours'),
+  ('70000000-0000-0000-0000-000000000008', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000004', 'inspection', 'in_progress', date_trunc('month', current_date) + interval '12 days', date_trunc('month', current_date) + interval '12 days 1 hour'),
+  ('70000000-0000-0000-0000-000000000009', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000002', 'maintenance', 'pending', date_trunc('month', current_date) + interval '15 days', date_trunc('month', current_date) + interval '16 days'),
+  ('70000000-0000-0000-0000-000000000010', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000003', 'delivery', 'pending', date_trunc('month', current_date) + interval '18 days', date_trunc('month', current_date) + interval '18 days 5 hours'),
+  ('70000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', 'transfer', 'pending', date_trunc('month', current_date) + interval '21 days', date_trunc('month', current_date) + interval '21 days 3 hours'),
+  ('70000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000002', 'pickup', 'cancelled', date_trunc('month', current_date) + interval '22 days', date_trunc('month', current_date) + interval '22 days 2 hours'),
+  ('70000000-0000-0000-0000-000000000013', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000005', 'delivery', 'pending', date_trunc('month', current_date) + interval '25 days', date_trunc('month', current_date) + interval '25 days 6 hours'),
+  ('70000000-0000-0000-0000-000000000014', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000006', 'inspection', 'pending', date_trunc('month', current_date) + interval '28 days', date_trunc('month', current_date) + interval '28 days 2 hours')
+ON CONFLICT (id) DO NOTHING;
+
 -- Demo contracts
 INSERT INTO contracts (id, tenant_id, organization_id, type, status, value_amount, value_currency, period_starts_at, period_ends_at) VALUES
   ('80000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'service', 'active', 45000.00, 'BRL', now() - interval '30 days', now() + interval '335 days'),

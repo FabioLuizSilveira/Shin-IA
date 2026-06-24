@@ -78,23 +78,41 @@ type TimelineItem = {
   type: "info" | "success" | "warning" | "error";
 };
 
+interface UpcomingOp {
+  id: string;
+  type: string;
+  status: string;
+  scheduled_starts_at: string;
+  resources: { name: string } | null;
+}
+
+const typeLabels: Record<string, string> = {
+  delivery: "Entrega",
+  pickup: "Coleta",
+  maintenance: "Manutenção",
+  inspection: "Inspeção",
+  transfer: "Transferência",
+};
+
 export default function DashboardPage() {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [activityItems, setActivityItems] = useState<TimelineItem[]>([]);
+  const [upcoming, setUpcoming] = useState<UpcomingOp[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [opsRes, assetsRes, contractsRes, analyticsRes, actRes] = await Promise.all([
+      const [opsRes, assetsRes, contractsRes, analyticsRes, actRes, upRes] = await Promise.all([
         fetch("/api/operations"),
         fetch("/api/assets"),
         fetch("/api/contracts"),
         fetch("/api/analytics"),
         fetch("/api/activity"),
+        fetch("/api/operations/upcoming"),
       ]);
 
       if (opsRes.ok) {
@@ -116,6 +134,10 @@ export default function DashboardPage() {
       if (actRes.ok) {
         const actJson = (await actRes.json()) as { data: TimelineItem[] };
         setActivityItems(actJson.data ?? []);
+      }
+      if (upRes.ok) {
+        const upJson = (await upRes.json()) as { data: UpcomingOp[] };
+        setUpcoming(upJson.data ?? []);
       }
     } catch {
       // silently keep empty state
@@ -304,39 +326,59 @@ export default function DashboardPage() {
           )}
         </ChartContainer>
 
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h3 className="text-base font-semibold text-slate-900 font-display">
-              Próximas Operações
-            </h3>
+        {/* Upcoming Operations */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-slate-900">Próximas Operações</h3>
+            <a href="/operations" className="text-sm text-shina-blue hover:underline">
+              Ver calendário →
+            </a>
           </div>
-          <div className="divide-y divide-slate-50 p-4 space-y-3">
-            {loading ? (
-              <div className="animate-pulse space-y-3">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-8 bg-slate-100 rounded" />
-                ))}
-              </div>
-            ) : openOps.length === 0 ? (
-              <p className="text-slate-400 text-sm py-4 text-center">Nenhuma operação pendente.</p>
-            ) : (
-              openOps.slice(0, 5).map((op) => (
-                <div key={op.id} className="flex items-center justify-between py-2">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-2 h-2 rounded-full ${op.status === "in_progress" ? "bg-shina-blue" : "bg-amber-400"}`}
-                    />
-                    <p className="text-sm text-slate-700">
-                      {op.type} — {op.resource_name ?? "sem recurso"}
-                    </p>
+          {loading ? (
+            <div className="animate-pulse space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-12 bg-slate-100 rounded" />
+              ))}
+            </div>
+          ) : upcoming.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-4">Nenhuma operação agendada</p>
+          ) : (
+            <div className="space-y-3">
+              {upcoming.map((op) => {
+                const d = new Date(op.scheduled_starts_at);
+                return (
+                  <div key={op.id} className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex flex-col items-center justify-center shrink-0">
+                      <span className="text-[10px] font-semibold text-shina-blue uppercase">
+                        {d.toLocaleDateString("pt-BR", { month: "short" })}
+                      </span>
+                      <span className="text-base font-bold text-shina-blue leading-none">
+                        {d.getDate()}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900">
+                        {typeLabels[op.type] ?? op.type}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">
+                        {op.resources?.name ?? "—"} ·{" "}
+                        {d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        op.status === "in_progress"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {op.status === "in_progress" ? "Em andamento" : "Pendente"}
+                    </span>
                   </div>
-                  <span className="text-xs text-slate-400">
-                    {new Date(op.scheduled_starts_at).toLocaleDateString("pt-BR")}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

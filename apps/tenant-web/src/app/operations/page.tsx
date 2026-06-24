@@ -6,7 +6,8 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { OperationDetail } from "@/components/ui/operation-detail";
 import { ExportButton } from "@/components/ui/export-button";
-import { Zap, User, Plus } from "lucide-react";
+import { OperationsCalendar } from "@/components/ui/operations-calendar";
+import { Zap, User, Plus, LayoutList, CalendarDays } from "lucide-react";
 import type { Operation, OperationStatus, OperationType, Resource } from "@/types/domain";
 
 function opStatusToUi(status: OperationStatus): "active" | "inactive" | "pending" | "warning" {
@@ -71,6 +72,7 @@ export default function OperationsPage() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectedOpId, setSelectedOpId] = useState<string | null>(null);
+  const [view, setView] = useState<"list" | "calendar">("list");
 
   const [formType, setFormType] = useState<OperationType>("delivery");
   const [formResource, setFormResource] = useState("");
@@ -148,6 +150,23 @@ export default function OperationsPage() {
         action={
           !showForm ? (
             <div className="flex items-center gap-2">
+              {/* View toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                <button
+                  onClick={() => setView("list")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${view === "list" ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                  <LayoutList className="w-4 h-4" />
+                  Lista
+                </button>
+                <button
+                  onClick={() => setView("calendar")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${view === "calendar" ? "bg-white shadow-sm text-slate-900 font-medium" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  Calendário
+                </button>
+              </div>
               <ExportButton entity="operations" />
               <button
                 onClick={() => setShowForm(true)}
@@ -247,100 +266,111 @@ export default function OperationsPage() {
         </form>
       )}
 
-      {/* Filter pills */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => setActiveFilter(f)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer border ${
-              activeFilter === f
-                ? "bg-shina-blue text-white border-shina-blue"
-                : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
-            }`}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 animate-pulse"
-            >
-              <div className="h-4 bg-slate-100 rounded mb-3 w-3/4" />
-              <div className="h-3 bg-slate-100 rounded mb-2 w-1/2" />
-              <div className="h-3 bg-slate-100 rounded mb-2 w-2/3" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.length === 0 ? (
-            <p className="text-slate-400 text-sm col-span-3 py-8 text-center">
-              Nenhuma operação encontrada.
-            </p>
-          ) : (
-            filtered.map((op) => (
-              <div
-                key={op.id}
-                className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow duration-200"
+      {view === "list" ? (
+        <>
+          {/* Filter pills */}
+          <div className="flex gap-2 mb-6 flex-wrap">
+            {FILTERS.map((f) => (
+              <button
+                key={f}
+                onClick={() => setActiveFilter(f)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer border ${
+                  activeFilter === f
+                    ? "bg-shina-blue text-white border-shina-blue"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                }`}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="text-xs font-mono text-slate-400 mb-0.5">
-                      {op.id.slice(0, 8).toUpperCase()}
-                    </p>
-                    <p className="text-sm font-semibold text-slate-900">{opTypeLabel(op.type)}</p>
-                  </div>
-                  <StatusBadge status={opStatusToUi(op.status)} label={opStatusLabel(op.status)} />
-                </div>
+                {f}
+              </button>
+            ))}
+          </div>
 
-                <div className="space-y-2 mb-4">
-                  {op.resource_name && (
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <User className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{op.resource_name}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <Zap className="w-3.5 h-3.5 text-slate-400" />
-                    <span>
-                      Início:{" "}
-                      {new Date(op.scheduled_starts_at).toLocaleString("pt-BR", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 animate-pulse"
+                >
+                  <div className="h-4 bg-slate-100 rounded mb-3 w-3/4" />
+                  <div className="h-3 bg-slate-100 rounded mb-2 w-1/2" />
+                  <div className="h-3 bg-slate-100 rounded mb-2 w-2/3" />
                 </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-                  <span className="text-xs text-slate-400">
-                    Fim:{" "}
-                    {new Date(op.scheduled_ends_at).toLocaleString("pt-BR", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  <button
-                    onClick={() => setSelectedOpId(op.id)}
-                    className="text-xs font-medium text-shina-blue hover:text-blue-700 transition-colors"
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.length === 0 ? (
+                <p className="text-slate-400 text-sm col-span-3 py-8 text-center">
+                  Nenhuma operação encontrada.
+                </p>
+              ) : (
+                filtered.map((op) => (
+                  <div
+                    key={op.id}
+                    className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow duration-200"
                   >
-                    Detalhes →
-                  </button>
-                </div>
-              </div>
-            ))
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-xs font-mono text-slate-400 mb-0.5">
+                          {op.id.slice(0, 8).toUpperCase()}
+                        </p>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {opTypeLabel(op.type)}
+                        </p>
+                      </div>
+                      <StatusBadge
+                        status={opStatusToUi(op.status)}
+                        label={opStatusLabel(op.status)}
+                      />
+                    </div>
+
+                    <div className="space-y-2 mb-4">
+                      {op.resource_name && (
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <User className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{op.resource_name}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        <Zap className="w-3.5 h-3.5 text-slate-400" />
+                        <span>
+                          Início:{" "}
+                          {new Date(op.scheduled_starts_at).toLocaleString("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                      <span className="text-xs text-slate-400">
+                        Fim:{" "}
+                        {new Date(op.scheduled_ends_at).toLocaleString("pt-BR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <button
+                        onClick={() => setSelectedOpId(op.id)}
+                        className="text-xs font-medium text-shina-blue hover:text-blue-700 transition-colors"
+                      >
+                        Detalhes →
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           )}
-        </div>
+        </>
+      ) : (
+        <OperationsCalendar onSelectOperation={(id) => setSelectedOpId(id)} />
       )}
 
       <OperationDetail
