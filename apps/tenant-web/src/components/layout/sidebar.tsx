@@ -14,6 +14,7 @@ import {
   BarChart2,
   Users,
   Users2,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { href: "/financial", label: "Financeiro", icon: DollarSign },
   { href: "/reports", label: "Relatórios", icon: BarChart2 },
   { href: "/commissions", label: "Comissões", icon: Award },
+  { href: "/ai", label: "AI Center", icon: Sparkles },
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
 
