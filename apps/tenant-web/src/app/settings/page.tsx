@@ -2,10 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/app-shell";
-import { Building2, User, Shield, Save, Check, Users2, UserPlus, X } from "lucide-react";
+import { Building2, User, Shield, Save, Check, Users2, UserPlus, X, Bell } from "lucide-react";
 import type { UserProfile, UserProfileStatus } from "@/types/domain";
 
-const TABS = ["Empresa", "Perfil", "Segurança", "Equipe"] as const;
+const TABS = ["Empresa", "Perfil", "Segurança", "Equipe", "Notificações"] as const;
 type Tab = (typeof TABS)[number];
 
 // Plan badge colors
@@ -83,6 +83,14 @@ export default function SettingsPage() {
   const [inviting, setInviting] = useState(false);
   const [teamError, setTeamError] = useState<string | null>(null);
 
+  // notification prefs
+  const [emailOps, setEmailOps] = useState(true);
+  const [emailInvoices, setEmailInvoices] = useState(true);
+  const [emailTeam, setEmailTeam] = useState(true);
+  const [emailGeneral, setEmailGeneral] = useState(true);
+  const [savingNotif, setSavingNotif] = useState(false);
+  const [savedNotif, setSavedNotif] = useState(false);
+
   const supabase = createClient();
 
   const fetchTeam = useCallback(async () => {
@@ -110,6 +118,14 @@ export default function SettingsPage() {
       if (data.user) {
         setEmail(data.user.email ?? "");
         setFullName((data.user.user_metadata?.full_name as string) ?? "");
+        // load notification prefs from user metadata
+        const meta = data.user.user_metadata as Record<string, boolean> | undefined;
+        if (meta) {
+          setEmailOps(meta.email_ops ?? true);
+          setEmailInvoices(meta.email_invoices ?? true);
+          setEmailTeam(meta.email_team ?? true);
+          setEmailGeneral(meta.email_general ?? true);
+        }
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -205,6 +221,23 @@ export default function SettingsPage() {
       await fetchTeam();
     } catch (e) {
       setTeamError(e instanceof Error ? e.message : "Erro ao desativar");
+    }
+  }
+
+  async function handleSaveNotifications() {
+    setSavingNotif(true);
+    const { error: updateError } = await supabase.auth.updateUser({
+      data: {
+        email_ops: emailOps,
+        email_invoices: emailInvoices,
+        email_team: emailTeam,
+        email_general: emailGeneral,
+      },
+    });
+    setSavingNotif(false);
+    if (!updateError) {
+      setSavedNotif(true);
+      setTimeout(() => setSavedNotif(false), 3000);
     }
   }
 
@@ -630,6 +663,112 @@ export default function SettingsPage() {
                   );
                 })
               )}
+            </div>
+          </div>
+        )}
+        {/* Notificações tab */}
+        {activeTab === "Notificações" && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">Notificações por Email</h2>
+                  <p className="text-xs text-slate-500">
+                    Escolha quais eventos geram emails para você
+                  </p>
+                </div>
+              </div>
+
+              {savedNotif && (
+                <div className="flex items-center gap-2 mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm">
+                  <Check className="w-4 h-4" /> Preferências salvas!
+                </div>
+              )}
+
+              <div className="space-y-1">
+                {(
+                  [
+                    {
+                      id: "notif-ops",
+                      label: "Operações",
+                      description: "Atualizações de status das suas operações",
+                      value: emailOps,
+                      onChange: setEmailOps,
+                    },
+                    {
+                      id: "notif-invoices",
+                      label: "Faturas",
+                      description: "Avisos de vencimento e pagamento de faturas",
+                      value: emailInvoices,
+                      onChange: setEmailInvoices,
+                    },
+                    {
+                      id: "notif-team",
+                      label: "Equipe",
+                      description: "Convites e alterações de membros da equipe",
+                      value: emailTeam,
+                      onChange: setEmailTeam,
+                    },
+                    {
+                      id: "notif-general",
+                      label: "Geral",
+                      description: "Novidades, releases e comunicados da plataforma",
+                      value: emailGeneral,
+                      onChange: setEmailGeneral,
+                    },
+                  ] as const
+                ).map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between py-4 border-b border-slate-100 last:border-0"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{item.label}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+                    </div>
+                    <button
+                      id={item.id}
+                      type="button"
+                      role="switch"
+                      aria-checked={item.value}
+                      onClick={() => item.onChange(!item.value)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                        item.value ? "bg-blue-600" : "bg-slate-200"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                          item.value ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6">
+                <button
+                  id="save-notifications"
+                  type="button"
+                  onClick={() => void handleSaveNotifications()}
+                  disabled={savingNotif}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-shina-blue hover:bg-blue-600 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  {savingNotif ? "Salvando..." : "Salvar preferências"}
+                </button>
+              </div>
+            </div>
+
+            {/* Info card */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <p className="text-sm text-amber-800">
+                <strong>📬 Dica:</strong> Os emails são enviados para o endereço da sua conta (
+                {email || "…"}). Para alterar o email, entre em contato com o suporte.
+              </p>
             </div>
           </div>
         )}
