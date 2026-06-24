@@ -12,7 +12,7 @@ Instructions and context for Claude Code when working on this project.
 
 ## Milestone Gate
 
-Milestones M1–M9 are complete. The platform is in active development.
+All milestones through M19 are complete and merged to `main`. The platform is feature-complete for the core product loop.
 
 **Completed:**
 
@@ -23,8 +23,26 @@ Milestones M1–M9 are complete. The platform is in active development.
 - M23: Notifications (in-app, polling, auto-create on events)
 - M24: Analytics & Reports (charts, dashboards, reports page)
 - M25: Settings & Deploy (profile, company settings, Vercel config)
+- M26: Operation Lifecycle (status transitions, detail drawer, asset updates)
+- M27: CRM & Contract Lifecycle (org CRUD, contract status transitions, detail drawer)
+- M28: Command Menu (global Cmd+K search across all entities)
+- M29: Financial & Invoices (billing accounts, invoices, line items, status transitions)
+- M30: Resources & Fleet Intelligence (resources page, detail drawer, admin metrics)
+- M31: Audit Log & Activity Feed (real-time activity timeline, admin audit page)
+- M32: Team & User Management (user profiles, settings Equipe tab, admin users view)
+- M33: Export & Print (CSV export for 6 entities, printable invoice page, ExportButton)
+- M34: Operations Calendar (monthly grid, upcoming widget on dashboard, mobile-friendly)
+- M35: Dark Mode & Mobile (class-based dark mode, mobile sidebar toggle, skeleton-ready)
 
 **Next milestone requires explicit user confirmation.**
+
+**Suggested next milestones:**
+
+- M36: Tenant Onboarding (signup wizard for new tenants)
+- M37: Email Notifications (Supabase Edge Functions for email delivery)
+- M38: Admin Tenant Detail (full tenant view in admin-web)
+- M39: AI Center (Claude API insights — anomaly detection, summaries)
+- M40: Public Landing Page (marketing site in apps/web)
 
 ---
 
