@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound, Loader2, AlertCircle, ChevronRight } from "lucide-react";
 
-export default function MfaRecoveryPage() {
+function MfaRecoveryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/dashboard";
@@ -106,5 +106,19 @@ export default function MfaRecoveryPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function MfaRecoveryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+        </div>
+      }
+    >
+      <MfaRecoveryContent />
+    </Suspense>
   );
 }

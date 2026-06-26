@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Shield, Loader2, AlertCircle, ChevronRight } from "lucide-react";
 
-export default function MfaChallengePage() {
+function MfaChallengeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/dashboard";
@@ -128,5 +128,19 @@ export default function MfaChallengePage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function MfaChallengePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        </div>
+      }
+    >
+      <MfaChallengeContent />
+    </Suspense>
   );
 }
