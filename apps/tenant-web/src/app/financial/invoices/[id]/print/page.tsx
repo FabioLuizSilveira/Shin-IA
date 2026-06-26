@@ -98,9 +98,7 @@ export default async function InvoicePrintPage({ params }: Props) {
       </head>
       <body>
         <div className="no-print">
-          <button className="btn-print" onClick="window.print()">
-            Imprimir / Salvar PDF
-          </button>
+          <button className="btn-print">Imprimir / Salvar PDF</button>
           <a href="/financial" className="btn-back">
             Voltar
           </a>
