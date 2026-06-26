@@ -48,12 +48,12 @@ export default defineConfig({
     },
   ],
 
-  webServer: process.env.CI
-    ? undefined
-    : {
-        command: "pnpm --filter @shina/tenant-web dev",
-        url: "http://localhost:3001",
-        reuseExistingServer: true,
-        timeout: 120_000,
-      },
+  webServer: {
+    command: process.env.CI
+      ? "pnpm --filter @shina/tenant-web start"
+      : "pnpm --filter @shina/tenant-web dev",
+    url: "http://localhost:3001",
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
 });
