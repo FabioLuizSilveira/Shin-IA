@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -6,101 +9,151 @@ import { ChartContainer } from "@/components/ui/chart-container";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { FileText, Truck, DollarSign, Zap } from "lucide-react";
+import type { Operation, OperationStatus, Asset, Contract } from "@/types/domain";
 
-export const dynamic = "force-dynamic";
+function opStatusToUi(
+  status: OperationStatus,
+): "active" | "inactive" | "pending" | "warning" {
+  switch (status) {
+    case "in_progress":
+      return "active";
+    case "pending":
+      return "pending";
+    case "completed":
+      return "inactive";
+    default:
+      return "warning";
+  }
+}
 
-const TIMELINE = [
-  {
-    time: "08:30",
-    title: "Operação #OP-0042 iniciada",
-    description: "Veículo ABC-1234 saiu da base em direção a São Paulo",
-    type: "info" as const,
-  },
-  {
-    time: "09:15",
-    title: "Contrato assinado",
-    description: "Logística Corporativa SA assinou contrato de 6 meses",
-    type: "success" as const,
-  },
-  {
-    time: "10:00",
-    title: "Documento pendente",
-    description: "CTe #000045 aguarda aprovação do financeiro",
-    type: "warning" as const,
-  },
-  {
-    time: "11:30",
-    title: "Entrega concluída",
-    description: "OP-0041 finalizada com sucesso — cliente satisfeito",
-    type: "success" as const,
-  },
-  {
-    time: "13:00",
-    title: "Alerta de manutenção",
-    description: "Veículo DEF-5678 com revisão programada para amanhã",
-    type: "warning" as const,
-  },
-];
+function opStatusLabel(status: OperationStatus): string {
+  switch (status) {
+    case "in_progress":
+      return "Em andamento";
+    case "pending":
+      return "Pendente";
+    case "completed":
+      return "Concluída";
+    case "cancelled":
+      return "Cancelada";
+    case "failed":
+      return "Falhou";
+    default:
+      return status;
+  }
+}
 
-const RECENT_OPS = [
-  {
-    id: "OP-0042",
-    asset: "ABC-1234 — Scania R450",
-    operator: "João Silva",
-    status: "active" as const,
-    value: "R$ 4.200",
-    date: "22/06/2026",
-  },
-  {
-    id: "OP-0041",
-    asset: "DEF-5678 — Volvo FH",
-    operator: "Maria Costa",
-    status: "active" as const,
-    value: "R$ 3.100",
-    date: "22/06/2026",
-  },
-  {
-    id: "OP-0040",
-    asset: "GHI-9012 — Mercedes Actros",
-    operator: "Carlos Nunes",
-    status: "inactive" as const,
-    value: "R$ 5.800",
-    date: "21/06/2026",
-  },
-  {
-    id: "OP-0039",
-    asset: "JKL-3456 — Scania P320",
-    operator: "Ana Lima",
-    status: "inactive" as const,
-    value: "R$ 2.400",
-    date: "21/06/2026",
-  },
-];
-
-type OpRow = (typeof RECENT_OPS)[number];
+type OpRow = {
+  id: string;
+  type: string;
+  resource: string;
+  uiStatus: "active" | "inactive" | "pending" | "warning";
+  rawStatus: OperationStatus;
+  date: string;
+};
 
 const OP_COLUMNS = [
-  { key: "id", label: "Operação" },
-  { key: "asset", label: "Ativo" },
-  { key: "operator", label: "Operador" },
   {
-    key: "status",
+    key: "id",
+    label: "Operação",
+    render: (row: OpRow) => row.id.slice(0, 8).toUpperCase(),
+  },
+  { key: "type", label: "Tipo" },
+  { key: "resource", label: "Recurso" },
+  {
+    key: "uiStatus",
     label: "Status",
     render: (row: OpRow) => (
-      <StatusBadge status={row.status} label={row.status === "active" ? "Em rota" : "Concluída"} />
+      <StatusBadge status={row.uiStatus} label={opStatusLabel(row.rawStatus)} />
     ),
   },
-  { key: "value", label: "Valor" },
   { key: "date", label: "Data" },
 ];
 
+type TimelineItem = {
+  time: string;
+  title: string;
+  description: string;
+  type: "info" | "success" | "warning" | "error";
+};
+
+function operationsToTimeline(ops: Operation[]): TimelineItem[] {
+  return ops.slice(0, 5).map((op) => {
+    const isCompleted = op.status === "completed";
+    const isInProgress = op.status === "in_progress";
+    return {
+      time: new Date(op.scheduled_starts_at).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      title: `Operação ${op.type} ${isCompleted ? "concluída" : isInProgress ? "em andamento" : "pendente"}`,
+      description: op.resource_name ? `Recurso: ${op.resource_name}` : "Sem recurso associado",
+      type: isCompleted ? ("success" as const) : isInProgress ? ("info" as const) : ("warning" as const),
+    };
+  });
+}
+
 export default function DashboardPage() {
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAll() {
+      setLoading(true);
+      try {
+        const [opsRes, assetsRes, contractsRes] = await Promise.all([
+          fetch("/api/operations"),
+          fetch("/api/assets"),
+          fetch("/api/contracts"),
+        ]);
+
+        if (opsRes.ok) {
+          const json = (await opsRes.json()) as { data: Operation[] };
+          setOperations(json.data ?? []);
+        }
+        if (assetsRes.ok) {
+          const json = (await assetsRes.json()) as { data: Asset[] };
+          setAssets(json.data ?? []);
+        }
+        if (contractsRes.ok) {
+          const json = (await contractsRes.json()) as { data: Contract[] };
+          setContracts(json.data ?? []);
+        }
+      } catch {
+        // silently keep empty state
+      } finally {
+        setLoading(false);
+      }
+    }
+    void fetchAll();
+  }, []);
+
   const today = new Date().toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "2-digit",
     month: "long",
     year: "numeric",
   });
+
+  const activeContracts = contracts.filter((c) => c.status === "active");
+  const availableAssets = assets.filter((a) => a.status === "available");
+  const openOps = operations.filter(
+    (o) => o.status === "pending" || o.status === "in_progress",
+  );
+  const totalContractValue = activeContracts.reduce((sum, c) => sum + c.value_amount, 0);
+
+  const recentOpsRows: OpRow[] = operations.slice(0, 5).map((op) => ({
+    id: op.id,
+    type: op.type,
+    resource: op.resource_name ?? "—",
+    uiStatus: opStatusToUi(op.status),
+    rawStatus: op.status,
+    date: new Date(op.scheduled_starts_at).toLocaleDateString("pt-BR"),
+  }));
+
+  const timeline = operationsToTimeline(operations);
 
   return (
     <AppShell title="Dashboard">
@@ -112,64 +165,90 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard
           title="Contratos Ativos"
-          value="12"
-          change={8}
-          changeLabel="este mês"
+          value={loading ? "—" : String(activeContracts.length)}
           trend="up"
           icon={<FileText className="w-5 h-5" />}
         />
         <MetricCard
-          title="Frota Disponível"
-          value="8/14"
-          changeLabel="veículos"
+          title="Ativos Disponíveis"
+          value={loading ? "—" : `${availableAssets.length}/${assets.length}`}
+          changeLabel="ativos"
           trend="neutral"
           icon={<Truck className="w-5 h-5" />}
         />
         <MetricCard
-          title="Receita (MTD)"
-          value="R$ 84.200"
-          change={12}
-          changeLabel="vs. mês anterior"
+          title="Valor Contratos"
+          value={
+            loading
+              ? "—"
+              : new Intl.NumberFormat("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                }).format(totalContractValue)
+          }
           trend="up"
           icon={<DollarSign className="w-5 h-5" />}
         />
         <MetricCard
           title="Operações Abertas"
-          value="6"
-          change={-2}
-          changeLabel="vs. ontem"
+          value={loading ? "—" : String(openOps.length)}
           trend="up"
           icon={<Zap className="w-5 h-5" />}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <ChartContainer title="Atividade Recente" description="Hoje, 22 de junho de 2026">
-          <ActivityTimeline items={TIMELINE} />
+        <ChartContainer
+          title="Atividade Recente"
+          description={today.charAt(0).toUpperCase() + today.slice(1)}
+        >
+          {loading ? (
+            <div className="animate-pulse space-y-3 p-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-10 bg-slate-100 rounded" />
+              ))}
+            </div>
+          ) : timeline.length > 0 ? (
+            <ActivityTimeline items={timeline} />
+          ) : (
+            <p className="text-slate-400 text-sm p-4">Nenhuma atividade recente.</p>
+          )}
         </ChartContainer>
 
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100">
             <h3 className="text-base font-semibold text-slate-900 font-display">
-              Próximos Eventos
+              Próximas Operações
             </h3>
           </div>
           <div className="divide-y divide-slate-50 p-4 space-y-3">
-            {[
-              { event: "Revisão veículo DEF-5678", date: "23/06/2026", type: "warning" },
-              { event: "Renovação contrato CS-001", date: "25/06/2026", type: "info" },
-              { event: "Fechamento financeiro junho", date: "30/06/2026", type: "info" },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between py-2">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-2 h-2 rounded-full ${item.type === "warning" ? "bg-amber-400" : "bg-shina-blue"}`}
-                  />
-                  <p className="text-sm text-slate-700">{item.event}</p>
-                </div>
-                <span className="text-xs text-slate-400">{item.date}</span>
+            {loading ? (
+              <div className="animate-pulse space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-8 bg-slate-100 rounded" />
+                ))}
               </div>
-            ))}
+            ) : openOps.length === 0 ? (
+              <p className="text-slate-400 text-sm py-4 text-center">
+                Nenhuma operação pendente.
+              </p>
+            ) : (
+              openOps.slice(0, 5).map((op) => (
+                <div key={op.id} className="flex items-center justify-between py-2">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-2 h-2 rounded-full ${op.status === "in_progress" ? "bg-shina-blue" : "bg-amber-400"}`}
+                    />
+                    <p className="text-sm text-slate-700">
+                      {op.type} — {op.resource_name ?? "sem recurso"}
+                    </p>
+                  </div>
+                  <span className="text-xs text-slate-400">
+                    {new Date(op.scheduled_starts_at).toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -180,7 +259,11 @@ export default function DashboardPage() {
             Operações Recentes
           </h3>
         </div>
-        <DataTable columns={OP_COLUMNS} data={RECENT_OPS} />
+        <DataTable
+          columns={OP_COLUMNS as Parameters<typeof DataTable>[0]["columns"]}
+          data={recentOpsRows as Parameters<typeof DataTable>[0]["data"]}
+          loading={loading}
+        />
       </div>
     </AppShell>
   );
