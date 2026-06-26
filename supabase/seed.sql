@@ -96,3 +96,10 @@ INSERT INTO resources (id, tenant_id, branch_id, type, name, status) VALUES
   ('60000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'vehicle', 'Rota SP-Sul', 'busy'),
   ('60000000-0000-0000-0000-000000000007', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'virtual', 'Sistema Rastreamento', 'available')
 ON CONFLICT (id) DO NOTHING;
+
+-- Demo user_profiles
+INSERT INTO user_profiles (id, tenant_id, auth_user_id, email, full_name, status) VALUES
+  ('e0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'e0da37c1-cfcc-42f0-9c48-443669b305c9', 'admin@shina.com.br', 'Admin Shinã', 'active'),
+  ('e0000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'f1000000-0000-0000-0000-000000000001', 'joao.motorista@acme.com.br', 'João Silva', 'active'),
+  ('e0000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'f2000000-0000-0000-0000-000000000002', 'maria.ops@acme.com.br', 'Maria Operações', 'inactive')
+ON CONFLICT (email) DO NOTHING;

@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { AppShell } from "@/components/layout/app-shell";
-import { Building2, User, Shield, Save, Check } from "lucide-react";
+import { Building2, User, Shield, Save, Check, Users2, UserPlus, X } from "lucide-react";
+import type { UserProfile, UserProfileStatus } from "@/types/domain";
 
-const TABS = ["Empresa", "Perfil", "Segurança"] as const;
+const TABS = ["Empresa", "Perfil", "Segurança", "Equipe"] as const;
 type Tab = (typeof TABS)[number];
 
 // Plan badge colors
@@ -12,6 +13,43 @@ const planColors: Record<string, string> = {
   starter: "bg-slate-100 text-slate-700",
   professional: "bg-blue-100 text-blue-700",
   enterprise: "bg-purple-100 text-purple-700",
+};
+
+// --- Team helpers ---
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
+const avatarColors = [
+  "bg-blue-500",
+  "bg-purple-500",
+  "bg-green-500",
+  "bg-orange-500",
+  "bg-cyan-500",
+];
+function avatarColor(name: string): string {
+  const idx = name.charCodeAt(0) % avatarColors.length;
+  return avatarColors[idx];
+}
+
+function formatLogin(dt: string | null | undefined): string {
+  if (!dt) return "Nunca";
+  return new Date(dt).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+const statusConfig: Record<UserProfileStatus, { label: string; className: string }> = {
+  active: { label: "Ativo", className: "bg-green-100 text-green-700" },
+  inactive: { label: "Inativo", className: "bg-slate-100 text-slate-600" },
+  suspended: { label: "Suspenso", className: "bg-red-100 text-red-700" },
 };
 
 export default function SettingsPage() {
@@ -35,7 +73,32 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // team
+  const [team, setTeam] = useState<UserProfile[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
+
   const supabase = createClient();
+
+  const fetchTeam = useCallback(async () => {
+    setTeamLoading(true);
+    setTeamError(null);
+    try {
+      const res = await fetch("/api/team");
+      if (!res.ok) throw new Error("Falha ao carregar equipe");
+      const json = (await res.json()) as { data: UserProfile[] };
+      setTeam(json.data ?? []);
+    } catch (e) {
+      setTeamError(e instanceof Error ? e.message : "Erro desconhecido");
+    } finally {
+      setTeamLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     // fetch tenant
@@ -51,6 +114,12 @@ export default function SettingsPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "Equipe") {
+      void fetchTeam();
+    }
+  }, [activeTab, fetchTeam]);
 
   function showSaved() {
     setSaved(true);
@@ -93,6 +162,50 @@ export default function SettingsPage() {
     setNewPassword("");
     setConfirmPassword("");
     showSaved();
+  }
+
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setInviting(true);
+    setTeamError(null);
+    try {
+      const res = await fetch("/api/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: inviteName,
+          email: inviteEmail,
+          phone_number: invitePhone || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const json = (await res.json()) as { error?: string };
+        throw new Error(json.error ?? "Falha ao convidar membro");
+      }
+      setShowInviteForm(false);
+      setInviteName("");
+      setInviteEmail("");
+      setInvitePhone("");
+      await fetchTeam();
+    } catch (e) {
+      setTeamError(e instanceof Error ? e.message : "Erro ao convidar");
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function handleDeactivate(id: string) {
+    try {
+      const res = await fetch(`/api/team/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "inactive" }),
+      });
+      if (!res.ok) throw new Error("Falha ao desativar");
+      await fetchTeam();
+    } catch (e) {
+      setTeamError(e instanceof Error ? e.message : "Erro ao desativar");
+    }
   }
 
   return (
@@ -339,6 +452,184 @@ export default function SettingsPage() {
                   Em breve
                 </span>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Equipe tab */}
+        {activeTab === "Equipe" && (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                  <Users2 className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">Membros da Equipe</h2>
+                  <p className="text-xs text-slate-500">{team.length} membro(s) encontrado(s)</p>
+                </div>
+              </div>
+              {!showInviteForm && (
+                <button
+                  onClick={() => setShowInviteForm(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-shina-blue text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-colors"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Convidar Membro
+                </button>
+              )}
+            </div>
+
+            {/* Invite form */}
+            {showInviteForm && (
+              <form
+                onSubmit={(e) => void handleInvite(e)}
+                className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-slate-900">Convidar Novo Membro</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowInviteForm(false);
+                      setTeamError(null);
+                    }}
+                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Nome completo <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={inviteName}
+                      onChange={(e) => setInviteName(e.target.value)}
+                      placeholder="Ex: João Silva"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-shina-blue/30 focus:border-shina-blue bg-slate-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Email <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="joao@empresa.com.br"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-shina-blue/30 focus:border-shina-blue bg-slate-50"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Telefone (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={invitePhone}
+                      onChange={(e) => setInvitePhone(e.target.value)}
+                      placeholder="+55 11 99999-9999"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-shina-blue/30 focus:border-shina-blue bg-slate-50"
+                    />
+                  </div>
+                </div>
+                {teamError && <p className="mt-3 text-xs text-red-600">{teamError}</p>}
+                <div className="flex gap-3 mt-4">
+                  <button
+                    type="submit"
+                    disabled={inviting}
+                    className="px-4 py-2 bg-shina-blue text-white rounded-xl text-sm font-medium hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                  >
+                    {inviting ? "Convidando..." : "Convidar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowInviteForm(false);
+                      setTeamError(null);
+                    }}
+                    className="px-4 py-2 text-slate-600 rounded-xl text-sm bg-slate-100 hover:bg-slate-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Team error (outside form) */}
+            {teamError && !showInviteForm && (
+              <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                {teamError}
+              </div>
+            )}
+
+            {/* Team list */}
+            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+              {teamLoading ? (
+                <div>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-4 p-4">
+                      <div className="w-10 h-10 rounded-full bg-slate-100 animate-pulse" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-slate-100 rounded animate-pulse w-40" />
+                        <div className="h-3 bg-slate-100 rounded animate-pulse w-56" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : team.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                  <Users2 className="w-10 h-10 mb-3 opacity-30" />
+                  <p className="text-sm">Nenhum membro encontrado</p>
+                </div>
+              ) : (
+                team.map((member) => {
+                  const cfg = statusConfig[member.status] ?? statusConfig.inactive;
+                  return (
+                    <div key={member.id} className="flex items-center gap-4 px-4 py-3">
+                      {/* Avatar */}
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 ${avatarColor(member.full_name)}`}
+                      >
+                        {initials(member.full_name)}
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate">
+                          {member.full_name}
+                        </p>
+                        <p className="text-xs text-slate-500 truncate">{member.email}</p>
+                      </div>
+                      {/* Status badge */}
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${cfg.className}`}
+                      >
+                        {cfg.label}
+                      </span>
+                      {/* Last login */}
+                      <div className="text-xs text-slate-400 shrink-0 w-28 text-right hidden sm:block">
+                        {formatLogin(member.last_login_at)}
+                      </div>
+                      {/* Action */}
+                      {member.status === "active" && (
+                        <button
+                          onClick={() => void handleDeactivate(member.id)}
+                          className="text-xs text-slate-500 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors shrink-0"
+                        >
+                          Desativar
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         )}

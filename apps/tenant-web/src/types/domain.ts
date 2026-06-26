@@ -215,3 +215,15 @@ export interface InvoiceLineItem {
 export interface InvoiceDetail extends Invoice {
   invoice_line_items: InvoiceLineItem[];
 }
+
+export type UserProfileStatus = "active" | "inactive" | "suspended";
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  status: UserProfileStatus;
+  phone_number?: string;
+  last_login_at?: string;
+  created_at: string;
+}

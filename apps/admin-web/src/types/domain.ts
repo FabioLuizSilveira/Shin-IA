@@ -67,3 +67,17 @@ export interface Resource {
   type: ResourceType;
   status: ResourceStatus;
 }
+
+export type UserProfileStatus = "active" | "inactive" | "suspended";
+
+export interface AdminUserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  status: UserProfileStatus;
+  phone_number?: string;
+  last_login_at?: string;
+  created_at: string;
+  tenant_id: string;
+  tenants?: { id: string; name: string };
+}
