@@ -1,0 +1,1 @@
+{"root":["./src/index.ts","./src/operator-network.ts","./src/opportunity-engine.ts","./src/partner-registry.ts","./src/plugin-sdk.ts","./src/types.ts","./src/__tests__/operator-network.test.ts","./src/__tests__/opportunity-engine.test.ts","./src/__tests__/partner-registry.test.ts","./src/__tests__/plugin-sdk.test.ts"],"version":"5.9.3"}

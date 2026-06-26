@@ -1,6 +1,6 @@
 # Architecture — Shinã Platform
 
-> Last updated: 2026-06-20 (Milestone 1.1 — Documentation Alignment)
+> Last updated: 2026-06-22 (Gate 2 — Integration Engine Foundation added)
 
 ---
 
@@ -31,7 +31,13 @@ Shinã Platform is a multi-tenant SaaS system for fleet and mobility management.
 ┌──────▼───────────▼───────────▼───────────▼───────────▼──────────┐
 │                         Engine Layer                            │
 │  Workflow · Rule · Resource · Operation · Notification          │
-│  Reporting · AI · Config                                        │
+│  Reporting · AI · Config · Integration                          │
+└──────────────────────────────────────┬──────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼──────────────────────────┐
+│                   Integration Engine                            │
+│  REST APIs · Webhooks · API Keys · OAuth · External IAM         │
+│  Sync Jobs · Field Mapping · Retry Policy · Audit Log           │
 └─────────────────────────────────────────────────────────────────┘
        │
 ┌──────▼───────────────────────────────────────────────────────────┐
@@ -140,27 +146,71 @@ Manages tenant-level and platform-level runtime configuration without deployment
 
 ---
 
-## IAM — Identity and Access Management
+### Integration Engine
 
-The platform uses a two-tier IAM model. See [`IAM.md`](IAM.md) for the full specification.
+Connects the Shinã platform to external systems through a uniform abstraction layer. Manages credentials, data synchronisation, webhook delivery and reception, and maintains an immutable audit trail of all external interactions.
 
-### Platform IAM
+**Responsibilities:** Provider registry · REST endpoint invocation · Outbound and inbound webhooks · API key lifecycle · OAuth 2.0 client credentials · External IAM (SAML, OIDC, LDAP) · Sync jobs · Bidirectional field mapping · Configurable retry policies · Integration audit log
 
-Governs identity and access at the **platform operator** level. Controls which tenants exist, which platform administrators have access, and cross-tenant operations.
-
-**Scope:** Platform operators · Tenant provisioning · Cross-tenant access · Platform-level audit
-
-**Key entities:** `PlatformUser`, `PlatformRole`, `PlatformPolicy`
+**Detailed specification:** [`INTEGRATION_ENGINE.md`](INTEGRATION_ENGINE.md)
 
 ---
 
-### Tenant IAM
+## IAM — Identity and Access Management
 
-Governs identity and access **within a single tenant**. Manages users, roles, permissions, branch scopes, and capability scopes.
+The platform uses a two-tier IAM model separating platform operators from tenant users. Both tiers support RBAC, ABAC, Delegated Access, Impersonation, MFA, and Approval Workflows.
 
-**Scope:** Tenant users · Role-based access (RBAC) · Attribute-based access (ABAC) · Branch scope · Capability scope · Delegated access · Impersonation
+**Complete IAM specification:** [`IAM.md`](IAM.md)
 
-**Key entities:** `User`, `Role`, `Permission`, `Policy`, `BranchScope`, `CapabilityScope`, `Delegation`, `Impersonation`
+### Platform IAM — 11 Operator Roles
+
+Governs access at the **platform operator** level. Defines 11 distinct roles for infrastructure, support, commercial, and finance operations.
+
+**Roles:** Owner · Admin · Commercial · Finance · Billing · Support N1/N2/N3 · Auditor · Developer · AI Manager
+
+**Scope:** Tenant provisioning · Cross-tenant operations · Platform-level audit · Impersonation
+
+**Detailed specification:** [`PLATFORM_IAM.md`](PLATFORM_IAM.md)
+
+---
+
+### Tenant IAM — 10 User Roles
+
+Governs access **within a single tenant**. Defines 10 distinct roles from organizational leadership (Owner, Admin) through operations (Fleet Manager, Ops Manager) to field staff (Operator, Driver).
+
+**Roles:** Owner · Admin · Fleet Manager · Ops Manager · Commercial Manager · Financial Manager · Supervisor · Operator · Driver · Customer
+
+**Scope:** Role-based access (RBAC) · Attribute-based access (ABAC) · Branch scope · Capability scope · Delegated access
+
+**Detailed specification:** [`TENANT_IAM.md`](TENANT_IAM.md)
+
+---
+
+### Authorization Model
+
+All authorization decisions flow through three sequential layers:
+
+1. **RBAC** — Does the user's role include the required permission?
+2. **ABAC** — Do the request attributes satisfy all active policies?
+3. **Approval Gate** — Does this operation require workflow approval?
+
+**Detailed specification:** [`AUTHORIZATION_MODEL.md`](AUTHORIZATION_MODEL.md)
+
+---
+
+### Permission Matrix
+
+Complete Role × Permission matrix for all Platform IAM and Tenant IAM roles (100 total permissions).
+
+**Access matrix:** [`ACCESS_MATRIX.md`](ACCESS_MATRIX.md)
+
+---
+
+### Approval Workflows
+
+Seven configurable approval workflows intercept sensitive operations (settlement approval, invoice approval, configuration changes, etc.) requiring human authorization before execution.
+
+**Workflow specifications:** [`APPROVAL_WORKFLOWS.md`](APPROVAL_WORKFLOWS.md)
 
 ---
 
@@ -169,6 +219,7 @@ Governs identity and access **within a single tenant**. Manages users, roles, pe
 A first-class bounded context cross-cutting the Resource, Operation, and Reporting engines. Provides real-time asset visibility.
 
 **Sub-domains:**
+
 - **Device Management** — provisioning and lifecycle of tracking hardware
 - **Position & Telemetry** — ingestion and storage of GPS positions and sensor readings
 - **Geofence Management** — definition and monitoring of geographic boundaries
@@ -180,30 +231,32 @@ A first-class bounded context cross-cutting the Resource, Operation, and Reporti
 
 Studios are operator-facing configuration interfaces (web modules) that configure platform behavior without code. They are detailed in [`TENANT_STUDIO.md`](TENANT_STUDIO.md).
 
-| Studio | Purpose |
-|--------|---------|
+| Studio                | Purpose                                                        |
+| --------------------- | -------------------------------------------------------------- |
 | Access Control Studio | Configure roles, permissions, branch scopes, capability scopes |
-| Commercial Studio | Configure commission plans, rules, campaigns |
+| Commercial Studio     | Configure commission plans, rules, campaigns                   |
 
 ---
 
 ## Cross-Cutting Concerns
 
-| Concern | Approach |
-|---------|---------|
-| Multi-tenancy | Row-level tenant isolation via Supabase RLS |
-| Auth | Supabase Auth + custom Tenant IAM layer |
-| Observability | Structured logs, distributed traces, metrics |
-| Eventing | Domain events on async bus (Supabase Realtime + queue) |
-| Audit | Immutable audit log for all state mutations |
-| Versioning | All APIs versioned; breaking changes gated |
+| Concern       | Approach                                               |
+| ------------- | ------------------------------------------------------ |
+| Multi-tenancy | Row-level tenant isolation via Supabase RLS            |
+| Auth          | Supabase Auth + custom Tenant IAM layer                |
+| Observability | Structured logs, distributed traces, metrics           |
+| Eventing      | Domain events on async bus (Supabase Realtime + queue) |
+| Audit         | Immutable audit log for all state mutations            |
+| Versioning    | All APIs versioned; breaking changes gated             |
 
 ---
 
 ## Decision Log
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-06-20 | Commission Engine separated from Billing Engine | Different bounded contexts: Billing = tenant subscription; Commission = commercial incentives |
-| 2026-06-20 | Tracking as first-class context, not sub-feature of Resource Engine | Volume and real-time requirements warrant dedicated infrastructure |
-| 2026-06-20 | Two-tier IAM (Platform + Tenant) | Platform operators and tenant users have fundamentally different access models |
+| Date       | Decision                                                            | Rationale                                                                                     |
+| ---------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 2026-06-20 | Commission Engine separated from Billing Engine                     | Different bounded contexts: Billing = tenant subscription; Commission = commercial incentives |
+| 2026-06-20 | Tracking as first-class context, not sub-feature of Resource Engine | Volume and real-time requirements warrant dedicated infrastructure                            |
+| 2026-06-20 | Two-tier IAM (Platform + Tenant)                                    | Platform operators and tenant users have fundamentally different access models                |
+| 2026-06-22 | Integration Engine as a dedicated engine, not embedded in API layer | Cross-cutting concern; shared by all other engines for outbound and inbound external comms    |
+| 2026-06-22 | IntegrationAuditLog is write-only at the repository interface level | Compliance and non-repudiation; immutability enforced before reaching the DB layer            |
