@@ -1,40 +1,26 @@
 import type { Config } from "tailwindcss";
 
-const config: Config = {
+export default {
+  darkMode: "class",
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
-      fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        display: ["Inter", "system-ui", "sans-serif"],
-      },
       colors: {
         shina: {
-          navy: "#0f172a",
+          navy: "#0F172A",
           blue: "#2563EB",
-          cyan: "#06b6d4",
-          dark: "#1e293b",
+          cyan: "#06B6D4",
+          green: "#10B981",
+          slate: "#64748B",
+          light: "#E2E8F0",
+          black: "#020617",
         },
       },
-      animation: {
-        "fade-in": "fadeIn 0.6s ease-out both",
-        "slide-up": "slideUp 0.6s ease-out both",
-        "gradient-x": "gradientX 6s ease infinite",
-      },
-      keyframes: {
-        fadeIn: { "0%": { opacity: "0" }, "100%": { opacity: "1" } },
-        slideUp: {
-          "0%": { opacity: "0", transform: "translateY(20px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" },
-        },
-        gradientX: {
-          "0%, 100%": { backgroundPosition: "0% 50%" },
-          "50%": { backgroundPosition: "100% 50%" },
-        },
+      fontFamily: {
+        sans: ["Inter", "system-ui", "sans-serif"],
+        display: ["Manrope", "Inter", "system-ui", "sans-serif"],
       },
     },
   },
   plugins: [],
-};
-
-export default config;
+} satisfies Config;

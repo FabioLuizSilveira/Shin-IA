@@ -1,6 +1,7 @@
 {
   "name": "@shina/tenant-web",
   "version": "0.0.0",
+  "deprecated": "Moved to @shina/web in M21",
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001",
