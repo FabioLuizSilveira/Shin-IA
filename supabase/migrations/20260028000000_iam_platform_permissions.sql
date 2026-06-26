@@ -14,11 +14,12 @@ create table if not exists platform_permissions (
   metadata         jsonb         not null default '{}',
   created_at       timestamptz   not null default now(),
   updated_at       timestamptz   not null default now(),
-  deleted_at       timestamptz,
-
-  constraint platform_permissions_unique_resource_action
-    unique (resource, action) where deleted_at is null
+  deleted_at       timestamptz
 );
+
+create unique index platform_permissions_unique_resource_action 
+  on platform_permissions (resource, action) 
+  where deleted_at is null;
 
 -- No RLS on platform_permissions - only accessible via service role
 

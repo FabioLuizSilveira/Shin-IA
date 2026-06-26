@@ -13,11 +13,12 @@ create table if not exists tenant_permissions (
   metadata         jsonb         not null default '{}',
   created_at       timestamptz   not null default now(),
   updated_at       timestamptz   not null default now(),
-  deleted_at       timestamptz,
-
-  constraint tenant_permissions_unique_key
-    unique (key) where deleted_at is null
+  deleted_at       timestamptz
 );
+
+create unique index tenant_permissions_unique_key 
+  on tenant_permissions (key) 
+  where deleted_at is null;
 
 -- No RLS on tenant_permissions - shared across all tenants
 -- Permissions are system-defined and same for all tenants

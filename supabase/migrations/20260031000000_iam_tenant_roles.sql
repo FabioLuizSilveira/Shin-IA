@@ -15,14 +15,16 @@ create table if not exists tenant_roles (
   deleted_at       timestamptz,
 
   constraint tenant_roles_tenant_fk
-    foreign key (tenant_id) references tenants (id) on delete cascade,
-
-  constraint tenant_roles_unique_key_per_tenant
-    unique (tenant_id, key) where key is not null and deleted_at is null,
-
-  constraint tenant_roles_unique_name_per_tenant
-    unique (tenant_id, name) where deleted_at is null
+    foreign key (tenant_id) references tenants (id) on delete cascade
 );
+
+create unique index tenant_roles_unique_key_per_tenant 
+  on tenant_roles (tenant_id, key) 
+  where key is not null and deleted_at is null;
+
+create unique index tenant_roles_unique_name_per_tenant 
+  on tenant_roles (tenant_id, name) 
+  where deleted_at is null;
 
 -- RLS: Users can read roles in their tenant, admins can manage
 alter table tenant_roles enable row level security;
