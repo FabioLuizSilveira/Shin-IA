@@ -13,6 +13,7 @@ import {
   Bot,
   LogOut,
   Zap,
+  Settings,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { href: "/support", label: "Suporte", icon: Headphones },
   { href: "/integrations", label: "Integrações", icon: Puzzle },
   { href: "/ai", label: "AI Center", icon: Bot },
+  { href: "/settings", label: "Configurações", icon: Settings },
 ];
 
 export function Sidebar() {

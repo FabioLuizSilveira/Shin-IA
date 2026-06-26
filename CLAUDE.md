@@ -12,12 +12,18 @@ Instructions and context for Claude Code when working on this project.
 
 ## Milestone Gate
 
-Always confirm which Milestone is active before implementing features.
+Milestones M1–M9 are complete. The platform is in active development.
 
-- **M1 (current):** Foundation only. No apps, no DB, no auth, no UI libraries.
-- **M2+:** Unlocked after explicit user confirmation.
+**Completed:**
+- M1: Foundation (monorepo, tooling, CI/CD)
+- M2–M20: Core domain packages and engines
+- M21: Design system (Tailwind, 15 components, 10 pages)
+- M22: Business features (real Supabase CRUD — operations, assets, contracts, tenants)
+- M23: Notifications (in-app, polling, auto-create on events)
+- M24: Analytics & Reports (charts, dashboards, reports page)
+- M25: Settings & Deploy (profile, company settings, Vercel config)
 
-Do not implement anything beyond the active milestone without explicit approval.
+**Next milestone requires explicit user confirmation.**
 
 ---
 
