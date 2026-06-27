@@ -32,28 +32,28 @@ export default function LoginPage() {
       }
 
       // Smart Routing based on User Role and Context
-      const role = data.user?.app_metadata?.role || data.user?.user_metadata?.role || "tenant_user";
+      const appMetadata = data.user?.app_metadata || {};
+      const platformRole = appMetadata.platform_role;
+      const tenantRole = appMetadata.tenant_role;
 
-      switch (role) {
-        case "platform_admin":
-        case "platform_user":
-          router.push("/platform");
-          break;
-        case "tenant_owner":
-        case "tenant_admin":
-          router.push("/tenant/dashboard");
-          break;
-        case "tenant_user":
-          router.push("/tenant");
-          break;
-        case "customer":
-          router.push("/customer");
-          break;
-        case "operator":
-          router.push("/operator");
-          break;
-        default:
-          router.push("/tenant");
+      if (platformRole) {
+        router.push("/platform/dashboard");
+      } else if (tenantRole) {
+        router.push("/tenant/dashboard");
+      } else {
+        const role = appMetadata.role || data.user?.user_metadata?.role || "tenant_user";
+        switch (role) {
+          case "platform_admin":
+          case "platform_user":
+          case "platform_owner":
+            router.push("/platform/dashboard");
+            break;
+          case "tenant_owner":
+          case "tenant_admin":
+          case "tenant_user":
+          default:
+            router.push("/tenant/dashboard");
+        }
       }
 
       router.refresh();
