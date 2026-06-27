@@ -15,7 +15,7 @@ interface ResendResponse {
 
 // ─── Template builders ────────────────────────────────────────────────────────
 
-const APP_URL = Deno.env.get("NEXT_PUBLIC_APP_URL") ?? "https://app.shina.com.br";
+const APP_URL = Deno.env.get("NEXT_PUBLIC_APP_URL") ?? "https://www.shinaia.com.br";
 const BRAND_COLOR = "#2563EB";
 
 function buildHtmlWrapper(title: string, body: string): string {
@@ -262,7 +262,7 @@ async function sendEmail(
     return { success: true, id: "dev-mode-no-send" };
   }
 
-  const fromEmail = Deno.env.get("FROM_EMAIL") ?? "noreply@shina.com.br";
+  const fromEmail = Deno.env.get("FROM_EMAIL") ?? "noreply@shinaia.com.br";
   const fromName = Deno.env.get("FROM_NAME") ?? "Shinã Platform";
 
   const res = await fetch("https://api.resend.com/emails", {

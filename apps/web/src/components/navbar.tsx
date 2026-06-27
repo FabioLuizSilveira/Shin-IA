@@ -41,7 +41,7 @@ export function Navbar() {
           {/* CTA */}
           <div className="hidden md:flex items-center gap-3">
             <Link
-              href="https://app.shina.com.br/login"
+              href="/login"
               className="text-sm font-medium text-slate-400 hover:text-white transition-colors no-underline"
             >
               Entrar
@@ -84,7 +84,7 @@ export function Navbar() {
             ))}
             <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
               <Link
-                href="https://app.shina.com.br/login"
+                href="/login"
                 className="block px-3 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors no-underline"
               >
                 Entrar

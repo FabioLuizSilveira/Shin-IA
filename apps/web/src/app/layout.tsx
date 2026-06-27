@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://shina.com.br"),
+  metadataBase: new URL("https://www.shinaia.com.br"),
   title: {
     default: "Shinã — Plataforma de Inteligência Operacional para Frotas",
     template: "%s | Shinã",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     title: "Shinã — Inteligência Operacional para Frotas",
     description:
       "Plataforma SaaS com IA para gestão de frotas, operações e equipes. Do agendamento à análise de desempenho.",
-    url: "https://shina.com.br",
+    url: "https://www.shinaia.com.br",
     siteName: "Shinã",
     locale: "pt_BR",
     type: "website",

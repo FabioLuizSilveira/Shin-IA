@@ -52,8 +52,8 @@ export default function ContactPage() {
                   {
                     icon: Mail,
                     label: "Email",
-                    value: "contato@shina.com.br",
-                    href: "mailto:contato@shina.com.br",
+                    value: "contato@shinaia.com.br",
+                    href: "mailto:contato@shinaia.com.br",
                   },
                   {
                     icon: Phone,
