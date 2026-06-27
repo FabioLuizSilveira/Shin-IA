@@ -3,6 +3,7 @@ export { TemplateEngine, type RenderResult } from "./template-engine.js";
 export {
   DispatcherRegistry,
   NoOpEmailDispatcher,
+  SupabaseEmailDispatcher,
   NoOpSmsDispatcher,
   NoOpPushDispatcher,
   NoOpInAppDispatcher,
