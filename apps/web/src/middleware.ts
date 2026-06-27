@@ -54,8 +54,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // ── 2. Authenticated on /login → redirect to dashboard ─────────────────────
-  if (user && pathname === "/login") {
+  // ── 2. Authenticated on /login or /dashboard → redirect to dashboard ─────────────
+  if (user && (pathname === "/login" || pathname === "/dashboard")) {
     const appMeta = user.app_metadata as {
       tenant_role?: string;
       platform_role?: string;
