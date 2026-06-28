@@ -33,16 +33,13 @@ All milestones through M19 are complete and merged to `main`. The platform is fe
 - M33: Export & Print (CSV export for 6 entities, printable invoice page, ExportButton)
 - M34: Operations Calendar (monthly grid, upcoming widget on dashboard, mobile-friendly)
 - M35: Dark Mode & Mobile (class-based dark mode, mobile sidebar toggle, skeleton-ready)
-
-**Next milestone requires explicit user confirmation.**
-
-**Suggested next milestones:**
-
 - M36: Tenant Onboarding (signup wizard for new tenants)
-- M37: Email Notifications (Supabase Edge Functions for email delivery)
-- M38: Admin Tenant Detail (full tenant view in admin-web)
-- M39: AI Center (Codex API insights — anomaly detection, summaries)
-- M40: Public Landing Page (marketing site in apps/web)
+- M37: Email Notifications (Supabase Edge Functions for email delivery using Resend)
+- M38: Admin Tenant Detail (full tenant view in platform/tenants)
+- M39: AI Center (AI insights page, admin agents list, and dynamic insights API)
+- M40: Public Landing Page (marketing site, pricing, and contact pages in apps/web)
+
+**All planned roadmap milestones (M1 to M40) are complete.**
 
 ---
 
