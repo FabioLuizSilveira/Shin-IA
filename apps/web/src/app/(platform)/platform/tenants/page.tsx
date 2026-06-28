@@ -116,6 +116,8 @@ export default function TenantsPage() {
   const [formName, setFormName] = useState("");
   const [formSlug, setFormSlug] = useState("");
   const [formPlan, setFormPlan] = useState<TenantPlan>("starter");
+  const [formAdminEmail, setFormAdminEmail] = useState("");
+  const [formAdminFullName, setFormAdminFullName] = useState("");
 
   async function fetchAll() {
     setLoading(true);
@@ -155,7 +157,13 @@ export default function TenantsPage() {
       const res = await fetch("/api/tenants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: formName, slug: formSlug, plan: formPlan }),
+        body: JSON.stringify({
+          name: formName,
+          slug: formSlug,
+          plan: formPlan,
+          adminEmail: formAdminEmail,
+          adminFullName: formAdminFullName,
+        }),
       });
       if (!res.ok) {
         const json = (await res.json()) as { error?: string };
@@ -165,6 +173,8 @@ export default function TenantsPage() {
       setFormName("");
       setFormSlug("");
       setFormPlan("starter");
+      setFormAdminEmail("");
+      setFormAdminFullName("");
       await fetchAll();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Erro ao criar tenant");
@@ -250,6 +260,36 @@ export default function TenantsPage() {
               </select>
             </div>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                Nome do Administrador <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={formAdminFullName}
+                onChange={(e) => setFormAdminFullName(e.target.value)}
+                placeholder="Ex: João da Silva"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-shina-blue/30 focus:border-shina-blue"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                E-mail do Administrador <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                required
+                value={formAdminEmail}
+                onChange={(e) => setFormAdminEmail(e.target.value)}
+                placeholder="Ex: joao@empresa.com"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-shina-blue/30 focus:border-shina-blue"
+              />
+            </div>
+          </div>
+
           <div className="flex gap-3 mt-4">
             <button
               type="submit"
