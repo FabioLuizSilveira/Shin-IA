@@ -17,23 +17,36 @@ import {
   Sparkles,
   Map,
   Shield,
+  Building2,
+  CreditCard,
+  Headphones,
+  Puzzle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/map", label: "Mapa da Frota", icon: Map },
-  { href: "/operations", label: "Operações", icon: Zap },
-  { href: "/resources", label: "Recursos", icon: Users2 },
-  { href: "/assets", label: "Frota & Ativos", icon: Truck },
-  { href: "/crm", label: "Clientes & Parceiros", icon: Users },
-  { href: "/contracts", label: "Contratos", icon: FileText },
-  { href: "/financial", label: "Financeiro", icon: DollarSign },
-  { href: "/reports", label: "Relatórios", icon: BarChart2 },
-  { href: "/commissions", label: "Comissões", icon: Award },
-  { href: "/studio/access", label: "Controle de Acesso", icon: Shield },
-  { href: "/ai", label: "AI Center", icon: Sparkles },
-  { href: "/settings", label: "Configurações", icon: Settings },
+const PLATFORM_NAV_ITEMS = [
+  { href: "/platform/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/platform/tenants", label: "Tenants", icon: Building2 },
+  { href: "/platform/billing", label: "Faturamento", icon: CreditCard },
+  { href: "/platform/support", label: "Suporte", icon: Headphones },
+  { href: "/platform/marketplace", label: "Marketplace", icon: Puzzle },
+  { href: "/platform/ai", label: "AI Center", icon: Sparkles },
+  { href: "/platform/settings", label: "Configurações", icon: Settings },
+];
+
+const TENANT_NAV_ITEMS = [
+  { href: "/tenant/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/tenant/tracking", label: "Mapa da Frota", icon: Map },
+  { href: "/tenant/operations", label: "Operações", icon: Zap },
+  { href: "/tenant/resources", label: "Recursos", icon: Users2 },
+  { href: "/tenant/assets", label: "Frota & Ativos", icon: Truck },
+  { href: "/tenant/crm", label: "Clientes & Parceiros", icon: Users },
+  { href: "/tenant/contracts", label: "Contratos", icon: FileText },
+  { href: "/tenant/billing", label: "Financeiro", icon: DollarSign },
+  { href: "/tenant/reports", label: "Relatórios", icon: BarChart2 },
+  { href: "/tenant/commission", label: "Comissões", icon: Award },
+  { href: "/tenant/studio", label: "Controle de Acesso", icon: Shield },
+  { href: "/tenant/ai", label: "AI Center", icon: Sparkles },
 ];
 
 interface SidebarProps {
@@ -44,6 +57,9 @@ export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+
+  const isPlatform = pathname.startsWith("/platform");
+  const navItems = isPlatform ? PLATFORM_NAV_ITEMS : TENANT_NAV_ITEMS;
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -70,7 +86,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
       {/* Nav */}
       <ul className="flex-1 py-4 px-3 space-y-0.5 list-none m-0 p-3">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {navItems.map(({ href, label, icon: Icon }) => {
           const isActive = pathname.startsWith(href);
           return (
             <li key={href}>
