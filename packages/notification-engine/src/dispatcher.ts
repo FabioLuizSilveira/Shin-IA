@@ -81,3 +81,51 @@ export class NoOpWebhookDispatcher implements ChannelDispatcher {
     return { success: true, externalId: crypto.randomUUID() };
   }
 }
+
+export class SupabaseEmailDispatcher implements ChannelDispatcher {
+  readonly channelType: NotificationChannelType = "email";
+
+  constructor(
+    private supabaseUrl: string,
+    private supabaseServiceKey: string,
+  ) {}
+
+  async dispatch(payload: DispatchPayload): Promise<DispatchResult> {
+    try {
+      const baseUrl = this.supabaseUrl.replace(/\/$/, "");
+      const url = `${baseUrl}/functions/v1/send-email`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.supabaseServiceKey}`,
+        },
+        body: JSON.stringify({
+          to: payload.recipientAddress,
+          template: payload.metadata?.template ?? "welcome",
+          data: payload.metadata?.data ?? {
+            subject: payload.subject ?? "",
+            body: payload.body,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        return {
+          success: false,
+          error: `Supabase edge function HTTP error ${res.status}: ${errorText}`,
+        };
+      }
+
+      const json = (await res.json()) as { id?: string; error?: string };
+      if (json.error) {
+        return { success: false, error: json.error };
+      }
+
+      return { success: true, externalId: json.id ?? "dev-mode-no-send" };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+}

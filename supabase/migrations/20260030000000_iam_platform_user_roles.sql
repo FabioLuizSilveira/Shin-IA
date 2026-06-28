@@ -15,11 +15,12 @@ create table if not exists platform_user_roles (
   deleted_at       timestamptz,
 
   constraint platform_user_roles_role_fk
-    foreign key (role_id) references platform_roles (id) on delete cascade,
-
-  constraint platform_user_roles_unique_active
-    unique (user_id, role_id) where deleted_at is null and expires_at is null
+    foreign key (role_id) references platform_roles (id) on delete cascade
 );
+
+create unique index platform_user_roles_unique_active 
+  on platform_user_roles (user_id, role_id) 
+  where deleted_at is null and expires_at is null;
 
 -- No RLS on platform_user_roles
 

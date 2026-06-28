@@ -38,11 +38,12 @@ create table if not exists mfa_enrollments (
     foreign key (tenant_id) references tenants (id) on delete cascade,
 
   constraint mfa_enrollments_user_fk
-    foreign key (user_id) references user_profiles (id) on delete cascade,
-
-  constraint mfa_enrollments_primary_unique
-    unique (user_id, method) where is_primary = true
+    foreign key (user_id) references user_profiles (id) on delete cascade
 );
+
+create unique index mfa_enrollments_primary_unique 
+  on mfa_enrollments (user_id, method) 
+  where is_primary = true;
 
 -- RLS: Users can read/manage their own enrollments
 alter table mfa_enrollments enable row level security;

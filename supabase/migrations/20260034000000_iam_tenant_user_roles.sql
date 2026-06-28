@@ -30,11 +30,12 @@ create table if not exists tenant_user_roles (
     foreign key (user_id) references user_profiles (id) on delete cascade,
 
   constraint tenant_user_roles_role_fk
-    foreign key (role_id) references tenant_roles (id) on delete cascade,
-
-  constraint tenant_user_roles_unique_active
-    unique (tenant_id, user_id, role_id) where deleted_at is null and expires_at is null
+    foreign key (role_id) references tenant_roles (id) on delete cascade
 );
+
+create unique index tenant_user_roles_unique_active 
+  on tenant_user_roles (tenant_id, user_id, role_id) 
+  where deleted_at is null and expires_at is null;
 
 -- RLS: Users can read their own roles, admins can read/manage all
 alter table tenant_user_roles enable row level security;

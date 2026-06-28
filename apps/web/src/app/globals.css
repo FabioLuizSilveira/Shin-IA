@@ -1,42 +1,49 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  html {
-    scroll-behavior: smooth;
-    -webkit-font-smoothing: antialiased;
-  }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
 
-  body {
-    @apply bg-slate-950 text-slate-100 font-sans;
-  }
+:root {
+  --shina-navy: #0F172A;
+  --shina-blue: #2563EB;
+  --shina-cyan: #06B6D4;
+  --shina-green: #10B981;
+  --shina-slate: #64748B;
+  --shina-light: #E2E8F0;
+  --shina-black: #020617;
 }
 
-@layer utilities {
-  .text-gradient {
-    background: linear-gradient(135deg, #60a5fa 0%, #06b6d4 50%, #818cf8 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
+* {
+  box-sizing: border-box;
+}
 
-  .bg-gradient-shine {
-    background: linear-gradient(
-      135deg,
-      #0f172a 0%,
-      #1e3a5f 40%,
-      #0f172a 100%
-    );
-  }
+body {
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: 'Inter', system-ui, sans-serif;
+  margin: 0;
+}
 
-  .card-glass {
-    @apply bg-white/5 backdrop-blur-sm border border-white/10;
-  }
+/* Smooth transitions */
+a {
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
 
-  .section-padding {
-    @apply px-4 sm:px-6 lg:px-8;
-  }
+button {
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.dark {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-card: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --border-color: #334155;
+}
+
+.dark body {
+  background: #0f172a;
+  color: #f1f5f9;
 }
