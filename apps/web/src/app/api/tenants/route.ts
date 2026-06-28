@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     plan?: TenantPlan;
     adminEmail?: string;
     adminFullName?: string;
+    adminPassword?: string;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -50,10 +51,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { name, slug, plan, adminEmail, adminFullName } = body;
-  if (!name || !slug || !adminEmail || !adminFullName) {
+  const { name, slug, plan, adminEmail, adminFullName, adminPassword } = body;
+  if (!name || !slug || !adminEmail || !adminFullName || !adminPassword) {
     return NextResponse.json(
-      { error: "name, slug, adminEmail and adminFullName are required" },
+      { error: "name, slug, adminEmail, adminFullName and adminPassword are required" },
       { status: 400 },
     );
   }
@@ -98,24 +99,23 @@ export async function POST(req: NextRequest) {
     console.error("[api/tenants] branch creation failed:", branchError);
   }
 
-  // 3. Invite Admin user
-  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
-    adminEmail,
-    {
-      data: {
-        full_name: adminFullName,
-        tenant_id: tenantId,
-        role: "tenant_admin",
-        onboarding: true,
-      },
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3002"}/dashboard`,
+  // 3. Create Admin user in Auth directly
+  const { data: inviteData, error: inviteError } = await admin.auth.admin.createUser({
+    email: adminEmail,
+    password: adminPassword,
+    email_confirm: true,
+    user_metadata: {
+      full_name: adminFullName,
+      tenant_id: tenantId,
+      role: "tenant_admin",
+      onboarding: true,
     },
-  );
+  });
 
   let authUserId = inviteData?.user?.id ?? null;
 
   if (inviteError) {
-    console.error("[api/tenants] invite user failed:", inviteError);
+    console.error("[api/tenants] create user failed:", inviteError);
     // If user already exists, try to get their ID to link them
     try {
       const { data: userList } = await admin.auth.admin.listUsers();

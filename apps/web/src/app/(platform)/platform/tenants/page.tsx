@@ -118,6 +118,7 @@ export default function TenantsPage() {
   const [formPlan, setFormPlan] = useState<TenantPlan>("starter");
   const [formAdminEmail, setFormAdminEmail] = useState("");
   const [formAdminFullName, setFormAdminFullName] = useState("");
+  const [formAdminPassword, setFormAdminPassword] = useState("");
 
   async function fetchAll() {
     setLoading(true);
@@ -163,6 +164,7 @@ export default function TenantsPage() {
           plan: formPlan,
           adminEmail: formAdminEmail,
           adminFullName: formAdminFullName,
+          adminPassword: formAdminPassword,
         }),
       });
       if (!res.ok) {
@@ -175,6 +177,7 @@ export default function TenantsPage() {
       setFormPlan("starter");
       setFormAdminEmail("");
       setFormAdminFullName("");
+      setFormAdminPassword("");
       await fetchAll();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Erro ao criar tenant");
@@ -261,7 +264,7 @@ export default function TenantsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                 Nome do Administrador <span className="text-red-500">*</span>
@@ -285,6 +288,19 @@ export default function TenantsPage() {
                 value={formAdminEmail}
                 onChange={(e) => setFormAdminEmail(e.target.value)}
                 placeholder="Ex: joao@empresa.com"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-shina-blue/30 focus:border-shina-blue"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                Senha do Administrador <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                required
+                value={formAdminPassword}
+                onChange={(e) => setFormAdminPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
                 className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-shina-blue/30 focus:border-shina-blue"
               />
             </div>
