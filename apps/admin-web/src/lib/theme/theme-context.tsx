@@ -18,11 +18,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("shina-theme") as Theme | null;
-    const preferred =
-      stored ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    setTheme(preferred);
-    document.documentElement.classList.toggle("dark", preferred === "dark");
+    try {
+      const stored = localStorage.getItem("shina-theme") as Theme | null;
+      const prefersDark =
+        typeof window !== "undefined" && window.matchMedia
+          ? window.matchMedia("(prefers-color-scheme: dark)").matches
+          : false;
+      const preferred = stored ?? (prefersDark ? "dark" : "light");
+      setTheme(preferred);
+      document.documentElement.classList.toggle("dark", preferred === "dark");
+    } catch {
+      // localStorage indisponível (modo privado) — mantém tema claro padrão
+    }
     setMounted(true);
   }, []);
 
