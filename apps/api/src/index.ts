@@ -5,7 +5,7 @@ const fastify = Fastify({
 });
 
 // Basic Healthcheck Route
-fastify.get("/health", async (request, reply) => {
+fastify.get("/health", async (_request, _reply) => {
   return { status: "ok", service: "@shina/api", timestamp: new Date().toISOString() };
 });
 
