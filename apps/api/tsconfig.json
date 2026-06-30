@@ -1,11 +1,12 @@
 {
-  "extends": "@shina/typescript-config/base.json",
+  "extends": "@shina/typescript-config/base",
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
     "target": "ES2022",
     "module": "CommonJS",
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "esModuleInterop": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
