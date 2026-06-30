@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   Sparkles,
@@ -283,7 +283,7 @@ function InsightWidget({ card }: { card: InsightCard }) {
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 
-export default function AIPage() {
+export default function AIPage(): React.JSX.Element {
   const [generating, setGenerating] = useState<InsightType | null>(null);
 
   async function generateAll() {
