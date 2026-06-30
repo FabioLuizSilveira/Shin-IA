@@ -2,7 +2,16 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // ── Public routes (no auth required) ──────────────────────────────────────────
-const PUBLIC_PATHS = ["/login", "/auth", "/onboarding", "/api/onboarding", "/api/auth"];
+const PUBLIC_PATHS = [
+  "/",
+  "/pricing",
+  "/contact",
+  "/login",
+  "/auth",
+  "/onboarding",
+  "/api/onboarding",
+  "/api/auth",
+];
 
 // ── MFA-enforcement paths (require mfa_enrolled if role mandates) ─────────────
 // Roles that MUST have MFA enrolled before accessing the platform

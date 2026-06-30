@@ -5,7 +5,7 @@ const fastify = Fastify({
 });
 
 // Basic Healthcheck Route
-fastify.get("/health", async (request, reply) => {
+fastify.get("/health", async (_request, _reply) => {
   return { status: "ok", service: "@shina/api", timestamp: new Date().toISOString() };
 });
 
@@ -16,7 +16,7 @@ const start = async () => {
     await fastify.listen({ port, host: "0.0.0.0" });
     fastify.log.info(`Server listening on port ${port}`);
   } catch (err) {
-    fastify.log.error(err);
+    fastify.log.error(err instanceof Error ? err : new Error(String(err)));
     process.exit(1);
   }
 };
