@@ -56,12 +56,12 @@ interface SidebarProps {
 export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
 
   const isPlatform = pathname.startsWith("/platform");
   const navItems = isPlatform ? PLATFORM_NAV_ITEMS : TENANT_NAV_ITEMS;
 
   async function handleLogout() {
+    const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
