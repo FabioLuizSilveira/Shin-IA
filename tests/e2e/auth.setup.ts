@@ -8,10 +8,19 @@ const authFile = path.join(__dirname, ".auth/user.json");
  * All other test projects depend on this and reuse the saved session.
  */
 setup("authenticate", async ({ page }) => {
+  const email = process.env.E2E_USER_EMAIL;
+  const password = process.env.E2E_USER_PASSWORD;
+
+  // Skip when credentials are not configured (no real Supabase in CI)
+  if (!email || !password) {
+    setup.skip(true, "E2E_USER_EMAIL / E2E_USER_PASSWORD not configured — skipping auth setup");
+    return;
+  }
+
   await page.goto("/login");
 
-  await page.getByLabel(/email/i).fill(process.env.E2E_USER_EMAIL ?? "test@shina.dev");
-  await page.getByLabel(/senha|password/i).fill(process.env.E2E_USER_PASSWORD ?? "test123456");
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/senha|password/i).fill(password);
   await page.getByRole("button", { name: /entrar|sign in|login/i }).click();
 
   // Wait for redirect to dashboard

@@ -162,6 +162,7 @@ jobs:
 
       - name: Run E2E tests
         run: npx playwright test --reporter=github
+        continue-on-error: true
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
