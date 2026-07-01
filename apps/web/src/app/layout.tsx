@@ -33,6 +33,7 @@ export const metadata: Metadata = {
     title: "Shinã — Inteligência Operacional para Frotas",
     description: "Plataforma SaaS com IA para gestão de frotas, operações e equipes.",
   },
+  // Landing pages are indexable; app subdomain gets noindex via middleware header.
   robots: { index: true, follow: true },
 };
 

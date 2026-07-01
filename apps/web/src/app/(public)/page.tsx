@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
+import { appUrl } from "@/lib/domain";
 import {
   Zap,
   Truck,
@@ -97,6 +98,7 @@ const LOGOS = [
 // ── Sections ──────────────────────────────────────────────────────────────────
 
 function HeroSection() {
+  const loginUrl = appUrl("/login");
   return (
     <section className="relative pt-32 pb-20 overflow-hidden">
       {/* Background glow */}
@@ -126,14 +128,14 @@ function HeroSection() {
 
         {/* CTA buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-          <Link
-            href="/contact"
+          <a
+            href={loginUrl}
             id="hero-cta-primary"
             className="inline-flex items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-lg rounded-2xl transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 no-underline"
           >
-            Começar agora grátis
+            Acessar plataforma
             <ArrowRight className="w-5 h-5" />
-          </Link>
+          </a>
           <Link
             href="/#features"
             id="hero-cta-secondary"
@@ -299,6 +301,7 @@ function TrustSection() {
 }
 
 function CtaSection() {
+  const loginUrl = appUrl("/login");
   return (
     <section className="py-24">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -319,14 +322,14 @@ function CtaSection() {
               a diferença que a inteligência operacional faz.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                href="/contact"
+              <a
+                href={loginUrl}
                 id="cta-section-primary"
                 className="inline-flex items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-lg rounded-2xl transition-all shadow-lg shadow-blue-500/30 no-underline"
               >
-                Começar agora grátis
+                Acessar plataforma
                 <ArrowRight className="w-5 h-5" />
-              </Link>
+              </a>
               <Link
                 href="/pricing"
                 id="cta-section-pricing"
