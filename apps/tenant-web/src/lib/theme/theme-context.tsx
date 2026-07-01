@@ -15,7 +15,6 @@ const ThemeContext = createContext<ThemeContextValue>({
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("light");
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     try {
@@ -30,7 +29,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // localStorage indisponível (modo privado) — mantém tema claro padrão
     }
-    setMounted(true);
   }, []);
 
   function toggleTheme() {
@@ -39,8 +37,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("shina-theme", next);
     document.documentElement.classList.toggle("dark", next === "dark");
   }
-
-  if (!mounted) return <>{children}</>;
 
   return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
 }
