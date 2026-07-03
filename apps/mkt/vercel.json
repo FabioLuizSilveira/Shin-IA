@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd ../.. && pnpm build --filter=@shina/mkt",
+  "outputDirectory": ".next",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "framework": "nextjs"
+}
