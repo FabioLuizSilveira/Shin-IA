@@ -1,0 +1,13 @@
+export const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "shinaia.com.br";
+export const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? `https://${ROOT_DOMAIN}`;
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+/**
+ * Returns a URL pointing to the app subdomain.
+ * Falls back to a relative path in local dev when NEXT_PUBLIC_APP_URL is not set.
+ */
+export function appUrl(path: string): string {
+  if (!APP_URL) return path;
+  return `${APP_URL}${path}`;
+}

@@ -1,27 +1,65 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// ── Public routes (no auth required) ──────────────────────────────────────────
-const PUBLIC_PATHS = [
-  "/",
-  "/pricing",
-  "/contact",
-  "/login",
-  "/auth",
-  "/onboarding",
-  "/api/onboarding",
-  "/api/auth",
-];
+// ── Domain config ──────────────────────────────────────────────────────────────
+const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "shinaia.com.br";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? `https://app.${ROOT_DOMAIN}`;
 
-// ── MFA-enforcement paths (require mfa_enrolled if role mandates) ─────────────
-// Roles that MUST have MFA enrolled before accessing the platform
+// Paths served exclusively by the institutional landing (root/www domain)
+const SITE_PATHS = ["/", "/pricing", "/contact", "/about", "/demo"];
+
+// Paths that are public within the app subdomain (no auth required)
+const APP_PUBLIC_PATHS = ["/login", "/auth", "/onboarding", "/api/onboarding", "/api/auth"];
+
+// Roles that require MFA enrollment before accessing the platform
 const MFA_REQUIRED_ROLES = new Set(["owner", "admin", "financial_manager"]);
 
-function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+type HostType = "root" | "app" | "local";
+
+function getHostType(hostname: string): HostType {
+  const bare = hostname.split(":")[0]; // strip port
+  if (bare === "localhost" || bare === "127.0.0.1") return "local";
+  if (bare === `app.${ROOT_DOMAIN}` || bare === "app.localhost") return "app";
+  return "root"; // shinaia.com.br, www.shinaia.com.br, etc.
 }
 
+/** Returns true when the path belongs to the institutional landing */
+function isSitePath(pathname: string): boolean {
+  return SITE_PATHS.some((p) => {
+    if (p === "/") return pathname === "/";
+    return pathname === p || pathname.startsWith(`${p}/`);
+  });
+}
+
+/** Returns true when the path is public within the app subdomain */
+function isAppPublicPath(pathname: string): boolean {
+  return APP_PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+}
+
+// ── Middleware ─────────────────────────────────────────────────────────────────
+
 export async function middleware(request: NextRequest) {
+  const hostname = request.headers.get("host") ?? "";
+  const hostType = getHostType(hostname);
+  const { pathname } = request.nextUrl;
+  const isApiRoute = pathname.startsWith("/api");
+
+  // ── Root / www domain ──────────────────────────────────────────────────────
+  // Only the institutional landing is served here.
+  // Any app or auth route gets a permanent redirect to app.shinaia.com.br.
+  if (hostType === "root") {
+    if (!isSitePath(pathname) && !isApiRoute) {
+      const target = new URL(pathname + request.nextUrl.search, APP_URL);
+      return NextResponse.redirect(target.toString(), { status: 308 });
+    }
+    return NextResponse.next();
+  }
+
+  // ── App subdomain + localhost ──────────────────────────────────────────────
+  // Run the full auth / MFA middleware.
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -43,16 +81,25 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // getUser() validates the JWT server-side
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-  const isPublic = isPublicPath(pathname);
-  const isApiRoute = pathname.startsWith("/api");
+  const isPublic = isAppPublicPath(pathname);
 
-  // ── 1. Unauthenticated → redirect / 401 ────────────────────────────────────
+  // ── 1. App subdomain "/" → login or dashboard ──────────────────────────────
+  if (hostType === "app" && pathname === "/") {
+    const url = request.nextUrl.clone();
+    if (user) {
+      const appMeta = user.app_metadata as { platform_role?: string };
+      url.pathname = appMeta.platform_role ? "/platform/dashboard" : "/tenant/dashboard";
+    } else {
+      url.pathname = "/login";
+    }
+    return NextResponse.redirect(url);
+  }
+
+  // ── 2. Unauthenticated → redirect to login / 401 ──────────────────────────
   if (!user && !isPublic) {
     if (isApiRoute) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -63,24 +110,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // ── 2. Authenticated on /login or /dashboard → redirect to dashboard ─────────────
+  // ── 3. Authenticated on /login or /dashboard → role-based redirect ─────────
   if (user && (pathname === "/login" || pathname === "/dashboard")) {
     const appMeta = user.app_metadata as {
       tenant_role?: string;
       platform_role?: string;
     };
     const url = request.nextUrl.clone();
-    if (appMeta.platform_role) {
-      url.pathname = "/platform/dashboard";
-    } else {
-      url.pathname = "/tenant/dashboard";
-    }
+    url.pathname = appMeta.platform_role ? "/platform/dashboard" : "/tenant/dashboard";
     return NextResponse.redirect(url);
   }
 
-  // ── 3. MFA enforcement (read from JWT custom claims — no extra DB query) ────
+  // ── 4. MFA enforcement ────────────────────────────────────────────────────
   if (user && !isPublic) {
-    // Claims are injected by the custom-access-token Edge Function hook
     const appMeta = user.app_metadata as {
       tenant_role?: string;
       platform_role?: string;
@@ -90,8 +132,6 @@ export async function middleware(request: NextRequest) {
     const role = appMeta.tenant_role ?? appMeta.platform_role ?? null;
     const mfaEnrolled = appMeta.mfa_enrolled ?? false;
 
-    // If role requires MFA but not enrolled → redirect to MFA setup
-    // Skip if already heading to /auth/mfa-setup
     if (
       role &&
       MFA_REQUIRED_ROLES.has(role) &&
@@ -104,8 +144,6 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // If role requires MFA, enrolled but session not verified → challenge
-    // (session_trust_level check would come from a separate session cookie)
     const mfaChallengeRequired =
       request.cookies.get("mfa_verified")?.value !== "1" &&
       role &&
@@ -120,6 +158,11 @@ export async function middleware(request: NextRequest) {
       url.searchParams.set("next", pathname);
       return NextResponse.redirect(url);
     }
+  }
+
+  // ── 5. Tell crawlers not to index the app subdomain ───────────────────────
+  if (hostType === "app") {
+    supabaseResponse.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
 
   return supabaseResponse;

@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Menu, X, Zap } from "lucide-react";
+import { appUrl } from "@/lib/domain";
 
 const NAV_LINKS = [
   { href: "/#features", label: "Funcionalidades" },
   { href: "/pricing", label: "Preços" },
   { href: "/contact", label: "Contato" },
 ];
+
+const LOGIN_URL = appUrl("/login");
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
@@ -40,19 +43,19 @@ export function Navbar() {
 
           {/* CTA */}
           <div className="hidden md:flex items-center gap-3">
-            <Link
-              href="/login"
+            <a
+              href={LOGIN_URL}
               className="text-sm font-medium text-slate-400 hover:text-white transition-colors no-underline"
             >
               Entrar
-            </Link>
-            <Link
-              href="/contact"
+            </a>
+            <a
+              href={LOGIN_URL}
               id="nav-cta"
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-colors no-underline shadow-lg shadow-blue-500/20"
             >
-              Começar grátis
-            </Link>
+              Acessar plataforma
+            </a>
           </div>
 
           {/* Mobile hamburger */}
@@ -83,18 +86,18 @@ export function Navbar() {
               </Link>
             ))}
             <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
-              <Link
-                href="/login"
+              <a
+                href={LOGIN_URL}
                 className="block px-3 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors no-underline"
               >
                 Entrar
-              </Link>
-              <Link
-                href="/contact"
+              </a>
+              <a
+                href={LOGIN_URL}
                 className="block px-3 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl text-center no-underline"
               >
-                Começar grátis
-              </Link>
+                Acessar plataforma
+              </a>
             </div>
           </div>
         </div>
