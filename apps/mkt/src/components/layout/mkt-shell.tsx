@@ -51,7 +51,7 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <span className="text-sm font-bold text-white leading-tight">
-            Marketing AI
+            Marketing IA
             <span className="block text-[10px] font-medium text-slate-500">by Shinã</span>
           </span>
         </div>

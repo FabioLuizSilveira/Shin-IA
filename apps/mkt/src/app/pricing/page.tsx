@@ -5,7 +5,7 @@ import { Sparkles, Check, ArrowRight } from "lucide-react";
 export const metadata: Metadata = {
   title: "Preços",
   description:
-    "Planos do Shinã Marketing AI: Free, Starter, Pro e Business. Comece grátis e escale com IA.",
+    "Planos do Shinã Marketing IA: Free, Starter, Pro e Business. Comece grátis e escale com IA.",
 };
 
 const PLANS = [
@@ -94,7 +94,7 @@ export default function PricingPage() {
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <span className="text-lg font-bold text-white tracking-tight">
-              Shinã <span className="text-gradient-mkt">Marketing AI</span>
+              Shinã <span className="text-gradient-mkt">Marketing IA</span>
             </span>
           </Link>
           <Link
@@ -173,7 +173,7 @@ export default function PricingPage() {
       </main>
 
       <footer className="border-t border-white/5 py-10 text-center text-sm text-slate-500">
-        Shinã Marketing AI © {new Date().getFullYear()} — parte do ecossistema{" "}
+        Shinã Marketing IA © {new Date().getFullYear()} — parte do ecossistema{" "}
         <a href="https://shinaia.com.br" className="text-slate-400 hover:text-white no-underline">
           Shinã I.A.
         </a>

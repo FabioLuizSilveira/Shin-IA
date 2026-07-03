@@ -59,7 +59,7 @@ export default function HomePage() {
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <span className="text-lg font-bold text-white tracking-tight">
-              Shinã <span className="text-gradient-mkt">Marketing AI</span>
+              Shinã <span className="text-gradient-mkt">Marketing IA</span>
             </span>
           </Link>
           <nav className="flex items-center gap-4">
@@ -153,7 +153,7 @@ export default function HomePage() {
       </main>
 
       <footer className="border-t border-white/5 py-10 text-center text-sm text-slate-500">
-        Shinã Marketing AI © {new Date().getFullYear()} — parte do ecossistema{" "}
+        Shinã Marketing IA © {new Date().getFullYear()} — parte do ecossistema{" "}
         <a href="https://shinaia.com.br" className="text-slate-400 hover:text-white no-underline">
           Shinã I.A.
         </a>
