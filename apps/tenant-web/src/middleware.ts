@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { MFA_COOKIE_NAME, verifyMfaCookie } from "@/lib/auth/mfa-cookie";
 
 // ── Public routes (no auth required) ──────────────────────────────────────────
 const PUBLIC_PATHS = ["/login", "/auth", "/onboarding", "/api/onboarding", "/api/auth"];
@@ -87,10 +88,13 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // If role requires MFA, enrolled but session not verified → challenge
-    // (session_trust_level check would come from a separate session cookie)
+    // If role requires MFA, enrolled but session not verified → challenge.
+    // The cookie is HMAC-signed and bound to the user id; forged values fail.
+    const mfaCookie = request.cookies.get(MFA_COOKIE_NAME)?.value;
+    const mfaVerified = mfaCookie ? await verifyMfaCookie(mfaCookie, user.id) : false;
+
     const mfaChallengeRequired =
-      request.cookies.get("mfa_verified")?.value !== "1" &&
+      !mfaVerified &&
       role &&
       MFA_REQUIRED_ROLES.has(role) &&
       mfaEnrolled &&

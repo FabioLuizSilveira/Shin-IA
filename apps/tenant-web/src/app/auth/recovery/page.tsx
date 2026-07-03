@@ -40,9 +40,7 @@ function MfaRecoveryContent() {
       return;
     }
 
-    // Mark MFA as verified for this session
-    document.cookie = "mfa_verified=1; path=/; SameSite=Lax; max-age=86400";
-
+    // The recovery API sets the signed httpOnly mfa_verified cookie server-side.
     router.push(next);
   }
 

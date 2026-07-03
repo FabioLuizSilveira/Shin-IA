@@ -52,8 +52,14 @@ function MfaChallengeContent() {
       return;
     }
 
-    // Mark MFA as verified in session cookie (middleware checks this)
-    document.cookie = "mfa_verified=1; path=/; SameSite=Lax; max-age=86400";
+    // Server validates the session reached aal2 and sets the signed
+    // httpOnly mfa_verified cookie — it cannot be forged client-side.
+    const confirmRes = await fetch("/api/auth/mfa/confirm", { method: "POST" });
+    if (!confirmRes.ok) {
+      setError("Falha ao confirmar verificação MFA. Tente novamente.");
+      setLoading(false);
+      return;
+    }
 
     router.push(next);
   }
