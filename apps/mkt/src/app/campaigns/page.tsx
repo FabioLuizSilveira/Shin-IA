@@ -1,16 +1,274 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
 import { MktShell } from "@/components/layout/mkt-shell";
-import { ModulePlaceholder } from "@/components/ui/module-placeholder";
-import { Megaphone } from "lucide-react";
+import { Megaphone, Plus, Loader2, X, ShieldCheck } from "lucide-react";
+
+interface Campaign {
+  id: string;
+  name: string;
+  platform: string;
+  objective: string | null;
+  budget_daily: number | null;
+  status: string;
+  start_date: string | null;
+  created_at: string;
+}
+
+interface BrandKit {
+  id: string;
+  name: string;
+}
+
+const STATUS_LABELS: Record<string, [string, string]> = {
+  draft: ["Rascunho", "bg-slate-500/15 text-slate-400"],
+  pending_approval: ["Aguardando aprovação", "bg-amber-500/15 text-amber-400"],
+  approved: ["Aprovada", "bg-emerald-500/15 text-emerald-400"],
+  active: ["Ativa", "bg-emerald-500/15 text-emerald-400"],
+  paused: ["Pausada", "bg-orange-500/15 text-orange-400"],
+  completed: ["Concluída", "bg-slate-500/15 text-slate-400"],
+  archived: ["Arquivada", "bg-slate-500/15 text-slate-500"],
+};
 
 export default function CampaignsPage() {
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [pendingDrafts, setPendingDrafts] = useState(0);
+  const [kits, setKits] = useState<BrandKit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    name: "",
+    platform: "meta",
+    objective: "",
+    budget_daily: "",
+    start_date: "",
+    brand_kit_id: "",
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [campaignsRes, draftsRes, kitsRes] = await Promise.all([
+      fetch("/api/campaigns"),
+      fetch("/api/drafts?status=pending"),
+      fetch("/api/brand-kits"),
+    ]);
+    const campaignsJson = (await campaignsRes.json()) as { data?: Campaign[] };
+    const draftsJson = (await draftsRes.json()) as { data?: unknown[] };
+    const kitsJson = (await kitsRes.json()) as { data?: BrandKit[] };
+    setCampaigns(campaignsJson.data ?? []);
+    setPendingDrafts(draftsJson.data?.length ?? 0);
+    setKits(kitsJson.data ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          platform: form.platform,
+          objective: form.objective || undefined,
+          budget_daily: form.budget_daily ? Number(form.budget_daily) : undefined,
+          start_date: form.start_date || undefined,
+          brand_kit_id: form.brand_kit_id || undefined,
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Erro ao criar campanha");
+      setShowForm(false);
+      setForm({
+        name: "",
+        platform: "meta",
+        objective: "",
+        budget_daily: "",
+        start_date: "",
+        brand_kit_id: "",
+      });
+      setNotice(
+        "Rascunho de campanha criado. Ele precisa ser aprovado na Central de Aprovações antes de qualquer publicação.",
+      );
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro inesperado");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <MktShell title="Campanhas">
-      <ModulePlaceholder
-        icon={Megaphone}
-        title="Campanhas"
-        description="Crie e gerencie campanhas em Meta, Google, TikTok e LinkedIn — sempre em modo rascunho até a aprovação."
-        milestone="M-MKT-05"
-      />
+      <div className="max-w-4xl">
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-sm text-slate-400">
+            Toda campanha nasce como rascunho e exige aprovação humana antes de ir ao ar.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-mkt-primary hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition border-0 cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" /> Nova campanha
+          </button>
+        </div>
+
+        {pendingDrafts > 0 && (
+          <a
+            href="/approvals"
+            className="flex items-center gap-3 mb-4 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm no-underline hover:bg-amber-500/15 transition"
+          >
+            <ShieldCheck className="w-4 h-4 shrink-0" />
+            {pendingDrafts} rascunho{pendingDrafts > 1 ? "s" : ""} aguardando aprovação — clique
+            para revisar
+          </a>
+        )}
+
+        {notice && (
+          <div className="mb-4 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm flex items-start justify-between gap-3">
+            <span>{notice}</span>
+            <button
+              type="button"
+              onClick={() => setNotice(null)}
+              className="p-0.5 text-emerald-400/60 hover:text-emerald-400 bg-transparent border-0 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+
+        {showForm && (
+          <form onSubmit={(e) => void handleCreate(e)} className="card-glass rounded-2xl p-5 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-white">Nova campanha (rascunho)</h2>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="p-1 text-slate-500 hover:text-white bg-transparent border-0 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Nome da campanha *"
+                className={inputCls}
+              />
+              <select
+                value={form.platform}
+                onChange={(e) => setForm({ ...form, platform: e.target.value })}
+                className={inputCls}
+              >
+                <option value="meta">Meta Ads</option>
+                <option value="google">Google Ads</option>
+                <option value="tiktok">TikTok Ads</option>
+                <option value="linkedin">LinkedIn Ads</option>
+              </select>
+              <input
+                value={form.objective}
+                onChange={(e) => setForm({ ...form, objective: e.target.value })}
+                placeholder="Objetivo (ex: conversões)"
+                className={inputCls}
+              />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.budget_daily}
+                onChange={(e) => setForm({ ...form, budget_daily: e.target.value })}
+                placeholder="Orçamento diário (R$)"
+                className={inputCls}
+              />
+              <input
+                type="date"
+                value={form.start_date}
+                onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                className={inputCls}
+              />
+              <select
+                value={form.brand_kit_id}
+                onChange={(e) => setForm({ ...form, brand_kit_id: e.target.value })}
+                className={inputCls}
+              >
+                <option value="">Sem brand kit</option>
+                {kits.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end mt-4">
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex items-center gap-2 px-5 py-2 bg-mkt-primary hover:bg-indigo-500 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition border-0 cursor-pointer"
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Criar rascunho
+              </button>
+            </div>
+          </form>
+        )}
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-slate-400 text-sm py-12 justify-center">
+            <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+          </div>
+        ) : campaigns.length === 0 ? (
+          <div className="card-glass rounded-2xl p-10 text-center">
+            <Megaphone className="w-8 h-8 text-mkt-glow mx-auto mb-3" />
+            <p className="text-sm text-slate-400">
+              Nenhuma campanha aprovada ainda. Crie um rascunho e aprove na Central de Aprovações.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {campaigns.map((c) => {
+              const [label, cls] = STATUS_LABELS[c.status] ?? [
+                c.status,
+                "bg-white/5 text-slate-400",
+              ];
+              return (
+                <div key={c.id} className="card-glass rounded-2xl p-4 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-white truncate">{c.name}</p>
+                    <p className="text-xs text-slate-400">
+                      {c.platform} {c.objective ? `· ${c.objective}` : ""}{" "}
+                      {c.budget_daily ? `· R$${c.budget_daily}/dia` : ""}
+                    </p>
+                  </div>
+                  <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${cls}`}>
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </MktShell>
   );
 }
+
+const inputCls =
+  "w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-mkt-primary/40 transition";
