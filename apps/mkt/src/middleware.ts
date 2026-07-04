@@ -2,7 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Public routes: landing, pricing, login and auth callbacks.
-const PUBLIC_PATHS = ["/", "/pricing", "/login", "/auth", "/api/auth"];
+// /api/mcp authenticates via Authorization bearer header, not cookies.
+const PUBLIC_PATHS = ["/", "/pricing", "/login", "/auth", "/api/auth", "/api/mcp"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => {

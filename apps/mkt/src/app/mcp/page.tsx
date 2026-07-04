@@ -41,10 +41,30 @@ export default function McpPage() {
           ))}
         </div>
 
-        <p className="text-xs text-slate-500 mt-6">
-          Endpoint MCP disponível no M-MKT-06. Tools com <Lock className="w-3 h-3 inline" /> criam
-          rascunhos; tools com <Eye className="w-3 h-3 inline" /> são somente leitura.
-        </p>
+        <div className="card-glass rounded-2xl p-5 mt-6">
+          <h3 className="text-sm font-bold text-white mb-2">Como conectar</h3>
+          <p className="text-xs text-slate-400 mb-3">
+            Endpoint MCP (Streamable HTTP) com autenticação por bearer token:
+          </p>
+          <pre className="text-xs text-slate-300 bg-black/30 rounded-xl p-3 overflow-x-auto">
+            {`URL:   https://mkt.shinaia.com.br/api/mcp
+Auth:  Authorization: Bearer <seu access token Supabase>
+
+Exemplo (Claude Desktop / claude_desktop_config.json):
+{
+  "mcpServers": {
+    "shina-marketing": {
+      "url": "https://mkt.shinaia.com.br/api/mcp",
+      "headers": { "Authorization": "Bearer SEU_TOKEN" }
+    }
+  }
+}`}
+          </pre>
+          <p className="text-xs text-slate-500 mt-3">
+            Tools com <Lock className="w-3 h-3 inline" /> criam rascunhos que exigem aprovação
+            humana; tools com <Eye className="w-3 h-3 inline" /> são somente leitura.
+          </p>
+        </div>
       </div>
     </MktShell>
   );
