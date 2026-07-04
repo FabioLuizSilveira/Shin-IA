@@ -79,6 +79,72 @@ export async function generateText(options: {
   };
 }
 
+export async function analyzeImage(options: {
+  system: string;
+  prompt: string;
+  imageUrl: string;
+  maxTokens?: number;
+  model?: string;
+}): Promise<AnthropicResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new AIProviderError(
+      "ANTHROPIC_API_KEY não configurada. Configure a variável de ambiente no servidor.",
+      503,
+    );
+  }
+
+  const model = options.model ?? DEFAULT_MODEL;
+  const res = await fetch(ANTHROPIC_API_URL, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: options.maxTokens ?? 2048,
+      system: options.system,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "url", url: options.imageUrl } },
+            { type: "text", text: options.prompt },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    throw new AIProviderError(
+      body?.error?.message ?? `Anthropic API error (${res.status})`,
+      res.status === 429 ? 429 : 502,
+    );
+  }
+
+  const json = (await res.json()) as {
+    content: { type: string; text?: string }[];
+    usage: { input_tokens: number; output_tokens: number };
+    model: string;
+  };
+
+  return {
+    text: json.content
+      .filter((b) => b.type === "text")
+      .map((b) => b.text ?? "")
+      .join(""),
+    tokensIn: json.usage.input_tokens,
+    tokensOut: json.usage.output_tokens,
+    model: json.model,
+  };
+}
+
 /** Extracts the first JSON object from a model response (tolerates fences). */
 export function parseJsonResponse<T>(text: string): T {
   const cleaned = text.replace(/```json\s*/g, "").replace(/```\s*/g, "");
