@@ -22,7 +22,7 @@ Se a ilustração "explica IA mostrando um robô", está errada.
 
 A linguagem é construída a partir destes elementos:
 
-| Elemento                   | O que representa                        |
+| Elemento                   | Forma                                   | Representa                     |
 | -------------------------- | --------------------------------------- | ------------------------------ |
 | **Fluxo**                  | Linhas curvas contínuas, correntes      | operações em movimento         |
 | **Energia**                | Glow, luz emanando                      | inteligência ativa             |
