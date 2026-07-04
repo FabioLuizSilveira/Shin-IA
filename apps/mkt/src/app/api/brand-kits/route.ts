@@ -15,11 +15,9 @@ export async function GET() {
       .order("created_at", { ascending: true });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ data });
-  } catch (e) {
-    if (e instanceof MktContextError) {
-      return NextResponse.json({ error: e.message }, { status: e.status });
-    }
-    throw e;
+  } catch (e: any) {
+    console.error("API Error in brand-kits GET:", e);
+    return NextResponse.json({ error: e.message || String(e), stack: e.stack }, { status: 500 });
   }
 }
 
