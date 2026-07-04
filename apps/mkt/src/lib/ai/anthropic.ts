@@ -25,8 +25,9 @@ export async function generateText(options: {
   prompt: string;
   maxTokens?: number;
   model?: string;
+  apiKey?: string;
 }): Promise<AnthropicResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new AIProviderError(
       "ANTHROPIC_API_KEY não configurada. Configure a variável de ambiente no servidor.",
@@ -85,8 +86,9 @@ export async function analyzeImage(options: {
   imageUrl: string;
   maxTokens?: number;
   model?: string;
+  apiKey?: string;
 }): Promise<AnthropicResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new AIProviderError(
       "ANTHROPIC_API_KEY não configurada. Configure a variável de ambiente no servidor.",

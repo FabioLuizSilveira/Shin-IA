@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
 import { generateText, parseJsonResponse, AIProviderError } from "@/lib/ai/anthropic";
+import { resolveAnthropicKey } from "@/lib/ai/byok";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -60,7 +61,8 @@ Responda SOMENTE com JSON válido:
       .join("\n\n");
 
     const started = Date.now();
-    const result = await generateText({ system, prompt, maxTokens: 3000 });
+    const apiKey = await resolveAnthropicKey(ctx.workspaceId);
+    const result = await generateText({ system, prompt, maxTokens: 3000, apiKey });
     const strategy = parseJsonResponse<Strategy>(result.text);
 
     await supabase

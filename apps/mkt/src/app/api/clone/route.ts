@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
 import { analyzeImage, parseJsonResponse, AIProviderError } from "@/lib/ai/anthropic";
+import { resolveAnthropicKey } from "@/lib/ai/byok";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -103,7 +104,8 @@ Responda SOMENTE com JSON válido:
       .join("\n\n");
 
     const started = Date.now();
-    const result = await analyzeImage({ system, prompt, imageUrl: sourceUrl.toString() });
+    const apiKey = await resolveAnthropicKey(ctx.workspaceId);
+    const result = await analyzeImage({ system, prompt, imageUrl: sourceUrl.toString(), apiKey });
     const clone = parseJsonResponse<CloneResult>(result.text);
 
     const { data: saved, error: saveError } = await supabase
