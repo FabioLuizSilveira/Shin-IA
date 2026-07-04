@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Shinã Marketing IA",
+  "version": "1.0.0",
+  "description": "Capture anúncios de qualquer página: salve no Swipe File ou clone para a sua marca com IA.",
+  "permissions": ["contextMenus", "storage"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Shinã Marketing IA"
+  }
+}

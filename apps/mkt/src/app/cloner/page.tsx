@@ -61,6 +61,15 @@ export default function ClonerPage() {
     void load();
   }, [load]);
 
+  // Pre-fill from the chrome extension: /cloner?source=<image url>
+  useEffect(() => {
+    const source = new URLSearchParams(window.location.search).get("source");
+    if (source) {
+      setForm((f) => ({ ...f, source_url: source }));
+      window.history.replaceState(null, "", "/cloner");
+    }
+  }, []);
+
   async function handleClone(e: React.FormEvent) {
     e.preventDefault();
     setCloning(true);

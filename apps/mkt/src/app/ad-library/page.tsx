@@ -104,6 +104,30 @@ export default function AdLibraryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Capture from the chrome extension: /ad-library?capture=<image url>&from=<page>
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const capture = params.get("capture");
+    if (!capture) return;
+    const from = params.get("from");
+    window.history.replaceState(null, "", "/ad-library");
+    void (async () => {
+      await fetch("/api/swipe-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          custom_ad_url: capture,
+          title: "Capturado via extensão",
+          notes: from ? `Fonte: ${from}` : undefined,
+          tags: ["extensao"],
+        }),
+      });
+      await loadSwipe();
+      setTab("swipe");
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function saveToSwipe(adId: string) {
     await fetch("/api/swipe-file", {
       method: "POST",

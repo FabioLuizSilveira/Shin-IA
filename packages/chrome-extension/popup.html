@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        width: 300px;
+        margin: 0;
+        padding: 16px;
+        font-family: system-ui, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 4px;
+        background: linear-gradient(135deg, #6366f1, #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      p {
+        font-size: 11px;
+        color: #94a3b8;
+        margin: 0 0 12px;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        color: #94a3b8;
+        margin: 8px 0 4px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        font-size: 12px;
+      }
+      button {
+        width: 100%;
+        margin-top: 12px;
+        padding: 9px;
+        border: 0;
+        border-radius: 10px;
+        background: #6366f1;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #818cf8;
+      }
+      .ok {
+        color: #10b981;
+        font-size: 11px;
+        margin-top: 8px;
+        display: none;
+      }
+      a {
+        color: #a78bfa;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Shinã Marketing IA</h1>
+    <p>
+      Clique com o botão direito em qualquer imagem de anúncio para salvar no Swipe File ou clonar
+      para a sua marca. As ações abrem o app já autenticado — sem tokens na extensão.
+    </p>
+
+    <label for="appUrl">URL do app</label>
+    <input id="appUrl" placeholder="https://mkt.shinaia.com.br" />
+
+    <button id="save">Salvar configuração</button>
+    <div class="ok" id="ok">Configuração salva ✓</div>
+
+    <p style="margin-top: 12px">
+      <a href="https://mkt.shinaia.com.br/dashboard" target="_blank" rel="noopener">
+        Abrir dashboard ↗
+      </a>
+    </p>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
