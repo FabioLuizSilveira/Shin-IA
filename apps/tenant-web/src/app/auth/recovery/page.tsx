@@ -7,7 +7,10 @@ import { KeyRound, Loader2, AlertCircle, ChevronRight } from "lucide-react";
 function MfaRecoveryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/dashboard";
+  // Only allow internal paths — a full URL here would be an open redirect.
+  const rawNext = searchParams.get("next");
+  const next =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
 
   const [recoveryCode, setRecoveryCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -37,9 +40,7 @@ function MfaRecoveryContent() {
       return;
     }
 
-    // Mark MFA as verified for this session
-    document.cookie = "mfa_verified=1; path=/; SameSite=Lax; max-age=86400";
-
+    // The recovery API sets the signed httpOnly mfa_verified cookie server-side.
     router.push(next);
   }
 

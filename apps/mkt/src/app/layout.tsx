@@ -4,16 +4,16 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://mkt.shinaia.com.br"),
   title: {
-    default: "Shinã Marketing AI — Anúncios vencedores com IA",
-    template: "%s | Shinã Marketing AI",
+    default: "Shinã Marketing IA — Anúncios vencedores com IA",
+    template: "%s | Shinã Marketing IA",
   },
   description:
     "Crie, clone e publique anúncios com IA. Ad Library de concorrentes, gerador de criativos, MCP Server para agentes e integração com Meta, Google e TikTok Ads.",
   openGraph: {
-    title: "Shinã Marketing AI",
+    title: "Shinã Marketing IA",
     description: "Crie, clone e publique anúncios com IA — com aprovação humana em cada etapa.",
     url: "https://mkt.shinaia.com.br",
-    siteName: "Shinã Marketing AI",
+    siteName: "Shinã Marketing IA",
     locale: "pt_BR",
     type: "website",
   },

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { MFA_COOKIE_NAME, verifyMfaCookie } from "@/lib/auth/mfa-cookie";
 
 // ── Domain config ──────────────────────────────────────────────────────────────
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "shinaia.com.br";
@@ -144,8 +145,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
+    const mfaCookie = request.cookies.get(MFA_COOKIE_NAME)?.value;
+    const mfaVerified = mfaCookie ? await verifyMfaCookie(mfaCookie, user.id) : false;
+
     const mfaChallengeRequired =
-      request.cookies.get("mfa_verified")?.value !== "1" &&
+      !mfaVerified &&
       role &&
       MFA_REQUIRED_ROLES.has(role) &&
       mfaEnrolled &&

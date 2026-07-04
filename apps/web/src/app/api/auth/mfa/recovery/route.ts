@@ -5,7 +5,8 @@ import { MFA_COOKIE_NAME, MFA_COOKIE_TTL_SECONDS, signMfaCookie } from "@/lib/au
 
 export const dynamic = "force-dynamic";
 
-// POST /api/auth/mfa/recovery — validate and consume a recovery code
+// POST /api/auth/mfa/recovery — validate and consume a recovery code.
+// On success the signed mfa_verified cookie is set server-side (httpOnly).
 export async function POST(req: NextRequest) {
   const supabase = await createServerClient();
   const {
@@ -29,7 +30,6 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const codeHash = Buffer.from(body.code.trim().toUpperCase()).toString("base64");
 
-  // Find unused code
   const { data: record, error: findError } = await admin
     .from("mfa_recovery_codes")
     .select("id")
@@ -46,13 +46,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid or already used recovery code" }, { status: 400 });
   }
 
-  // Mark as used
   await admin
     .from("mfa_recovery_codes")
     .update({ used: true, used_at: new Date().toISOString() })
     .eq("id", record.id);
 
-  // Set the signed httpOnly mfa_verified cookie — cannot be forged client-side.
   const response = NextResponse.json({ valid: true });
   response.cookies.set(MFA_COOKIE_NAME, await signMfaCookie(user.id), {
     httpOnly: true,

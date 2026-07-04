@@ -16,7 +16,10 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/dashboard";
+  // Only allow internal paths — a full URL here would be an open redirect.
+  const rawNext = searchParams.get("next");
+  const next =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -44,7 +47,7 @@ function LoginForm() {
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-bold text-white">
-            Shinã <span className="text-gradient-mkt">Marketing AI</span>
+            Shinã <span className="text-gradient-mkt">Marketing IA</span>
           </span>
         </div>
 
