@@ -2,7 +2,26 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { MktShell } from "@/components/layout/mkt-shell";
-import { Megaphone, Plus, Loader2, X, ShieldCheck } from "lucide-react";
+import {
+  Megaphone,
+  Plus,
+  Loader2,
+  X,
+  ShieldCheck,
+  Brain,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+
+interface Strategy {
+  target_audience?: string;
+  key_message?: string;
+  channels?: { channel: string; rationale: string }[];
+  funnel?: { stage: string; tactic: string }[];
+  differentiators?: string[];
+  expected_kpis?: { metric: string; target: string }[];
+  next_steps?: string[];
+}
 
 interface Campaign {
   id: string;
@@ -13,6 +32,7 @@ interface Campaign {
   status: string;
   start_date: string | null;
   created_at: string;
+  ai_strategy: Strategy | null;
 }
 
 interface BrandKit {
@@ -47,6 +67,28 @@ export default function CampaignsPage() {
     start_date: "",
     brand_kit_id: "",
   });
+  const [strategyFor, setStrategyFor] = useState<string | null>(null);
+  const [expandedStrategy, setExpandedStrategy] = useState<string | null>(null);
+
+  async function generateStrategy(campaignId: string) {
+    setStrategyFor(campaignId);
+    setError(null);
+    try {
+      const res = await fetch("/api/strategy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaign_id: campaignId }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Erro ao gerar estratégia");
+      setExpandedStrategy(campaignId);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro inesperado");
+    } finally {
+      setStrategyFor(null);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -248,18 +290,93 @@ export default function CampaignsPage() {
                 c.status,
                 "bg-white/5 text-slate-400",
               ];
+              const s = c.ai_strategy;
+              const expanded = expandedStrategy === c.id;
               return (
-                <div key={c.id} className="card-glass rounded-2xl p-4 flex items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-white truncate">{c.name}</p>
-                    <p className="text-xs text-slate-400">
-                      {c.platform} {c.objective ? `· ${c.objective}` : ""}{" "}
-                      {c.budget_daily ? `· R$${c.budget_daily}/dia` : ""}
-                    </p>
+                <div key={c.id} className="card-glass rounded-2xl p-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{c.name}</p>
+                      <p className="text-xs text-slate-400">
+                        {c.platform} {c.objective ? `· ${c.objective}` : ""}{" "}
+                        {c.budget_daily ? `· R$${c.budget_daily}/dia` : ""}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={strategyFor === c.id}
+                      onClick={() =>
+                        s
+                          ? setExpandedStrategy(expanded ? null : c.id)
+                          : void generateStrategy(c.id)
+                      }
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-mkt-primary/15 text-mkt-glow hover:bg-mkt-primary/25 text-xs font-semibold transition border-0 cursor-pointer"
+                    >
+                      {strategyFor === c.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Brain className="w-3.5 h-3.5" />
+                      )}
+                      {s ? "Estratégia" : "Gerar estratégia IA"}
+                      {s &&
+                        (expanded ? (
+                          <ChevronUp className="w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3" />
+                        ))}
+                    </button>
+                    <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${cls}`}>
+                      {label}
+                    </span>
                   </div>
-                  <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${cls}`}>
-                    {label}
-                  </span>
+
+                  {s && expanded && (
+                    <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      {s.target_audience && (
+                        <div>
+                          <p className="font-semibold text-slate-400 mb-1">Público-alvo</p>
+                          <p className="text-slate-300">{s.target_audience}</p>
+                        </div>
+                      )}
+                      {s.key_message && (
+                        <div>
+                          <p className="font-semibold text-slate-400 mb-1">Mensagem-chave</p>
+                          <p className="text-slate-300">{s.key_message}</p>
+                        </div>
+                      )}
+                      {s.funnel && s.funnel.length > 0 && (
+                        <div>
+                          <p className="font-semibold text-slate-400 mb-1">Funil</p>
+                          {s.funnel.map((f, i) => (
+                            <p key={i} className="text-slate-300">
+                              <span className="text-mkt-glow font-semibold">{f.stage}:</span>{" "}
+                              {f.tactic}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      {s.expected_kpis && s.expected_kpis.length > 0 && (
+                        <div>
+                          <p className="font-semibold text-slate-400 mb-1">KPIs esperados</p>
+                          {s.expected_kpis.map((k, i) => (
+                            <p key={i} className="text-slate-300">
+                              {k.metric}: <span className="text-white">{k.target}</span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      {s.next_steps && s.next_steps.length > 0 && (
+                        <div className="sm:col-span-2">
+                          <p className="font-semibold text-slate-400 mb-1">Próximos passos</p>
+                          <ul className="list-disc list-inside text-slate-300 space-y-0.5">
+                            {s.next_steps.map((step, i) => (
+                              <li key={i}>{step}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
