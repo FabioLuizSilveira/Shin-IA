@@ -1,0 +1,9 @@
+{
+  "extends": "@shina/typescript-config/react-library",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["@testing-library/jest-dom"]
+  },
+  "include": ["src"]
+}
