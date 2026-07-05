@@ -440,6 +440,28 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(lightningcss@1.32.0)(terser@5.48.0)
 
+  packages/charts:
+    dependencies:
+      '@shina/tokens':
+        specifier: workspace:*
+        version: link:../tokens
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/react':
+        specifier: ^18.3.3
+        version: 18.3.31
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(lightningcss@1.32.0)(terser@5.48.0)
+
   packages/commission-engine:
     devDependencies:
       '@shina/typescript-config':
@@ -535,6 +557,50 @@ importers:
       vitest:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.43)(@vitest/ui@1.6.1)(lightningcss@1.32.0)(terser@5.48.0)
+
+  packages/icons:
+    dependencies:
+      lucide-react:
+        specifier: ^1.21.0
+        version: 1.21.0(react@18.3.1)
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/react':
+        specifier: ^18.3.3
+        version: 18.3.31
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(lightningcss@1.32.0)(terser@5.48.0)
+
+  packages/illustrations:
+    dependencies:
+      '@shina/tokens':
+        specifier: workspace:*
+        version: link:../tokens
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/react':
+        specifier: ^18.3.3
+        version: 18.3.31
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(lightningcss@1.32.0)(terser@5.48.0)
 
   packages/marketing-ai:
     dependencies:
