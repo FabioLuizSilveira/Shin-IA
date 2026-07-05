@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ShinaThemeProvider } from "@shina/theme";
+import { ToastProvider } from "@shina/design-system";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://mkt.shinaia.com.br"),
@@ -27,7 +29,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className="bg-slate-950 text-slate-100 antialiased">{children}</body>
+      <body className="bg-slate-950 text-slate-100 antialiased">
+        {/* Wave 2.5 ORBIT: fonte única de tema — dark é o padrão do produto (doc 04 §9) */}
+        <ShinaThemeProvider product="mkt" defaultPreference="dark">
+          <ToastProvider>{children}</ToastProvider>
+        </ShinaThemeProvider>
+      </body>
     </html>
   );
 }

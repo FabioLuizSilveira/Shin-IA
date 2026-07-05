@@ -1,32 +1,17 @@
 import type { Config } from "tailwindcss";
+import { shinaPreset } from "@shina/theme";
+
+// Wave 2.5 ORBIT: cores, radius, sombras e durações vêm do preset oficial
+// (@shina/theme) — nada de tokens locais duplicados. Este app não define
+// mais sua própria paleta; ela é a fonte única do design system.
 
 export default {
+  presets: [shinaPreset],
   darkMode: "class",
-  content: ["./src/**/*.{ts,tsx}", "../../packages/marketing-ai/src/**/*.{ts,tsx}"],
-  theme: {
-    extend: {
-      colors: {
-        shina: {
-          navy: "#0F172A",
-          blue: "#2563EB",
-          cyan: "#06B6D4",
-          green: "#10B981",
-          slate: "#64748B",
-          light: "#E2E8F0",
-          black: "#020617",
-        },
-        // Marketing AI accent — indigo/violet, distinct from platform blue
-        mkt: {
-          primary: "#6366F1",
-          secondary: "#8B5CF6",
-          glow: "#A78BFA",
-        },
-      },
-      fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        display: ["Manrope", "Inter", "system-ui", "sans-serif"],
-      },
-    },
-  },
-  plugins: [],
+  content: [
+    "./src/**/*.{ts,tsx}",
+    "../../packages/marketing-ai/src/**/*.{ts,tsx}",
+    "../../packages/design-system/src/**/*.{ts,tsx}",
+    "../../packages/landing/src/**/*.{ts,tsx}",
+  ],
 } satisfies Config;
