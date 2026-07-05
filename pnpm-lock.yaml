@@ -124,6 +124,15 @@ importers:
       '@shina/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
+      '@shina/flow-engine':
+        specifier: workspace:*
+        version: link:../../packages/flow-engine
+      '@shina/icons':
+        specifier: workspace:*
+        version: link:../../packages/icons
+      '@shina/landing':
+        specifier: workspace:*
+        version: link:../../packages/landing
       '@shina/marketing-ai':
         specifier: workspace:*
         version: link:../../packages/marketing-ai
