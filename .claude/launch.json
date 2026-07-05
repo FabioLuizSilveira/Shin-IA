@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@shina/web", "dev"],
+      "port": 3002
+    },
+    {
+      "name": "mkt",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@shina/mkt", "dev"],
+      "port": 3003
+    },
+    {
+      "name": "storybook",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@shina/storybook", "dev"],
+      "port": 6006
+    }
+  ]
+}

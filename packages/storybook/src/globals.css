@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Wave 2.5: mesmas utilitárias de superfície usadas pelos apps (globals.css
+   de apps/web e apps/mkt), replicadas aqui para o Storybook renderizar os
+   componentes exatamente como em produção. */
+.card-glass {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.text-gradient,
+.text-gradient-mkt {
+  background: var(--shina-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

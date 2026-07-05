@@ -274,6 +274,15 @@ importers:
       '@shina/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
+      '@shina/flow-engine':
+        specifier: workspace:*
+        version: link:../../packages/flow-engine
+      '@shina/icons':
+        specifier: workspace:*
+        version: link:../../packages/icons
+      '@shina/landing':
+        specifier: workspace:*
+        version: link:../../packages/landing
       '@shina/theme':
         specifier: workspace:*
         version: link:../../packages/theme
@@ -976,9 +985,18 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.0
         version: 18.3.7(@types/react@18.3.31)
+      autoprefixer:
+        specifier: ^10.4.20
+        version: 10.5.0(postcss@8.5.15)
+      postcss:
+        specifier: ^8.5.0
+        version: 8.5.15
       storybook:
         specifier: ^8.2.9
         version: 8.6.18(prettier@3.8.4)
+      tailwindcss:
+        specifier: ^3.4.0
+        version: 3.4.19(tsx@4.22.4)(yaml@2.9.0)
       typescript:
         specifier: ^5.4.5
         version: 5.9.3

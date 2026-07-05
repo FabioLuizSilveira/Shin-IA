@@ -2,6 +2,7 @@ import type { Preview, Decorator } from "@storybook/react";
 import React from "react";
 import { ShinaThemeProvider } from "@shina/theme";
 import { ToastProvider } from "@shina/design-system";
+import "../src/globals.css";
 
 // Todo componente é revisado nos dois eixos do sistema: modo (dark/light,
 // doc 04 §9) e produto (platform/mkt, doc 02). Nenhuma história escapa

@@ -1,3 +1,5 @@
+"use client";
+
 // Utilidades internas do Flow Engine.
 
 import { useEffect, useState } from "react";
