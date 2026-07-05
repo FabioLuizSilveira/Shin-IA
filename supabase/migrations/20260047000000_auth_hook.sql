@@ -7,7 +7,7 @@ security definer
 as $$
 declare
   claims jsonb;
-  user_id uuid;
+  v_user_id uuid;
   t_id uuid;
   t_role text;
   p_role text;
@@ -15,18 +15,18 @@ declare
   mfa_active boolean;
 begin
   -- Get user ID and current claims from event payload
-  user_id := (event ->> 'user_id')::uuid;
+  v_user_id := (event ->> 'user_id')::uuid;
   claims := event -> 'claims';
 
   -- 1. Get tenant_id from user_profiles
   select tenant_id into t_id
   from public.user_profiles
-  where auth_user_id = user_id;
+  where auth_user_id = v_user_id;
 
   -- 2. Get MFA enrollment status (verified/active status)
   select exists(
     select 1 from public.mfa_enrollments
-    where user_id = (select id from public.user_profiles where auth_user_id = user_id)
+    where user_id = (select id from public.user_profiles where auth_user_id = v_user_id)
       and status = 'active'
   ) into mfa_active;
 
@@ -36,7 +36,7 @@ begin
     select r.key into t_role
     from public.tenant_user_roles ur
     join public.tenant_roles r on ur.role_id = r.id
-    where ur.user_id = (select id from public.user_profiles where auth_user_id = user_id)
+    where ur.user_id = (select id from public.user_profiles where auth_user_id = v_user_id)
       and ur.tenant_id = t_id
       and ur.deleted_at is null
       and (ur.expires_at is null or ur.expires_at > now())
@@ -45,7 +45,7 @@ begin
     -- Branch IDs
     select coalesce(json_agg(branch_id), '[]'::json) into b_ids
     from public.tenant_user_roles
-    where user_id = (select id from public.user_profiles where auth_user_id = user_id)
+    where user_id = (select id from public.user_profiles where auth_user_id = v_user_id)
       and tenant_id = t_id
       and deleted_at is null
       and (expires_at is null or expires_at > now())
@@ -55,7 +55,7 @@ begin
     select r.key into p_role
     from public.platform_user_roles ur
     join public.platform_roles r on ur.role_id = r.id
-    where ur.user_id = user_id
+    where ur.user_id = v_user_id
       and ur.deleted_at is null
       and (ur.expires_at is null or ur.expires_at > now())
     limit 1;

@@ -2,13 +2,15 @@
 # scripts/start-supabase.ps1
 # Inicia o Supabase local (Docker) se ainda não estiver rodando.
 
-$composeFile = Join-Path $PSScriptRoot "..\supabase\docker-compose.yml"
+$supabaseDir = Join-Path $PSScriptRoot "..\supabase"
 
-# Verifica serviços em execução
-$running = docker compose -f $composeFile ps --services --filter "status=running"
-if ($running) {
+# Verifica se Supabase já está rodando
+$running = supabase status -p $supabaseDir 2>$null
+if ($LASTEXITCODE -eq 0 -and $running -match "API running at") {
   Write-Host "Supabase já está rodando."
 } else {
   Write-Host "Iniciando Supabase..."
-  docker compose -f $composeFile up -d
+  Push-Location $supabaseDir
+  supabase start
+  Pop-Location
 }
