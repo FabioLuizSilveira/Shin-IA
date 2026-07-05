@@ -1,0 +1,35 @@
+{
+  "name": "@shina/motion",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@shina/tokens": "workspace:*"
+  },
+  "peerDependencies": {
+    "framer-motion": ">=10"
+  },
+  "peerDependenciesMeta": {
+    "framer-motion": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@shina/typescript-config": "workspace:*",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}

@@ -20,12 +20,17 @@ export async function GET() {
   ]);
 
   const totalTenants = tenants.data?.length ?? 0;
-  const activeTenants = tenants.data?.filter((t) => t.status === "active").length ?? 0;
-  const totalRevenue =
-    invoices.data
-      ?.filter((i) => i.status === "paid")
-      .reduce((sum, i) => sum + Number(i.total_amount), 0) ?? 0;
-  const activeOperations = operations.data?.filter((o) => o.status === "in_progress").length ?? 0;
+  const activeTenants = tenants.data ? tenants.data.filter((t) => t.status === "active").length : 0;
+
+  const totalRevenue = invoices.data
+    ? invoices.data
+        .filter((i) => i.status === "paid")
+        .reduce((sum, i) => sum + Number(i.total_amount), 0)
+    : 0;
+
+  const activeOperations = operations.data
+    ? operations.data.filter((o) => o.status === "in_progress").length
+    : 0;
 
   return NextResponse.json({ totalTenants, activeTenants, totalRevenue, activeOperations });
 }
