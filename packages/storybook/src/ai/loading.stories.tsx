@@ -1,5 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { Skeleton, FlowLoader } from "@shina/flow-engine";
+import {
+  Skeleton,
+  FlowLoader,
+  MetricLoader,
+  ChartLoader,
+  WorkspaceLoader,
+  GalleryLoader,
+  MarketplaceLoader,
+} from "@shina/flow-engine";
 
 // Doc 14 — Loading System. Spinner tradicional é proibido em toda a Shinã.
 
@@ -34,6 +42,42 @@ export const FlowLoaderBar: Story = {
   render: () => (
     <div style={{ width: 280 }}>
       <FlowLoader label="Gerando anúncio" />
+    </div>
+  ),
+};
+
+export const MetricLoaderCard: Story = {
+  render: () => <MetricLoader />,
+};
+
+export const ChartLoaderBars: Story = {
+  render: () => (
+    <div style={{ width: 280 }}>
+      <ChartLoader />
+    </div>
+  ),
+};
+
+export const WorkspaceLoaderLayout: Story = {
+  render: () => (
+    <div style={{ width: 480 }}>
+      <WorkspaceLoader />
+    </div>
+  ),
+};
+
+export const GalleryLoaderGrid: Story = {
+  render: () => (
+    <div style={{ width: 480 }}>
+      <GalleryLoader />
+    </div>
+  ),
+};
+
+export const MarketplaceLoaderCards: Story = {
+  render: () => (
+    <div style={{ width: 640 }}>
+      <MarketplaceLoader />
     </div>
   ),
 };

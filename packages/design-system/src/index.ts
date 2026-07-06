@@ -29,6 +29,8 @@ export { MetricCard, type MetricCardProps } from "./components/metric-card";
 export { Table, type TableProps, type TableColumn } from "./components/table";
 export { Progress, type ProgressProps } from "./components/progress";
 export { EmptyState, type EmptyStateProps } from "./components/empty-state";
+export { ErrorState, type ErrorStateProps, type ErrorCode } from "./components/error-state";
+export { SuccessState, type SuccessStateProps } from "./components/success-state";
 
 export { InsightCard, type InsightCardProps, type InsightState } from "./components/insight-card";
 export { MarketplaceCard, type MarketplaceCardProps } from "./components/marketplace-card";

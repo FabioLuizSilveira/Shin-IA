@@ -5,6 +5,8 @@ import { Badge } from "../components/badge";
 import { Avatar } from "../components/avatar";
 import { GlassCard } from "../components/glass-card";
 import { EmptyState } from "../components/empty-state";
+import { ErrorState } from "../components/error-state";
+import { SuccessState } from "../components/success-state";
 import { Progress } from "../components/progress";
 import { Table } from "../components/table";
 import { cn } from "../utils/cn";
@@ -65,6 +67,46 @@ describe("EmptyState", () => {
     expect(screen.getByText("Nenhuma campanha")).toBeInTheDocument();
     expect(screen.getByText("Crie sua primeira campanha para começar.")).toBeInTheDocument();
     expect(screen.getByText("Nova campanha")).toBeInTheDocument();
+  });
+});
+
+describe("EmptyState", () => {
+  it("renderiza o aiHint quando fornecido", () => {
+    render(
+      <EmptyState
+        title="Nenhum anúncio ainda"
+        description="Comece pesquisando um concorrente."
+        aiHint="A IA sugere: importe seu primeiro Brand Kit."
+      />,
+    );
+    expect(screen.getByText(/A IA sugere/)).toBeInTheDocument();
+  });
+});
+
+describe("ErrorState", () => {
+  it("usa a cópia padrão do código de erro (nunca culpa o usuário)", () => {
+    render(<ErrorState code="offline" />);
+    expect(screen.getByText("Sem conexão com a internet")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
+
+  it("permite sobrescrever título e descrição mantendo o código", () => {
+    render(<ErrorState code="server" title="Falha ao gerar o vídeo" />);
+    expect(screen.getByText("Falha ao gerar o vídeo")).toBeInTheDocument();
+  });
+});
+
+describe("SuccessState", () => {
+  it("renderiza título, descrição e ação", () => {
+    render(
+      <SuccessState
+        title="Campanha publicada"
+        description="Sua campanha já está no ar."
+        action={<Button>Ver campanha</Button>}
+      />,
+    );
+    expect(screen.getByText("Campanha publicada")).toBeInTheDocument();
+    expect(screen.getByText("Ver campanha")).toBeInTheDocument();
   });
 });
 

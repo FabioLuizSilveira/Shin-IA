@@ -150,6 +150,33 @@ export function ParticlesIllustration({
   );
 }
 
+/** Família Drift — nó desconectado da constelação (erros: offline, timeout, integração indisponível). */
+export function DriftIllustration({
+  size = 96,
+  product = "platform",
+  ...props
+}: IllustrationProps) {
+  const { primary, accent } = useAccent(product);
+  return (
+    <svg width={size} height={size * 0.6} viewBox="0 0 160 96" fill="none" aria-hidden {...props}>
+      <g stroke={accent} strokeWidth="0.8" opacity="0.25" strokeDasharray="3 4">
+        <path d="M45 30L75 45M75 45L100 28" />
+      </g>
+      <circle cx="45" cy="30" r="3.5" fill={accent} opacity="0.6" />
+      <circle cx="100" cy="28" r="3" fill={accent} opacity="0.4" />
+      <circle cx="120" cy="68" r="4.5" fill={primary} opacity="0.85" />
+      <circle cx="120" cy="68" r="10" stroke={primary} strokeWidth="0.6" opacity="0.3" />
+      <path
+        d="M75 45L108 62"
+        stroke={accent}
+        strokeWidth="0.8"
+        opacity="0.15"
+        strokeDasharray="2 6"
+      />
+    </svg>
+  );
+}
+
 /** Família Aurora/Mesh — manchas de luz (atmosfera, capas). */
 export function AuroraIllustration({
   size = 160,
