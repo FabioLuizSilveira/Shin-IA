@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     template: "%s | Shinã Marketing IA",
   },
   description:
-    "Crie, clone e publique anúncios com IA. Ad Library de concorrentes, gerador de criativos, MCP Server para agentes e integração com Meta, Google e TikTok Ads.",
+    "Crie, clone e publique anúncios com IA. Ad Library de concorrentes, gerador de criativos, relatórios, pesquisa de audiência, MCP Server para agentes e integração com Meta, Google, TikTok, LinkedIn, Reddit e X Ads.",
   openGraph: {
     title: "Shinã Marketing IA",
     description: "Crie, clone e publique anúncios com IA — com aprovação humana em cada etapa.",

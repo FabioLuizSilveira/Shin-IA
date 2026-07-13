@@ -2,8 +2,8 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Navbar } from "@/components/navbar";
-import { Footer } from "@/components/footer";
+import { Navbar } from "@/components/marketing/navbar";
+import { Footer } from "@/components/marketing/footer";
 import { Pricing, Faq, SectionTitle, type PricingPlan } from "@shina/landing";
 import { Zap } from "@shina/icons";
 

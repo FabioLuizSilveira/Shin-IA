@@ -86,7 +86,7 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isPublic = isAppPublicPath(pathname);
+  const isPublic = isAppPublicPath(pathname) || isSitePath(pathname);
 
   // ── 1. App subdomain "/" → login or dashboard ──────────────────────────────
   if (hostType === "app" && pathname === "/") {

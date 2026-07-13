@@ -1,9 +1,22 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Public routes: landing, pricing, login and auth callbacks.
+// Public routes: landing, pricing, signup, login and auth callbacks.
 // /api/mcp authenticates via Authorization bearer header, not cookies.
-const PUBLIC_PATHS = ["/", "/pricing", "/login", "/auth", "/api/auth", "/api/mcp"];
+// /api/checkout is hit by unauthenticated visitors starting a subscription.
+// /api/webhooks is called server-to-server by Stripe — no user session
+// ever exists for it, so it must never redirect to /login.
+const PUBLIC_PATHS = [
+  "/",
+  "/pricing",
+  "/signup",
+  "/login",
+  "/auth",
+  "/api/auth",
+  "/api/mcp",
+  "/api/checkout",
+  "/api/webhooks",
+];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => {

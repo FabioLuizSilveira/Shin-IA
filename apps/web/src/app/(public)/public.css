@@ -1,0 +1,301 @@
+/* Estilos exclusivos do site institucional público (grupo de rotas
+   (public)). Visual "liquid glass" preto/serif — deliberadamente à parte
+   do Shinã Flow Design System (globals.css, tokens indigo/violeta) usado
+   no restante da plataforma. Ver plano de rebrand para o motivo.
+
+   .liquid-glass / .liquid-glass-strong replicam a receita exata do
+   template de referência (fundo quase transparente + luminosity blend +
+   anel de borda em gradiente via mask-composite) — conferida diretamente
+   no editor da Aura.build, não uma aproximação. */
+
+.liquid-glass {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.01);
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: none;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.45) 0%,
+    rgba(255, 255, 255, 0.15) 20%,
+    rgba(255, 255, 255, 0) 40%,
+    rgba(255, 255, 255, 0) 60%,
+    rgba(255, 255, 255, 0.15) 80%,
+    rgba(255, 255, 255, 0.45) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.liquid-glass-strong {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.01);
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(50px);
+  -webkit-backdrop-filter: blur(50px);
+  border: none;
+  box-shadow:
+    4px 4px 4px rgba(0, 0, 0, 0.05),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
+
+.liquid-glass-strong::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.2) 20%,
+    rgba(255, 255, 255, 0) 40%,
+    rgba(255, 255, 255, 0) 60%,
+    rgba(255, 255, 255, 0.2) 80%,
+    rgba(255, 255, 255, 0.5) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* AMBIENT BACKGROUND — "seda líquida" iridescente (ver
+   ambient-background.tsx). Bandas de gradiente cônico em tons perolados
+   (grafite/malva/lavanda/champanhe) giram lentamente sob um filtro SVG de
+   turbulência+displacement, que dobra as bandas em pregas orgânicas —
+   recriação em código do vídeo de tecido metálico do template de
+   referência, sem texto embutido. */
+
+.silk-wrap {
+  position: absolute;
+  inset: 0;
+  filter: url(#silk-warp);
+}
+
+.silk-sheet {
+  position: absolute;
+  inset: -60%;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    #050507 0deg,
+    #0a090c 35deg,
+    #57496a 70deg,
+    #e3d3f0 100deg,
+    #fff6e8 126deg,
+    #b39cc0 160deg,
+    #100e14 200deg,
+    #0a0a0c 240deg,
+    #3a3048 280deg,
+    #d8c8e2 318deg,
+    #050507 360deg
+  );
+  animation: silk-rotate 14s linear infinite;
+  will-change: transform;
+}
+
+.silk-sheet-b {
+  opacity: 0.65;
+  transform: scale(1.35);
+  animation: silk-rotate-b 21s linear infinite;
+}
+
+@keyframes silk-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes silk-rotate-b {
+  from {
+    transform: scale(1.35) rotate(0deg);
+  }
+  to {
+    transform: scale(1.35) rotate(-360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .silk-sheet {
+    animation: none !important;
+  }
+}
+
+/* COSMIC BACKGROUND — nebulosa + estrelas + semente neural (ver
+   cosmic-background.tsx). Recriação em código do efeito "gênese" do
+   template de referência. */
+
+.cosmic-nebula {
+  position: absolute;
+  inset: -10%;
+  background:
+    radial-gradient(45% 40% at 25% 30%, rgba(88, 60, 160, 0.4), transparent 70%),
+    radial-gradient(50% 45% at 75% 20%, rgba(49, 46, 129, 0.45), transparent 70%),
+    radial-gradient(40% 35% at 60% 75%, rgba(120, 60, 150, 0.3), transparent 70%),
+    radial-gradient(30% 25% at 15% 80%, rgba(170, 120, 60, 0.16), transparent 70%),
+    radial-gradient(35% 30% at 88% 70%, rgba(160, 100, 50, 0.14), transparent 70%),
+    #05060e;
+  filter: blur(6px);
+  animation: cosmic-drift 60s ease-in-out infinite;
+}
+
+.cosmic-twinkle {
+  animation: cosmic-twinkle 3.5s ease-in-out infinite;
+}
+
+/* Estado inicial: semente minúscula, ramos não desenhados, nós apagados.
+   Quando a seção entra na tela (.cosmic-grow), tudo cresce em sequência:
+   núcleo (0s) → semente escala (0–2.2s) → troncos (0.6s) → bifurcações
+   (1.7s) → nós acendem (2.6s) → respiração contínua (3s+). */
+
+.cosmic-seed {
+  transform-origin: 500px 380px;
+  transform: scale(0.12);
+  opacity: 0;
+}
+
+.cosmic-grow .cosmic-seed {
+  animation:
+    cosmic-seed-grow 2.2s cubic-bezier(0.22, 0.9, 0.3, 1) forwards,
+    cosmic-spin 55s linear 3s infinite;
+}
+
+.cosmic-core {
+  transform-origin: 500px 380px;
+  transform: scale(0.2);
+  opacity: 0;
+}
+
+.cosmic-grow .cosmic-core {
+  animation: cosmic-core-in 1s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s forwards;
+}
+
+.cosmic-branch {
+  stroke-dasharray: 480;
+  stroke-dashoffset: 480;
+}
+
+.cosmic-grow .cosmic-branch {
+  animation: cosmic-draw 1.5s ease-out forwards;
+  /* delay por ramo definido inline (troncos antes das bifurcações) */
+}
+
+.cosmic-node {
+  opacity: 0;
+}
+
+.cosmic-grow .cosmic-node {
+  animation:
+    cosmic-node-in 0.5s ease-out forwards,
+    cosmic-node-pulse 3s ease-in-out infinite;
+  /* delays por nó definidos inline */
+}
+
+@keyframes cosmic-seed-grow {
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cosmic-core-in {
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cosmic-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes cosmic-node-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.45;
+  }
+}
+
+@keyframes cosmic-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(2%, 1.5%);
+  }
+}
+
+@keyframes cosmic-twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes cosmic-node-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Rotação horária contínua após o crescimento (0→360° = sentido horário). */
+@keyframes cosmic-spin {
+  from {
+    transform: scale(1) rotate(0deg);
+  }
+  to {
+    transform: scale(1) rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cosmic-nebula,
+  .cosmic-twinkle {
+    animation: none !important;
+  }
+  /* sem motion: mostra o estado final direto */
+  .cosmic-seed,
+  .cosmic-core {
+    transform: none !important;
+    opacity: 1 !important;
+    animation: none !important;
+  }
+  .cosmic-branch {
+    stroke-dashoffset: 0 !important;
+    animation: none !important;
+  }
+  .cosmic-node {
+    opacity: 0.7 !important;
+    animation: none !important;
+  }
+}

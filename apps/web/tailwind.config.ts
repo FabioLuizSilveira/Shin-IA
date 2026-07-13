@@ -13,4 +13,14 @@ export default {
     "../../packages/design-system/src/**/*.{ts,tsx}",
     "../../packages/landing/src/**/*.{ts,tsx}",
   ],
+  theme: {
+    extend: {
+      // Tipografia exclusiva do site institucional (public)/ — ver public.css.
+      // Não substitui sans/display do preset compartilhado, só adiciona.
+      fontFamily: {
+        heading: ["var(--font-heading)", "serif"],
+        body: ["var(--font-body)", "sans-serif"],
+      },
+    },
+  },
 } satisfies Config;
