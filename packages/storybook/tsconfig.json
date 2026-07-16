@@ -1,0 +1,7 @@
+{
+  "extends": "@shina/typescript-config/react-library",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [".storybook", "src"]
+}

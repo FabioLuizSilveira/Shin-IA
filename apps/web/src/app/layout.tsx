@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ToastProvider } from "@shina/design-system";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.shinaia.com.br"),
@@ -44,7 +45,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className="bg-slate-950 text-slate-100 antialiased">{children}</body>
+      <body className="bg-slate-950 text-slate-100 antialiased">
+        {/* Wave 2.5 ORBIT: Toast oficial disponível ao app inteiro. Tema
+            continua no ThemeProvider local (lib/theme) — dashboard tenant/
+            admin já tem toggle claro/escuro funcional; migrar para
+            ShinaThemeProvider é trabalho de Wave 3, não desta etapa. */}
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

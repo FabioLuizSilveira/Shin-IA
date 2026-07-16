@@ -22,4 +22,21 @@ export type {
 
 export { MetricCounter, type MetricCounterProps } from "./metric-counter";
 export { Skeleton, FlowLoader, type SkeletonProps, type FlowLoaderProps } from "./loaders";
-export { useReducedMotion } from "./internal";
+export { useReducedMotion, ensureKeyframes } from "./internal";
+
+export {
+  MetricLoader,
+  ChartLoader,
+  WorkspaceLoader,
+  GalleryLoader,
+  MarketplaceLoader,
+  BackgroundLoader,
+} from "./context-loaders";
+export type {
+  MetricLoaderProps,
+  ChartLoaderProps,
+  WorkspaceLoaderProps,
+  GalleryLoaderProps,
+  MarketplaceLoaderProps,
+  BackgroundLoaderProps,
+} from "./context-loaders";

@@ -12,10 +12,18 @@
   },
   "dependencies": {
     "@shina/marketing-ai": "workspace:*",
+    "@shina/tokens": "workspace:*",
+    "@shina/theme": "workspace:*",
+    "@shina/design-system": "workspace:*",
+    "@shina/landing": "workspace:*",
+    "@shina/icons": "workspace:*",
+    "@shina/flow-engine": "workspace:*",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.38.0",
+    "framer-motion": "^11.11.0",
     "lucide-react": "^1.21.0",
     "next": "^14.2.3",
+    "stripe": "^17.4.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

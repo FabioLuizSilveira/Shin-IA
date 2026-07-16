@@ -1,3 +1,5 @@
+"use client";
+
 // Utilidades internas do Flow Engine.
 
 import { useEffect, useState } from "react";
@@ -43,6 +45,7 @@ export function ensureKeyframes(): void {
 @keyframes shina-shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
 @keyframes shina-node-pulse { 0%,100%{opacity:.35} 50%{opacity:1} }
 @keyframes shina-caret { 0%,100%{opacity:1} 50%{opacity:.2} }
+@keyframes shina-success-pop { 0%{transform:scale(.6);opacity:0} 60%{transform:scale(1.08);opacity:1} 100%{transform:scale(1);opacity:1} }
 @media (prefers-reduced-motion: reduce) {
   [data-shina-flow] * { animation: none !important; }
 }
