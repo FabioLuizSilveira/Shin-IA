@@ -171,15 +171,23 @@ All design questions are resolved. Implementation may begin.
 
 ---
 
-## Local Dev Workflow (Planned)
+## Local Dev Workflow
+
+All four apps (`web`, `mkt`, `tenant-web`, `admin-web`) point `.env.local` at the
+hosted Supabase project by default — no Docker, no `supabase start` needed for
+day-to-day work. `supabase db push` applies migrations straight to the hosted
+project over its connection string.
 
 ```bash
-supabase start                         # start local Supabase stack
 supabase migration new <name>          # create new migration file
-supabase db reset                      # drop + replay all migrations + seed
-supabase db push                       # apply pending migrations to remote
+supabase db push                       # apply pending migrations to the hosted project
 supabase gen types typescript          # generate TypeScript types from schema
 ```
+
+`supabase start` (the local Docker stack) still works if you specifically need
+an isolated sandbox to test a destructive migration before pushing it, but
+it's opt-in, not the default — don't point `.env.local` back at
+`127.0.0.1:54321` unless you're intentionally using it.
 
 Output of `gen types` will go to `packages/db/src/supabase.types.ts` (M3 package creation).
 
