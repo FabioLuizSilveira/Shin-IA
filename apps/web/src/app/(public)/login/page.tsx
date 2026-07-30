@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { decodeSessionClaims } from "@/lib/jwt-claims";
 import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -31,29 +32,17 @@ export default function LoginPage() {
         return;
       }
 
-      // Smart Routing based on User Role and Context
-      const appMetadata = data.user?.app_metadata || {};
-      const platformRole = appMetadata.platform_role;
-      const tenantRole = appMetadata.tenant_role;
+      // Smart Routing based on User Role and Context.
+      // data.user.app_metadata reflects auth.users' stored column, not the
+      // tenant_role/platform_role claims custom_access_token_hook injects
+      // into the issued JWT — decode the session's own access token instead
+      // (see apps/web/src/lib/jwt-claims.ts).
+      const claims = decodeSessionClaims(data.session?.access_token ?? "");
 
-      if (platformRole) {
+      if (claims.platform_role) {
         router.push("/platform/dashboard");
-      } else if (tenantRole) {
-        router.push("/tenant/dashboard");
       } else {
-        const role = appMetadata.role || data.user?.user_metadata?.role || "tenant_user";
-        switch (role) {
-          case "platform_admin":
-          case "platform_user":
-          case "platform_owner":
-            router.push("/platform/dashboard");
-            break;
-          case "tenant_owner":
-          case "tenant_admin":
-          case "tenant_user":
-          default:
-            router.push("/tenant/dashboard");
-        }
+        router.push("/tenant/dashboard");
       }
 
       router.refresh();

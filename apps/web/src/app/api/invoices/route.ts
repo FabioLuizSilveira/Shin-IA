@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { decodeSessionClaims } from "@/lib/jwt-claims";
 import type { Invoice } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +21,11 @@ export async function GET(req: NextRequest) {
   const scope = new URL(req.url).searchParams.get("scope");
 
   if (scope === "platform") {
-    const appMeta = user.app_metadata as { platform_role?: string };
-    if (!appMeta.platform_role) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const claims = session ? decodeSessionClaims(session.access_token) : {};
+    if (!claims.platform_role) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const admin = createAdminClient();

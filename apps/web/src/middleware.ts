@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { MFA_COOKIE_NAME, verifyMfaCookie } from "@/lib/auth/mfa-cookie";
+import { decodeSessionClaims, type SessionClaims } from "@/lib/jwt-claims";
 
 // ── Domain config ──────────────────────────────────────────────────────────────
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "shinaia.com.br";
@@ -111,17 +112,28 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // getUser() (not getSession()) so the session is actually revalidated —
+  // but user.app_metadata reflects auth.users' stored column, not the
+  // tenant_role/platform_role claims custom_access_token_hook injects into
+  // the issued JWT, so role checks below decode the session's access token
+  // instead (see jwt-claims.ts).
   const user = await supabase.auth
     .getUser()
     .then(({ data }) => data.user)
     .catch(() => null);
 
+  const claims: SessionClaims = user
+    ? await supabase.auth
+        .getSession()
+        .then(({ data }) => (data.session ? decodeSessionClaims(data.session.access_token) : {}))
+        .catch(() => ({}))
+    : {};
+
   // ── 1. App subdomain "/" → login or dashboard ──────────────────────────────
   if (hostType === "app" && pathname === "/") {
     const url = request.nextUrl.clone();
     if (user) {
-      const appMeta = user.app_metadata as { platform_role?: string };
-      url.pathname = appMeta.platform_role ? "/platform/dashboard" : "/tenant/dashboard";
+      url.pathname = claims.platform_role ? "/platform/dashboard" : "/tenant/dashboard";
     } else {
       url.pathname = "/login";
     }
@@ -141,25 +153,15 @@ export async function middleware(request: NextRequest) {
 
   // ── 3. Authenticated on /login or /dashboard → role-based redirect ─────────
   if (user && (pathname === "/login" || pathname === "/dashboard")) {
-    const appMeta = user.app_metadata as {
-      tenant_role?: string;
-      platform_role?: string;
-    };
     const url = request.nextUrl.clone();
-    url.pathname = appMeta.platform_role ? "/platform/dashboard" : "/tenant/dashboard";
+    url.pathname = claims.platform_role ? "/platform/dashboard" : "/tenant/dashboard";
     return NextResponse.redirect(url);
   }
 
   // ── 4. MFA enforcement ────────────────────────────────────────────────────
   if (user && !isPublic) {
-    const appMeta = user.app_metadata as {
-      tenant_role?: string;
-      platform_role?: string;
-      mfa_enrolled?: boolean;
-    };
-
-    const role = appMeta.tenant_role ?? appMeta.platform_role ?? null;
-    const mfaEnrolled = appMeta.mfa_enrolled ?? false;
+    const role = claims.tenant_role ?? claims.platform_role ?? null;
+    const mfaEnrolled = claims.mfa_enrolled ?? false;
 
     if (
       role &&
