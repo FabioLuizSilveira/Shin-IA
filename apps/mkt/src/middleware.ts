@@ -25,13 +25,32 @@ function isPublicPath(pathname: string): boolean {
   });
 }
 
+// Supabase call, bounded so a DNS/network hiccup reaching the auth API fails
+// fast instead of hanging the middleware until Vercel's hard 25s timeout
+// (which previously turned a Supabase blip into a site-wide 504).
+function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
+  return fetch(input, { ...init, signal: AbortSignal.timeout(8000) });
+}
+
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const isPublic = isPublicPath(pathname);
+  const isApiRoute = pathname.startsWith("/api");
+
+  // Marketing/public pages don't need a session — skip the Supabase round
+  // trip entirely. /login is the one public path that still needs to know
+  // whether a user is already signed in (to bounce them to /dashboard).
+  if (isPublic && pathname !== "/login") {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: fetchWithTimeout },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -47,13 +66,10 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
-  const isPublic = isPublicPath(pathname);
-  const isApiRoute = pathname.startsWith("/api");
+  const user = await supabase.auth
+    .getUser()
+    .then(({ data }) => data.user)
+    .catch(() => null);
 
   if (!user && !isPublic) {
     if (isApiRoute) {
