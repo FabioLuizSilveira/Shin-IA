@@ -6,24 +6,17 @@
 
 import { motion } from "framer-motion";
 import { Bot, ArrowRight } from "@shina/icons";
+import { WispBackground } from "./wisp-background";
 
 export function Hero() {
   return (
     <section className="relative pt-40 pb-24 px-4 overflow-hidden">
-      {/* Mesmo vídeo de fundo do Hero de shinaia.com.br (apps/web),
-          mesmo tratamento: overlay preto 40% + fade inferior alto. */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover z-0"
-      >
-        <source
-          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260307_083826_e938b29f-a43a-41ec-a153-3d4730578ab8.mp4"
-          type="video/mp4"
-        />
-      </video>
+      {/* Fundo WebGL "wisp" (template Nexus, recolorido indigo/violeta) +
+          overlay preto 40% + fade inferior alto, mesmo tratamento do Hero
+          de shinaia.com.br (apps/web). */}
+      <div className="absolute inset-0 z-0">
+        <WispBackground />
+      </div>
       <div aria-hidden className="absolute inset-0 bg-black/40 z-0 pointer-events-none" />
       <div
         aria-hidden

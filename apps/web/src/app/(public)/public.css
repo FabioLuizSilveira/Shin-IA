@@ -78,66 +78,8 @@
   pointer-events: none;
 }
 
-/* AMBIENT BACKGROUND — "seda líquida" iridescente (ver
-   ambient-background.tsx). Bandas de gradiente cônico em tons perolados
-   (grafite/malva/lavanda/champanhe) giram lentamente sob um filtro SVG de
-   turbulência+displacement, que dobra as bandas em pregas orgânicas —
-   recriação em código do vídeo de tecido metálico do template de
-   referência, sem texto embutido. */
-
-.silk-wrap {
-  position: absolute;
-  inset: 0;
-  filter: url(#silk-warp);
-}
-
-.silk-sheet {
-  position: absolute;
-  inset: -60%;
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    #050507 0deg,
-    #0a090c 35deg,
-    #57496a 70deg,
-    #e3d3f0 100deg,
-    #fff6e8 126deg,
-    #b39cc0 160deg,
-    #100e14 200deg,
-    #0a0a0c 240deg,
-    #3a3048 280deg,
-    #d8c8e2 318deg,
-    #050507 360deg
-  );
-  animation: silk-rotate 14s linear infinite;
-  will-change: transform;
-}
-
-.silk-sheet-b {
-  opacity: 0.65;
-  transform: scale(1.35);
-  animation: silk-rotate-b 21s linear infinite;
-}
-
-@keyframes silk-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes silk-rotate-b {
-  from {
-    transform: scale(1.35) rotate(0deg);
-  }
-  to {
-    transform: scale(1.35) rotate(-360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .silk-sheet {
-    animation: none !important;
-  }
-}
+/* AMBIENT BACKGROUND — fundo padrão é o shader WebGL "wisp" (ver
+   ambient-background.tsx / wisp-background.tsx). */
 
 /* COSMIC BACKGROUND — nebulosa + estrelas + semente neural (ver
    cosmic-background.tsx). Recriação em código do efeito "gênese" do
