@@ -9,8 +9,17 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? `https://app.${ROOT_DOMAIN}`;
 // Paths served exclusively by the institutional landing (root/www domain)
 const SITE_PATHS = ["/", "/pricing", "/contact", "/about", "/demo"];
 
-// Paths that are public within the app subdomain (no auth required)
-const APP_PUBLIC_PATHS = ["/login", "/auth", "/onboarding", "/api/onboarding", "/api/auth"];
+// Paths that are public within the app subdomain (no auth required).
+// /api/webhooks is called server-to-server by Stripe — no user session
+// ever exists for it, so it must never redirect to /login.
+const APP_PUBLIC_PATHS = [
+  "/login",
+  "/auth",
+  "/onboarding",
+  "/api/onboarding",
+  "/api/auth",
+  "/api/webhooks",
+];
 
 // Roles that require MFA enrollment before accessing the platform
 const MFA_REQUIRED_ROLES = new Set(["owner", "admin", "financial_manager"]);
@@ -37,6 +46,14 @@ function isSitePath(pathname: string): boolean {
 /** Returns true when the path is public within the app subdomain */
 function isAppPublicPath(pathname: string): boolean {
   return APP_PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+}
+
+// Supabase call, bounded so a DNS/network hiccup reaching the auth API fails
+// fast instead of hanging the middleware until Vercel's hard 25s timeout —
+// same fix already applied to apps/mkt/src/middleware.ts after a production
+// incident. Without this, a Supabase blip turns into a site-wide 504.
+function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
+  return fetch(input, { ...init, signal: AbortSignal.timeout(8000) });
 }
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
@@ -67,6 +84,7 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: fetchWithTimeout },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -82,11 +100,21 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const isPublic = isAppPublicPath(pathname) || isSitePath(pathname);
+
+  // Public paths that never inspect `user` (everything except "/" and
+  // "/login", which redirect differently for signed-in visitors) skip the
+  // Supabase round trip entirely — this is what actually keeps a webhook
+  // or a marketing page up during a Supabase auth hiccup, the timeout above
+  // is only a fallback for paths that truly need the session.
+  if (isPublic && pathname !== "/" && pathname !== "/login") {
+    return supabaseResponse;
+  }
+
+  const user = await supabase.auth
+    .getUser()
+    .then(({ data }) => data.user)
+    .catch(() => null);
 
   // ── 1. App subdomain "/" → login or dashboard ──────────────────────────────
   if (hostType === "app" && pathname === "/") {
