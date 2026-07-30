@@ -1,8 +1,9 @@
-// Substitui os vídeos de fundo do template de referência (hospedados na
-// conta do autor original — ver plano de rebrand, não copiados por questão
-// de propriedade do asset). Recria a mesma estrutura de camadas (fundo em
-// movimento + fades de gradiente + overlay escuro) só que com blobs CSS
-// animados nas cores da marca, no lugar de vídeo real.
+// Recria a mesma estrutura de camadas (fundo em movimento + fades de
+// gradiente + overlay escuro) do template de referência. Fundo padrão é o
+// shader WebGL "wisp" (ver wisp-background.tsx); a prop `src` permite
+// sobrepor com uma imagem/gif específico quando necessário.
+
+import { WispBackground } from "./wisp-background";
 
 interface AmbientBackgroundProps {
   /** mídia de fundo (gif/imagem) — quando presente, substitui os blobs animados */
@@ -39,33 +40,7 @@ export function AmbientBackground({
           // eslint-disable-next-line @next/next/no-img-element -- gif animado externo; next/image congelaria/otimizaria o frame
           <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" />
         ) : (
-          <>
-            {/* Filtro de turbulência que dobra as bandas de gradiente em
-                pregas orgânicas — recria a "seda líquida" iridescente do
-                vídeo de referência. */}
-            <svg aria-hidden width="0" height="0" style={{ position: "absolute" }}>
-              <filter id="silk-warp" x="-30%" y="-30%" width="160%" height="160%">
-                <feTurbulence
-                  type="fractalNoise"
-                  baseFrequency="0.0035 0.007"
-                  numOctaves="2"
-                  seed="7"
-                  result="noise"
-                />
-                <feDisplacementMap
-                  in="SourceGraphic"
-                  in2="noise"
-                  scale="380"
-                  xChannelSelector="R"
-                  yChannelSelector="G"
-                />
-              </filter>
-            </svg>
-            <div className="silk-wrap">
-              <div className="silk-sheet" />
-              <div className="silk-sheet silk-sheet-b" />
-            </div>
-          </>
+          <WispBackground />
         )}
       </div>
 
