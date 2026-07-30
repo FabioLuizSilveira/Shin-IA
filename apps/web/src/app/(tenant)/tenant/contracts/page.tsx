@@ -83,7 +83,7 @@ export default function TenantContractsPage() {
     setFormError(null);
     setShowForm(true);
     if (organizations.length === 0) {
-      const res = await fetch("/api/organizations");
+      const res = await fetch("/api/organizations?activeOnly=1");
       const json = (await res.json()) as { data?: OrganizationOption[] };
       setOrganizations(json.data ?? []);
     }
