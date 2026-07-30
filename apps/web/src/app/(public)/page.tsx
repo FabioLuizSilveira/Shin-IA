@@ -7,7 +7,6 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/marketing/navbar";
 import { Hero } from "@/components/marketing/hero";
-import { StartSection } from "@/components/marketing/start-section";
 import { FeaturesChess } from "@/components/marketing/features-chess";
 import { FeaturesGrid } from "@/components/marketing/features-grid";
 import { Stats } from "@/components/marketing/stats";
@@ -26,7 +25,6 @@ export default function HomePage() {
       <Navbar />
       <main>
         <Hero />
-        <StartSection />
         <FeaturesChess />
         <FeaturesGrid />
         <Stats />
