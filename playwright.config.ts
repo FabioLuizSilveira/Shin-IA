@@ -14,7 +14,7 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "html",
 
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3001",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3002",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "on-first-retry",
@@ -49,10 +49,10 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: process.env.CI
-      ? "pnpm --filter @shina/tenant-web start"
-      : "pnpm --filter @shina/tenant-web dev",
-    url: "http://localhost:3001",
+    // @shina/tenant-web was consolidated into @shina/web at M21 and removed
+    // from the monorepo — this pipeline still targeted the deleted app.
+    command: process.env.CI ? "pnpm --filter @shina/web start" : "pnpm --filter @shina/web dev",
+    url: "http://localhost:3002",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
