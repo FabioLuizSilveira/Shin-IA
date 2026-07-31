@@ -1,0 +1,58 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+
+export const dynamic = "force-dynamic";
+
+// tenant_permissions has no tenant_id column — it's a single shared catalog
+// across all tenants by design (see migration comment), so this list is
+// intentionally not filtered by scope.tenantId.
+export async function GET() {
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+
+  const { data, error } = await scope.db
+    .from("tenant_permissions")
+    .select("id, key, resource, action, name, description, is_system")
+    .is("deleted_at", null)
+    .order("resource", { ascending: true })
+    .order("action", { ascending: true });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ data });
+}
+
+export async function POST(req: NextRequest) {
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  if (isReadOnlyScope(scope)) {
+    return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
+  }
+
+  const body = (await req.json()) as {
+    resource?: string;
+    action?: string;
+    name?: string;
+    description?: string;
+  };
+
+  if (!body.resource?.trim() || !body.action?.trim() || !body.name?.trim()) {
+    return NextResponse.json({ error: "resource, action and name are required" }, { status: 422 });
+  }
+  const key = `${body.resource.trim()}:${body.action.trim()}`;
+
+  const { data, error } = await scope.db
+    .from("tenant_permissions")
+    .insert({
+      key,
+      resource: body.resource.trim(),
+      action: body.action.trim(),
+      name: body.name.trim(),
+      description: body.description?.trim() || null,
+      is_system: false,
+    })
+    .select("id, key, resource, action, name, description, is_system")
+    .single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ data }, { status: 201 });
+}
