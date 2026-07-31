@@ -21,6 +21,7 @@ import {
   CreditCard,
   Headphones,
   Puzzle,
+  MessageSquareWarning,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -45,6 +46,11 @@ const TENANT_NAV_ITEMS = [
   { href: "/tenant/billing", label: "Financeiro", icon: DollarSign },
   { href: "/tenant/reports", label: "Relatórios", icon: BarChart2 },
   { href: "/tenant/commission", label: "Comissões", icon: Award },
+  {
+    href: "/tenant/customer-requests",
+    label: "Pedidos de Clientes",
+    icon: MessageSquareWarning,
+  },
   { href: "/tenant/studio", label: "Controle de Acesso", icon: Shield },
   { href: "/tenant/ai", label: "AI Center", icon: Sparkles },
   { href: "/tenant/apps", label: "Apps", icon: Puzzle },
