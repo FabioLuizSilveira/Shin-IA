@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { hasLiveSubscription } from "@shina/billing-platform/claims";
 import { MFA_COOKIE_NAME, verifyMfaCookie } from "@/lib/auth/mfa-cookie";
 import { decodeSessionClaims, type SessionClaims } from "@/lib/jwt-claims";
 import { IMPERSONATION_COOKIE } from "@/lib/impersonation-cookie";
@@ -178,6 +179,26 @@ export async function middleware(request: NextRequest) {
       url.pathname = "/tenant/dashboard";
       return NextResponse.redirect(url);
     }
+  }
+
+  // ── 2.6. Subscription gate for tenant pages ────────────────────────────────
+  // Only real tenant users are gated (claims.tenant_id present) — an
+  // impersonating platform admin bypasses it, since support has to be able
+  // to reach a suspended tenant. /tenant/billing stays reachable so a
+  // blocked tenant can fix payment; API routes keep their own route-level
+  // auth and aren't gated here (the billing page's own APIs must still work).
+  if (
+    user &&
+    claims.tenant_id &&
+    !isApiRoute &&
+    pathname.startsWith("/tenant") &&
+    !pathname.startsWith("/tenant/billing") &&
+    !hasLiveSubscription(claims.platform_subscription_status)
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/tenant/billing";
+    url.searchParams.set("upgrade", "1");
+    return NextResponse.redirect(url);
   }
 
   // ── 3. Authenticated on /login or /dashboard → role-based redirect ─────────

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { decodeSessionClaims, hasLiveSubscription } from "@shina/billing-platform/claims";
 
 // Public routes: landing, pricing, signup, login and auth callbacks.
 // /api/mcp authenticates via Authorization bearer header, not cookies.
@@ -85,6 +86,26 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
+  }
+
+  // ── Subscription gate ──────────────────────────────────────────────────────
+  // App pages (dashboard etc.) need a live MKT subscription. The status
+  // comes from the JWT claim custom_access_token_hook injects
+  // (mkt_subscription_status) — no extra DB round trip here. Access is only
+  // ever granted by the Stripe webhook writing platform_subscriptions, so a
+  // user straight off the success page without a processed webhook still
+  // lands back on /signup. API routes keep their own route-level auth.
+  if (user && !isPublic && !isApiRoute) {
+    const claims = await supabase.auth
+      .getSession()
+      .then(({ data }) => (data.session ? decodeSessionClaims(data.session.access_token) : {}))
+      .catch(() => ({}) as ReturnType<typeof decodeSessionClaims>);
+    if (!hasLiveSubscription(claims.mkt_subscription_status)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/signup";
+      url.searchParams.set("upgrade", "1");
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

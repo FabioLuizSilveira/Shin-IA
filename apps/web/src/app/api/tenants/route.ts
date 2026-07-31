@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { provisionPlatformSubscription } from "@/lib/platform-subscription";
 import type { Tenant, TenantPlan } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
@@ -82,17 +83,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2. Create default main branch
+  // 2. Create default main branch — branches has no city/state/type
+  // columns (they were silently failing this insert before); extra info
+  // goes in metadata, real columns are name/code/active/scope_mode.
   const { error: branchError } = await admin.from("branches").insert({
     id: crypto.randomUUID(),
     tenant_id: tenantId,
     name: `Sede ${name}`,
     code: "HQ-001",
-    type: "headquarters",
-    city: "São Paulo",
-    state: "SP",
-    country: "BR",
-    is_active: true,
+    active: true,
+    metadata: { type: "headquarters", country: "BR" },
   });
 
   if (branchError) {
@@ -130,6 +130,14 @@ export async function POST(req: NextRequest) {
 
   // 4. Create user profile & assign role
   if (authUserId) {
+    await provisionPlatformSubscription(admin, {
+      authUserId,
+      email: adminEmail,
+      tenantId,
+      planKey: plan ?? "starter",
+      status: "active",
+    });
+
     const profileId = crypto.randomUUID();
     const { error: profileError } = await admin.from("user_profiles").insert({
       id: profileId,

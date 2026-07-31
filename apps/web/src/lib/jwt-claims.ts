@@ -9,6 +9,8 @@ export interface SessionClaims {
   tenant_role?: string | null;
   platform_role?: string | null;
   mfa_enrolled?: boolean;
+  platform_subscription_status?: string | null;
+  mkt_subscription_status?: string | null;
 }
 
 export function decodeSessionClaims(accessToken: string): SessionClaims {
