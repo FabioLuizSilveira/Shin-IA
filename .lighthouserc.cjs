@@ -5,14 +5,13 @@
 module.exports = {
   ci: {
     collect: {
-      // Start the Next.js server before running audits
-      startServerCommand: "pnpm --filter @shina/tenant-web start",
+      // Start the Next.js server before running audits.
+      // @shina/tenant-web was consolidated into @shina/web at M21 and
+      // removed from the monorepo — this pipeline still targeted it.
+      startServerCommand: "pnpm --filter @shina/web start",
       startServerReadyPattern: "Ready on",
       startServerReadyTimeout: 60000,
-      url: [
-        "http://localhost:3001/login",
-        "http://localhost:3001/dashboard",
-      ],
+      url: ["http://localhost:3002/login", "http://localhost:3002/dashboard"],
       numberOfRuns: 3,
     },
     assert: {
