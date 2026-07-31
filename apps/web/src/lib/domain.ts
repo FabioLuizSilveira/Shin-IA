@@ -3,6 +3,11 @@ export const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? `https://${ROOT_DOMAIN}`;
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 export const MKT_URL = process.env.NEXT_PUBLIC_MKT_URL ?? "";
+// Deep link scheme the rental-customer mobile app (apps/mobile) registers —
+// used as the invite email's redirectTo so accepting it opens the app
+// instead of a web page.
+export const MOBILE_APP_SCHEME =
+  process.env.NEXT_PUBLIC_MOBILE_APP_SCHEME ?? "shinacustomer://auth/callback";
 
 /**
  * Returns a URL pointing to the app subdomain.
