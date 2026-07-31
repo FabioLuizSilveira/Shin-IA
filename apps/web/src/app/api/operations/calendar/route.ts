@@ -1,16 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireTenantScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 
   const { searchParams } = new URL(req.url);
   const year = Number(searchParams.get("year"));
@@ -22,9 +17,10 @@ export async function GET(req: NextRequest) {
   const rangeStart = new Date(year, month - 1, 1).toISOString();
   const rangeEnd = new Date(year, month, 1).toISOString();
 
-  const { data, error } = await supabase
+  const { data, error } = await scope.db
     .from("operations")
     .select("id, type, status, scheduled_starts_at, scheduled_ends_at, resources(name)")
+    .eq("tenant_id", scope.tenantId)
     .is("deleted_at", null)
     .gte("scheduled_starts_at", rangeStart)
     .lt("scheduled_starts_at", rangeEnd)

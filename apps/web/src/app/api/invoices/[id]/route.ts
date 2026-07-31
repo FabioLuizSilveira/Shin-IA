@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 import type { InvoiceDetail } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
@@ -9,18 +9,15 @@ const SELECT =
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  const supabase = scope.db;
 
   const { data: invoice, error } = await supabase
     .from("invoices")
     .select(SELECT)
     .eq("id", id)
+    .eq("tenant_id", scope.tenantId)
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
@@ -50,13 +47,12 @@ const MANUAL_TRANSITIONS: Record<string, string[]> = {
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  if (isReadOnlyScope(scope)) {
+    return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
   }
+  const supabase = scope.db;
 
   const body = (await req.json()) as { status?: string };
   if (!body.status) {
@@ -67,6 +63,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .from("invoices")
     .select("status")
     .eq("id", id)
+    .eq("tenant_id", scope.tenantId)
     .maybeSingle();
   if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
   if (!current) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
@@ -85,7 +82,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   };
   if (body.status === "paid") update.paid_at = new Date().toISOString();
 
-  const { error: updateError } = await supabase.from("invoices").update(update).eq("id", id);
+  const { error: updateError } = await supabase
+    .from("invoices")
+    .update(update)
+    .eq("id", id)
+    .eq("tenant_id", scope.tenantId);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 
   return NextResponse.json({ data: { ok: true } });

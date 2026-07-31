@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireTenantScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
@@ -12,18 +12,10 @@ interface UpcomingOperation {
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const tenantId = user.user_metadata?.tenant_id as string | undefined;
-  if (!tenantId) {
-    return NextResponse.json({ error: "No tenant associated with this user" }, { status: 403 });
-  }
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  const supabase = scope.db;
+  const tenantId = scope.tenantId;
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();

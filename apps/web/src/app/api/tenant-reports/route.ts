@@ -1,22 +1,27 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireTenantScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  const supabase = scope.db;
+  const tenantId = scope.tenantId;
 
   const [opsRes, assetsRes, contractsRes, invoicesRes] = await Promise.all([
-    supabase.from("operations").select("status").is("deleted_at", null),
-    supabase.from("assets").select("category").is("deleted_at", null),
-    supabase.from("contracts").select("status, value_amount").is("deleted_at", null),
-    supabase.from("invoices").select("status, total_amount").is("deleted_at", null),
+    supabase.from("operations").select("status").eq("tenant_id", tenantId).is("deleted_at", null),
+    supabase.from("assets").select("category").eq("tenant_id", tenantId).is("deleted_at", null),
+    supabase
+      .from("contracts")
+      .select("status, value_amount")
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null),
+    supabase
+      .from("invoices")
+      .select("status, total_amount")
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null),
   ]);
 
   const errors = [opsRes, assetsRes, contractsRes, invoicesRes].map((r) => r.error).filter(Boolean);

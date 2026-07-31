@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decodeSessionClaims } from "@/lib/jwt-claims";
+import { requireTenantScope } from "@/lib/tenant-context";
 import type { Invoice } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
@@ -10,17 +11,10 @@ const SELECT =
   "id, billing_account_id, status, total_amount, total_currency, due_date, paid_at, created_at, billing_accounts(id, cycle, organizations(id, name))";
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const scopeParam = new URL(req.url).searchParams.get("scope");
 
-  const scope = new URL(req.url).searchParams.get("scope");
-
-  if (scope === "platform") {
+  if (scopeParam === "platform") {
+    const supabase = await createClient();
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -38,9 +32,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: data as unknown as Invoice[] });
   }
 
-  const { data, error } = await supabase
+  const tenantScope = await requireTenantScope();
+  if ("error" in tenantScope) {
+    return NextResponse.json({ error: tenantScope.error }, { status: tenantScope.status });
+  }
+
+  const { data, error } = await tenantScope.db
     .from("invoices")
     .select(SELECT)
+    .eq("tenant_id", tenantScope.tenantId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

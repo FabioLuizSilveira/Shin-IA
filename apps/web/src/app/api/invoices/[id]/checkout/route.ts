@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 import { stripe, isStripeConfigured } from "@/lib/stripe/client";
 
 export const dynamic = "force-dynamic";
@@ -16,13 +16,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  if (isReadOnlyScope(scope)) {
+    return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
   }
+  const supabase = scope.db;
 
   const { data: invoice, error } = await supabase
     .from("invoices")
@@ -30,6 +29,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       "id, status, total_amount, total_currency, billing_account_id, billing_accounts(id, stripe_customer_id, organizations(id, name, email))",
     )
     .eq("id", id)
+    .eq("tenant_id", scope.tenantId)
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });

@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { MFA_COOKIE_NAME, verifyMfaCookie } from "@/lib/auth/mfa-cookie";
 import { decodeSessionClaims, type SessionClaims } from "@/lib/jwt-claims";
+import { IMPERSONATION_COOKIE } from "@/lib/impersonation-cookie";
 
 // ── Domain config ──────────────────────────────────────────────────────────────
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "shinaia.com.br";
@@ -149,6 +150,34 @@ export async function middleware(request: NextRequest) {
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
+  }
+
+  // ── 2.5. Cross-role route guard for /tenant and /platform ──────────────────
+  // A platform admin has no tenant_id claim of their own, so /tenant/* pages
+  // are only reachable while an impersonation session cookie is present —
+  // deep validation (expiry, ownership) happens per-request in
+  // requireTenantScope(). A tenant user has no platform_role, so /platform/*
+  // is off-limits outright.
+  if (user && hostType === "app") {
+    if (pathname.startsWith("/tenant") && !claims.tenant_id) {
+      const url = request.nextUrl.clone();
+      if (claims.platform_role) {
+        const hasImpersonation = request.cookies.get(IMPERSONATION_COOKIE)?.value;
+        if (!hasImpersonation) {
+          url.pathname = "/platform/tenants";
+          return NextResponse.redirect(url);
+        }
+      } else {
+        url.pathname = "/login";
+        return NextResponse.redirect(url);
+      }
+    }
+
+    if (pathname.startsWith("/platform") && !claims.platform_role) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/tenant/dashboard";
+      return NextResponse.redirect(url);
+    }
   }
 
   // ── 3. Authenticated on /login or /dashboard → role-based redirect ─────────
