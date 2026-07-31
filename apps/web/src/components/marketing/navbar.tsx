@@ -8,6 +8,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { Menu, X } from "@shina/icons";
 import { appUrl } from "@/lib/domain";
+import { AuthOptions } from "@/components/auth/auth-options";
 
 const NAV_LINKS = [
   { href: "/#plataforma", label: "Plataforma" },
@@ -21,6 +22,7 @@ const DEMO_URL = appUrl("/login");
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
 
   return (
     <header className="fixed top-0 inset-x-0 z-50 liquid-glass border-b border-white/5">
@@ -53,6 +55,14 @@ export function Navbar() {
           </nav>
 
           <div className="hidden md:flex items-center gap-3">
+            <button
+              type="button"
+              id="nav-login"
+              onClick={() => setLoginOpen(true)}
+              className="px-4 py-2 text-white/80 hover:text-white text-sm font-body font-semibold bg-transparent border-0 cursor-pointer transition-colors"
+            >
+              Entrar
+            </button>
             <a
               href={DEMO_URL}
               id="nav-cta"
@@ -87,7 +97,17 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <div className="pt-3 border-t border-white/5">
+            <div className="pt-3 border-t border-white/5 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setLoginOpen(true);
+                }}
+                className="block w-full px-3 py-2.5 text-white/80 hover:text-white text-sm font-body font-semibold bg-white/5 rounded-xl text-center border-0 cursor-pointer"
+              >
+                Entrar
+              </button>
               <a
                 href={DEMO_URL}
                 className="block px-3 py-2.5 liquid-glass-strong text-white text-sm font-body font-semibold rounded-xl text-center no-underline"
@@ -95,6 +115,31 @@ export function Navbar() {
                 Agendar Demo
               </a>
             </div>
+          </div>
+        </div>
+      )}
+
+      {loginOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div
+            className="absolute inset-0"
+            onClick={() => setLoginOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="relative w-full max-w-sm p-8 bg-slate-950 border border-white/10 rounded-2xl shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setLoginOpen(false)}
+              className="absolute top-4 right-4 p-1.5 text-white/50 hover:text-white bg-transparent border-0 cursor-pointer"
+              aria-label="Fechar"
+            >
+              <X size={18} />
+            </button>
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold text-white">Entrar na Shinã</h2>
+              <p className="text-sm text-slate-400 mt-1">Uma conta para todos os produtos</p>
+            </div>
+            <AuthOptions />
           </div>
         </div>
       )}

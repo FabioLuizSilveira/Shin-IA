@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { provisionPlatformSubscription } from "@/lib/platform-subscription";
 import type {
   OnboardingStep1,
   OnboardingStep2,
@@ -77,10 +78,12 @@ export async function POST(request: NextRequest) {
   const plan = PLAN_FOR_BLUEPRINT[step4.blueprintId];
 
   try {
-    // 1. Create tenant
+    // 1. Create tenant — tenants.id has no column default, so the id must
+    // be generated here (same as /api/tenants POST does).
     const { data: tenant, error: tenantError } = await supabase
       .from("tenants")
       .insert({
+        id: crypto.randomUUID(),
         name: step1.companyName,
         slug: tenantSlug,
         plan,
@@ -105,15 +108,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Create main branch
+    // branches has no city/state/type columns — those wizard fields live in
+    // the metadata jsonb; the real columns are name/code/active/scope_mode.
     const { error: branchError } = await supabase.from("branches").insert({
+      id: crypto.randomUUID(),
       tenant_id: tenant.id,
       name: step2.branchName,
       code: step2.branchCode,
-      type: "headquarters",
-      city: step2.city,
-      state: step2.state,
-      country: "BR",
-      is_active: true,
+      active: true,
+      metadata: { type: "headquarters", city: step2.city, state: step2.state, country: "BR" },
     });
 
     if (branchError) {
@@ -127,19 +130,33 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Invite admin user via Supabase Auth
-    const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(step3.adminEmail, {
-      data: {
-        full_name: step3.adminFullName,
-        tenant_id: tenant.id,
-        role: "tenant_admin",
-        onboarding: true,
+    const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
+      step3.adminEmail,
+      {
+        data: {
+          full_name: step3.adminFullName,
+          tenant_id: tenant.id,
+          role: "tenant_admin",
+          onboarding: true,
+        },
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/dashboard`,
       },
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/dashboard`,
-    });
+    );
 
     if (inviteError) {
       console.error("[onboarding] invite error:", inviteError);
       // Non-fatal: tenant and branch are created, admin invite will be retried via UI
+    }
+
+    // 4. Provision the trial subscription row (source of truth for gating)
+    if (inviteData?.user?.id) {
+      await provisionPlatformSubscription(supabase, {
+        authUserId: inviteData.user.id,
+        email: step3.adminEmail,
+        tenantId: tenant.id,
+        planKey: plan,
+        status: "trialing",
+      });
     }
 
     return NextResponse.json(

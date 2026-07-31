@@ -1,16 +1,30 @@
 import { NextResponse } from "next/server";
 import { stripe, isStripeConfigured, PLAN_PRICE_ENV } from "@/lib/stripe/client";
+import { createClient } from "@/lib/supabase/server";
 
 // Cria uma sessão de Checkout do Stripe em modo assinatura. Cobrança
 // imediata (sem trial nativo do Stripe) — a garantia de reembolso em 14
 // dias é tratada no webhook (ver /api/webhooks/stripe), não como um trial
 // period, porque o cliente já entra com o cartão cobrado desde o dia 1.
+//
+// Exige sessão autenticada: client_reference_id vincula a Checkout Session
+// ao auth_user_id do Supabase, e é isso que o webhook usa para provisionar
+// a assinatura na identidade certa. Sem esse vínculo o pagamento ficaria
+// órfão (era exatamente o TODO antigo do webhook).
 export async function POST(request: Request) {
   if (!isStripeConfigured) {
     return NextResponse.json(
       { error: "Pagamentos ainda não configurados (STRIPE_SECRET_KEY ausente)." },
       { status: 503 },
     );
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Faça login antes de continuar." }, { status: 401 });
   }
 
   const { plan } = (await request.json()) as { plan?: string };
@@ -34,12 +48,18 @@ export async function POST(request: Request) {
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
+    client_reference_id: user.id,
+    customer_email: user.email ?? undefined,
     success_url: `${appUrl}/signup/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl}/signup?plan=${plan}`,
     subscription_data: {
-      metadata: { plan, refundEligibleUntil: String(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+      metadata: {
+        product: "mkt",
+        plan,
+        refundEligibleUntil: String(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      },
     },
-    metadata: { plan },
+    metadata: { product: "mkt", plan },
     allow_promotion_codes: true,
   });
 

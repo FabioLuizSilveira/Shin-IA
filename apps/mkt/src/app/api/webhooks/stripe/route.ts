@@ -1,20 +1,17 @@
 import { NextResponse } from "next/server";
+import { syncStripeEvent } from "@shina/billing-platform";
 import { stripe } from "@/lib/stripe/client";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type Stripe from "stripe";
 
-// Webhook do Stripe. Dois eventos importam para o fluxo de signup:
+// Webhook do Stripe. Toda liberação de acesso acontece AQUI (nunca na
+// página de sucesso do checkout): syncStripeEvent processa o evento de
+// forma idempotente (platform_billing_events.stripe_event_id) e cria/
+// atualiza platform_customers + platform_subscriptions vinculados ao
+// auth_user_id que /api/checkout colocou em client_reference_id.
 //
-// - checkout.session.completed: pagamento confirmado → aqui é onde a conta
-//   do usuário deveria ser provisionada de fato (criar/ativar o tenant no
-//   Supabase). Esse projeto já tem um fluxo de onboarding em
-//   apps/web/src/app/(public)/onboarding — a integração entre "pagamento
-//   aprovado" e "tenant criado" fica marcada como TODO abaixo porque requer
-//   decisão de produto sobre qual fluxo de provisionamento reaproveitar.
-//
-// - customer.subscription.deleted: assinatura cancelada → se o cancelamento
-//   aconteceu dentro dos 14 dias de garantia (guardados nos metadados da
-//   assinatura, ver /api/checkout), emite reembolso automático do último
-//   pagamento via Stripe Refunds API.
+// customer.subscription.deleted mantém, além da sincronização, a garantia
+// de reembolso em 14 dias (metadados da assinatura, ver /api/checkout).
 export async function POST(request: Request) {
   const body = await request.text();
   const signature = request.headers.get("stripe-signature");
@@ -32,45 +29,41 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      // TODO(produto): provisionar o tenant/conta do usuário aqui, usando
-      // session.customer / session.customer_details.email e o plano em
-      // session.metadata.plan. Ver apps/web/(public)/onboarding para o
-      // fluxo de criação de tenant já existente na plataforma.
-      console.log("[stripe webhook] checkout completed", {
-        customer: session.customer,
-        plan: session.metadata?.plan,
+  // Provisionamento/sincronização de assinatura (idempotente).
+  const admin = createAdminClient();
+  try {
+    const sync = await syncStripeEvent(admin, event, { defaultProduct: "mkt" });
+    if (sync.duplicate) {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+  } catch (err) {
+    console.error("[stripe webhook] sync failed:", err);
+    // 500 força o Stripe a reenviar o evento — melhor do que perder o
+    // provisionamento silenciosamente.
+    return NextResponse.json({ error: "sync failed" }, { status: 500 });
+  }
+
+  // Garantia de reembolso em 14 dias — lógica preservada como estava.
+  if (event.type === "customer.subscription.deleted") {
+    const subscription = event.data.object as Stripe.Subscription;
+    const refundEligibleUntil = Number(subscription.metadata.refundEligibleUntil ?? 0);
+
+    if (refundEligibleUntil && Date.now() <= refundEligibleUntil) {
+      const invoices = await stripe.invoices.list({
+        subscription: subscription.id,
+        limit: 1,
       });
-      break;
-    }
+      const lastInvoice = invoices.data[0];
+      const paymentIntentId =
+        typeof lastInvoice?.payment_intent === "string" ? lastInvoice.payment_intent : null;
 
-    case "customer.subscription.deleted": {
-      const subscription = event.data.object as Stripe.Subscription;
-      const refundEligibleUntil = Number(subscription.metadata.refundEligibleUntil ?? 0);
-
-      if (refundEligibleUntil && Date.now() <= refundEligibleUntil) {
-        const invoices = await stripe.invoices.list({
-          subscription: subscription.id,
-          limit: 1,
+      if (paymentIntentId) {
+        await stripe.refunds.create({
+          payment_intent: paymentIntentId,
+          reason: "requested_by_customer",
         });
-        const lastInvoice = invoices.data[0];
-        const paymentIntentId =
-          typeof lastInvoice?.payment_intent === "string" ? lastInvoice.payment_intent : null;
-
-        if (paymentIntentId) {
-          await stripe.refunds.create({
-            payment_intent: paymentIntentId,
-            reason: "requested_by_customer",
-          });
-        }
       }
-      break;
     }
-
-    default:
-      break;
   }
 
   return NextResponse.json({ received: true });
