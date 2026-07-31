@@ -2,6 +2,7 @@
 
 import { Search, Sun, Moon, Menu } from "lucide-react";
 import { NotificationBell } from "@/components/ui/notification-dropdown";
+import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { useTheme } from "@/lib/theme/theme-context";
 
 interface TopbarProps {
@@ -51,6 +52,7 @@ export function Topbar({ title, onMenuClick }: TopbarProps) {
           {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
         <NotificationBell />
+        <WorkspaceSwitcher />
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-shina-blue to-shina-cyan flex items-center justify-center text-white text-xs font-bold ml-1">
           T
         </div>
