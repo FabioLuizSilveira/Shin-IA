@@ -13,6 +13,7 @@
   "dependencies": {
     "@sentry/nextjs": "^10.60.0",
     "@shina/billing-platform": "workspace:*",
+    "@shina/commission-engine": "workspace:*",
     "@shina/tokens": "workspace:*",
     "@shina/theme": "workspace:*",
     "@shina/design-system": "workspace:*",
