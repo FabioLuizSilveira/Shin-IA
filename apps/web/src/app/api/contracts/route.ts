@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
@@ -14,17 +14,13 @@ function flattenOrg<T extends { organizations: { name: string } | null }>(
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 
-  const { data, error } = await supabase
+  const { data, error } = await scope.db
     .from("contracts")
     .select(SELECT)
+    .eq("tenant_id", scope.tenantId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -37,18 +33,12 @@ export async function GET() {
 const VALID_TYPES = ["service", "rental", "lease", "subscription", "one_time"];
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  if (isReadOnlyScope(scope)) {
+    return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
   }
-
-  const tenantId = user.user_metadata?.tenant_id as string | undefined;
-  if (!tenantId) {
-    return NextResponse.json({ error: "No tenant associated with this user" }, { status: 403 });
-  }
+  const tenantId = scope.tenantId;
 
   const body = (await req.json()) as {
     type?: string;
@@ -83,7 +73,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data: created, error: insertError } = await supabase
+  const { data: created, error: insertError } = await scope.db
     .from("contracts")
     .insert({
       id: crypto.randomUUID(),

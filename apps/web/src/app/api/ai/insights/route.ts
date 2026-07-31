@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireTenantScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
@@ -10,15 +10,10 @@ interface InsightRequestBody {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  const supabase = scope.db;
+  const tenantId = scope.tenantId;
 
   let body: InsightRequestBody;
   try {
@@ -31,28 +26,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "type is required" }, { status: 422 });
   }
 
-  // Fetch operational context from Supabase
-  const tenantId = user.user_metadata?.tenant_id as string | undefined;
-
   const [opsRes, assetsRes, contractsRes, tenantRes] = await Promise.all([
     supabase
       .from("operations")
       .select("status")
-      .eq("tenant_id", tenantId ?? "")
+      .eq("tenant_id", tenantId)
       .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
-    supabase
-      .from("assets")
-      .select("status")
-      .eq("tenant_id", tenantId ?? ""),
+    supabase.from("assets").select("status").eq("tenant_id", tenantId),
     supabase
       .from("contracts")
       .select("status, value_amount, period_ends_at")
-      .eq("tenant_id", tenantId ?? ""),
-    supabase
-      .from("tenants")
-      .select("name")
-      .eq("id", tenantId ?? "")
-      .single(),
+      .eq("tenant_id", tenantId),
+    supabase.from("tenants").select("name").eq("id", tenantId).single(),
   ]);
 
   const ops = opsRes.data ?? [];

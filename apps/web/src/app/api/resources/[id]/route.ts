@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
@@ -7,12 +7,10 @@ const VALID_STATUSES = ["available", "busy", "offline", "suspended"];
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  if (isReadOnlyScope(scope)) {
+    return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
   }
 
   const body = (await req.json()) as { status?: string };
@@ -20,10 +18,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "a valid status is required" }, { status: 422 });
   }
 
-  const { error } = await supabase
+  const { error } = await scope.db
     .from("resources")
     .update({ status: body.status, updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("tenant_id", scope.tenantId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ data: { ok: true } });

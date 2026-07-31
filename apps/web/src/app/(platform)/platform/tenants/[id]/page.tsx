@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -19,6 +20,8 @@ import {
   MapPin,
   Calendar,
   TrendingUp,
+  Shield,
+  X,
 } from "lucide-react";
 import type { TenantStatus, TenantPlan, OperationStatus, ContractStatus } from "@/types/domain";
 
@@ -28,9 +31,7 @@ interface Branch {
   id: string;
   name: string;
   code: string;
-  city: string;
-  state: string;
-  is_active: boolean;
+  active: boolean;
 }
 
 interface TenantUser {
@@ -414,14 +415,12 @@ function BranchesTab({ branches }: { branches: Branch[] }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{b.name}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {b.code} · {b.city}, {b.state}
-              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{b.code}</p>
             </div>
             <span
-              className={`text-xs font-semibold px-2.5 py-1 rounded-full ${b.is_active ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"}`}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full ${b.active ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"}`}
             >
-              {b.is_active ? "Ativa" : "Inativa"}
+              {b.active ? "Ativa" : "Inativa"}
             </span>
           </div>
         ))
@@ -509,6 +508,100 @@ function SettingsTab({
   );
 }
 
+function ImpersonateModal({
+  tenantName,
+  onClose,
+  onConfirm,
+  submitting,
+  error,
+}: {
+  tenantName: string;
+  onClose: () => void;
+  onConfirm: (reason: string, accessMode: "full" | "read_only") => void;
+  submitting: boolean;
+  error: string | null;
+}) {
+  const [reason, setReason] = useState("");
+  const [accessMode, setAccessMode] = useState<"full" | "read_only">("full");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Shield className="w-4 h-4" />
+            Acessar como suporte — {tenantName}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 bg-transparent border-0 cursor-pointer text-slate-400 hover:text-slate-600"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+              Motivo (obrigatório)
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+              placeholder="Ex: investigar chamado de suporte #123"
+              className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+              Modo de acesso
+            </label>
+            <div className="flex gap-2">
+              {(["full", "read_only"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setAccessMode(mode)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer border ${
+                    accessMode === mode
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700"
+                  }`}
+                >
+                  {mode === "full" ? "Completo (4h)" : "Somente leitura (2h)"}
+                </button>
+              ))}
+            </div>
+          </div>
+          {error && (
+            <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 p-2 rounded-lg">
+              {error}
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 dark:border-slate-800">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 bg-transparent border-0 cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={submitting || !reason.trim()}
+            onClick={() => onConfirm(reason, accessMode)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60 cursor-pointer border-0"
+          >
+            {submitting ? "Iniciando..." : "Acessar tenant"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -528,11 +621,37 @@ interface PageProps {
 
 export default function TenantDetailPage({ params }: PageProps) {
   const { id } = params;
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [data, setData] = useState<TenantDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showImpersonate, setShowImpersonate] = useState(false);
+  const [impersonating, setImpersonating] = useState(false);
+  const [impersonateError, setImpersonateError] = useState<string | null>(null);
+
+  async function handleImpersonate(reason: string, accessMode: "full" | "read_only") {
+    setImpersonating(true);
+    setImpersonateError(null);
+    try {
+      const res = await fetch("/api/impersonation/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: id, reason, access_mode: accessMode }),
+      });
+      if (!res.ok) {
+        const json = (await res.json()) as { error?: string };
+        throw new Error(json.error ?? "Falha ao iniciar personificação");
+      }
+      router.push("/tenant/dashboard");
+      router.refresh();
+    } catch (err: unknown) {
+      setImpersonateError(err instanceof Error ? err.message : "Erro inesperado");
+    } finally {
+      setImpersonating(false);
+    }
+  }
 
   const fetchDetail = useCallback(async () => {
     setLoading(true);
@@ -671,7 +790,28 @@ export default function TenantDetailPage({ params }: PageProps) {
                 <span>{data.metrics.totalBranches} filial(is)</span>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowImpersonate(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-amber-950 text-sm font-semibold rounded-xl transition-colors cursor-pointer border-0"
+            >
+              <Shield className="w-4 h-4" />
+              Acessar como suporte
+            </button>
           </div>
+
+          {showImpersonate && (
+            <ImpersonateModal
+              tenantName={tenant.name}
+              onClose={() => {
+                setShowImpersonate(false);
+                setImpersonateError(null);
+              }}
+              onConfirm={(reason, accessMode) => void handleImpersonate(reason, accessMode)}
+              submitting={impersonating}
+              error={impersonateError}
+            />
+          )}
 
           {/* Tabs */}
           <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 gap-0 overflow-x-auto">

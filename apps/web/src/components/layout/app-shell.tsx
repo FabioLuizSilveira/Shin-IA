@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { CommandMenu } from "@/components/ui/command-menu";
+import { ImpersonationBanner } from "./impersonation-banner";
 
 interface AppShellProps {
   children: ReactNode;
@@ -35,6 +36,7 @@ export function AppShell({ children, title }: AppShellProps) {
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <ImpersonationBanner />
         <Topbar title={title} onMenuClick={() => setSidebarOpen((prev) => !prev)} />
         <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 p-4 md:p-6">
           {children}

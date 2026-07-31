@@ -1,20 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 
-  const { data, error } = await supabase
+  const { data, error } = await scope.db
     .from("resources")
     .select("id, name, type, status, created_at")
+    .eq("tenant_id", scope.tenantId)
     .is("deleted_at", null)
     .order("name", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -25,25 +21,19 @@ export async function GET() {
 const VALID_TYPES = ["human", "vehicle", "equipment", "virtual"];
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  if (isReadOnlyScope(scope)) {
+    return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
   }
-
-  const tenantId = user.user_metadata?.tenant_id as string | undefined;
-  if (!tenantId) {
-    return NextResponse.json({ error: "No tenant associated with this user" }, { status: 403 });
-  }
+  const tenantId = scope.tenantId;
 
   const body = (await req.json()) as { name?: string; type?: string };
   if (!body.name?.trim() || !body.type || !VALID_TYPES.includes(body.type)) {
     return NextResponse.json({ error: "name and type are required" }, { status: 422 });
   }
 
-  const { data: branch, error: branchError } = await supabase
+  const { data: branch, error: branchError } = await scope.db
     .from("branches")
     .select("id")
     .eq("tenant_id", tenantId)
@@ -58,7 +48,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data: created, error: insertError } = await supabase
+  const { data: created, error: insertError } = await scope.db
     .from("resources")
     .insert({
       id: crypto.randomUUID(),

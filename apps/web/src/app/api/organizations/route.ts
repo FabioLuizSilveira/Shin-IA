@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
@@ -7,17 +7,16 @@ const SELECT =
   "id, name, trade_name, document, type, email, phone, address_city, address_state, address_country, active, created_at";
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
 
   const activeOnly = new URL(req.url).searchParams.get("activeOnly") === "1";
 
-  let query = supabase.from("organizations").select(SELECT).is("deleted_at", null);
+  let query = scope.db
+    .from("organizations")
+    .select(SELECT)
+    .eq("tenant_id", scope.tenantId)
+    .is("deleted_at", null);
   if (activeOnly) query = query.eq("active", true);
 
   const { data, error } = await query.order("name", { ascending: true });
@@ -29,18 +28,12 @@ export async function GET(req: NextRequest) {
 const VALID_TYPES = ["customer", "supplier", "partner", "internal"];
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  if (isReadOnlyScope(scope)) {
+    return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
   }
-
-  const tenantId = user.user_metadata?.tenant_id as string | undefined;
-  if (!tenantId) {
-    return NextResponse.json({ error: "No tenant associated with this user" }, { status: 403 });
-  }
+  const tenantId = scope.tenantId;
 
   const body = (await req.json()) as {
     name?: string;
@@ -67,7 +60,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data: created, error: insertError } = await supabase
+  const { data: created, error: insertError } = await scope.db
     .from("organizations")
     .insert({
       id: crypto.randomUUID(),
