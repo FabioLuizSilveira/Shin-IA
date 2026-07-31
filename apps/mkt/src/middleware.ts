@@ -33,6 +33,17 @@ function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
   return fetch(input, { ...init, signal: AbortSignal.timeout(8000) });
 }
 
+// Same cross-subdomain cookie-domain logic as lib/supabase/{client,server}.ts
+// — a session cookie refreshed here must keep the shared domain, or the
+// workspace switcher's "no second login" breaks on the next token refresh.
+function authCookieDomain(hostname: string): string | undefined {
+  const host = hostname.split(":")[0];
+  const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "shinaia.com.br";
+  if (host === "localhost" || host.endsWith(".localhost")) return "localhost";
+  if (host === root || host.endsWith(`.${root}`)) return `.${root}`;
+  return undefined;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublic = isPublicPath(pathname);
@@ -52,6 +63,7 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       global: { fetch: fetchWithTimeout },
+      cookieOptions: { domain: authCookieDomain(request.headers.get("host") ?? "") },
       cookies: {
         getAll() {
           return request.cookies.getAll();

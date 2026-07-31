@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { provisionPlatformSubscription } from "@/lib/platform-subscription";
+import { requirePlatformRole } from "@/lib/platform-guard";
+import { provisionTenant } from "@/lib/tenant-provisioning";
+import { appUrl } from "@/lib/domain";
 import type { Tenant, TenantPlan } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const guard = await requirePlatformRole();
+  if ("error" in guard) return NextResponse.json({ error: guard.error }, { status: guard.status });
 
   const admin = createAdminClient();
   const { data, error } = await admin
@@ -29,14 +25,17 @@ export async function GET() {
   return NextResponse.json({ data: data as Tenant[] });
 }
 
+// Platform-staff-assisted tenant creation. Shares provisionTenant() with the
+// public onboarding wizard (/api/onboarding/complete) — previously this
+// route hand-rolled its own tenant/branch/role/subscription inserts, which
+// is how it ended up pointing every new tenant's admin role at the demo
+// tenant's own tenant_admin row (tenant_roles is per-tenant, and nothing
+// seeded a fresh set for tenants created here). Staff-assisted tenants start
+// "active" (already vetted) rather than "trialing"; the admin is invited by
+// email like every other Shinã Identity signup, not given a direct password.
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const guard = await requirePlatformRole();
+  if ("error" in guard) return NextResponse.json({ error: guard.error }, { status: guard.status });
 
   let body: {
     name?: string;
@@ -44,7 +43,6 @@ export async function POST(req: NextRequest) {
     plan?: TenantPlan;
     adminEmail?: string;
     adminFullName?: string;
-    adminPassword?: string;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -52,116 +50,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { name, slug, plan, adminEmail, adminFullName, adminPassword } = body;
-  if (!name || !slug || !adminEmail || !adminFullName || !adminPassword) {
+  const { name, slug, plan, adminEmail, adminFullName } = body;
+  if (!name || !slug || !adminEmail || !adminFullName) {
     return NextResponse.json(
-      { error: "name, slug, adminEmail, adminFullName and adminPassword are required" },
+      { error: "name, slug, adminEmail and adminFullName are required" },
       { status: 400 },
     );
   }
 
   const admin = createAdminClient();
-  const tenantId = crypto.randomUUID();
-
-  // 1. Insert Tenant
-  const { data: tenantData, error: tenantError } = await admin
-    .from("tenants")
-    .insert({
-      id: tenantId,
+  try {
+    const result = await provisionTenant(admin, {
       name,
       slug,
       plan: plan ?? "starter",
       status: "active",
-    })
-    .select("id, name, slug, plan, status, created_at")
-    .single();
-
-  if (tenantError || !tenantData) {
-    return NextResponse.json(
-      { error: tenantError?.message ?? "Failed to create tenant" },
-      { status: 400 },
-    );
-  }
-
-  // 2. Create default main branch — branches has no city/state/type
-  // columns (they were silently failing this insert before); extra info
-  // goes in metadata, real columns are name/code/active/scope_mode.
-  const { error: branchError } = await admin.from("branches").insert({
-    id: crypto.randomUUID(),
-    tenant_id: tenantId,
-    name: `Sede ${name}`,
-    code: "HQ-001",
-    active: true,
-    metadata: { type: "headquarters", country: "BR" },
-  });
-
-  if (branchError) {
-    console.error("[api/tenants] branch creation failed:", branchError);
-  }
-
-  // 3. Create Admin user in Auth directly
-  const { data: inviteData, error: inviteError } = await admin.auth.admin.createUser({
-    email: adminEmail,
-    password: adminPassword,
-    email_confirm: true,
-    user_metadata: {
-      full_name: adminFullName,
-      tenant_id: tenantId,
-      role: "tenant_admin",
-      onboarding: true,
-    },
-  });
-
-  let authUserId = inviteData?.user?.id ?? null;
-
-  if (inviteError) {
-    console.error("[api/tenants] create user failed:", inviteError);
-    // If user already exists, try to get their ID to link them
-    try {
-      const { data: userList } = await admin.auth.admin.listUsers();
-      const existingUser = userList?.users?.find((u) => u.email === adminEmail);
-      if (existingUser) {
-        authUserId = existingUser.id;
-      }
-    } catch (listErr) {
-      console.error("[api/tenants] listing users failed:", listErr);
-    }
-  }
-
-  // 4. Create user profile & assign role
-  if (authUserId) {
-    await provisionPlatformSubscription(admin, {
-      authUserId,
-      email: adminEmail,
-      tenantId,
-      planKey: plan ?? "starter",
-      status: "active",
+      branchName: `Sede ${name}`,
+      branchCode: "HQ-001",
+      branchMetadata: { type: "headquarters", country: "BR" },
+      adminEmail,
+      adminFullName,
+      inviteRedirectTo: appUrl("/dashboard"),
     });
 
-    const profileId = crypto.randomUUID();
-    const { error: profileError } = await admin.from("user_profiles").insert({
-      id: profileId,
-      tenant_id: tenantId,
-      auth_user_id: authUserId,
-      email: adminEmail,
-      full_name: adminFullName,
-      status: "active",
-    });
+    const { data: tenantData } = await admin
+      .from("tenants")
+      .select("id, name, slug, plan, status, created_at")
+      .eq("id", result.tenantId)
+      .single();
 
-    if (profileError) {
-      console.error("[api/tenants] profile insert failed:", profileError);
-    } else {
-      const { error: roleError } = await admin.from("tenant_user_roles").insert({
-        id: crypto.randomUUID(),
-        tenant_id: tenantId,
-        user_id: profileId,
-        role_id: "f0000000-0000-0000-0000-000000000002", // tenant_admin role
-      });
-      if (roleError) {
-        console.error("[api/tenants] role insert failed:", roleError);
-      }
-    }
+    return NextResponse.json({ data: tenantData as Tenant }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to create tenant";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
-
-  return NextResponse.json({ data: tenantData as Tenant }, { status: 201 });
 }

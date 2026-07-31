@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import {
   Sparkles,
   LayoutDashboard,
@@ -78,7 +79,8 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
           })}
         </nav>
 
-        <div className="p-3 border-t border-white/5">
+        <div className="p-3 border-t border-white/5 space-y-1">
+          <WorkspaceSwitcher />
           <button
             type="button"
             onClick={() => void handleLogout()}
