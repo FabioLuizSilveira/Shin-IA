@@ -1,13 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { requireTenantScope, isReadOnlyScope, isTenantAdmin } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
 // M25 gap — no page ever let a tenant configure its own company info.
-// Same authorization posture as tenant/studio (any authenticated tenant
-// staff member, via requireTenantScope) — this app doesn't gate individual
-// actions by tenant_role anywhere else, so this doesn't invent a new
-// pattern only for this route.
+// GET is open to any authenticated tenant staff member (matches the rest
+// of the app); PATCH is gated to tenant_owner/tenant_admin — company-wide
+// config (name, currency, support contact) isn't something any staff
+// member should be able to change, unlike per-user profile settings.
 export async function GET() {
   const scope = await requireTenantScope();
   if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
@@ -19,7 +19,7 @@ export async function GET() {
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ data });
+  return NextResponse.json({ data: { ...data, can_edit: isTenantAdmin(scope) } });
 }
 
 export async function PATCH(req: NextRequest) {
@@ -27,6 +27,12 @@ export async function PATCH(req: NextRequest) {
   if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
   if (isReadOnlyScope(scope)) {
     return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
+  }
+  if (!isTenantAdmin(scope)) {
+    return NextResponse.json(
+      { error: "Only tenant owners/admins can edit company settings" },
+      { status: 403 },
+    );
   }
 
   const body = (await req.json()) as {

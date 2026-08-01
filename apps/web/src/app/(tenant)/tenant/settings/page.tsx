@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
-import { User, Building2, Check } from "lucide-react";
+import { User, Building2, Check, Lock } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -21,6 +21,7 @@ interface Company {
   status: string;
   default_currency: string;
   metadata: { support_email?: string; phone?: string };
+  can_edit: boolean;
 }
 
 const CURRENCIES = ["BRL", "USD", "EUR"];
@@ -220,60 +221,75 @@ export default function TenantSettingsPage() {
           onSubmit={(e) => void handleSaveCompany(e)}
           className="max-w-md bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 space-y-4"
         >
-          <Field label="Nome da empresa">
-            <input
-              required
-              value={companyForm.name}
-              onChange={(e) => setCompanyForm((f) => ({ ...f, name: e.target.value }))}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Identificador (slug)">
-            <input readOnly value={company?.slug ?? ""} className={`${inputClass} opacity-60`} />
-          </Field>
-          <Field label="Moeda padrão">
-            <select
-              value={companyForm.default_currency}
-              onChange={(e) => setCompanyForm((f) => ({ ...f, default_currency: e.target.value }))}
-              className={inputClass}
-            >
-              {CURRENCIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="E-mail de suporte">
-            <input
-              type="email"
-              value={companyForm.support_email}
-              onChange={(e) => setCompanyForm((f) => ({ ...f, support_email: e.target.value }))}
-              placeholder="suporte@suaempresa.com"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Telefone">
-            <input
-              value={companyForm.phone}
-              onChange={(e) => setCompanyForm((f) => ({ ...f, phone: e.target.value }))}
-              placeholder="(11) 3333-4444"
-              className={inputClass}
-            />
-          </Field>
-          <button
-            type="submit"
-            disabled={companySaving}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-shina-blue hover:bg-blue-600 disabled:opacity-60 text-white rounded-lg border-0 cursor-pointer"
+          {company && !company.can_edit && (
+            <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 rounded-lg px-3 py-2">
+              <Lock className="w-3.5 h-3.5 shrink-0" />
+              Só administradores e proprietários do tenant podem editar as configurações da empresa.
+            </div>
+          )}
+          <fieldset
+            disabled={company ? !company.can_edit : true}
+            className="space-y-4 border-0 p-0 m-0"
           >
-            {companySaved ? (
-              <>
-                <Check className="w-4 h-4" /> Salvo
-              </>
-            ) : (
-              "Salvar"
-            )}
-          </button>
+            <Field label="Nome da empresa">
+              <input
+                required
+                value={companyForm.name}
+                onChange={(e) => setCompanyForm((f) => ({ ...f, name: e.target.value }))}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Identificador (slug)">
+              <input readOnly value={company?.slug ?? ""} className={`${inputClass} opacity-60`} />
+            </Field>
+            <Field label="Moeda padrão">
+              <select
+                value={companyForm.default_currency}
+                onChange={(e) =>
+                  setCompanyForm((f) => ({ ...f, default_currency: e.target.value }))
+                }
+                className={inputClass}
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="E-mail de suporte">
+              <input
+                type="email"
+                value={companyForm.support_email}
+                onChange={(e) => setCompanyForm((f) => ({ ...f, support_email: e.target.value }))}
+                placeholder="suporte@suaempresa.com"
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Telefone">
+              <input
+                value={companyForm.phone}
+                onChange={(e) => setCompanyForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="(11) 3333-4444"
+                className={inputClass}
+              />
+            </Field>
+          </fieldset>
+          {company?.can_edit && (
+            <button
+              type="submit"
+              disabled={companySaving}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-shina-blue hover:bg-blue-600 disabled:opacity-60 text-white rounded-lg border-0 cursor-pointer"
+            >
+              {companySaved ? (
+                <>
+                  <Check className="w-4 h-4" /> Salvo
+                </>
+              ) : (
+                "Salvar"
+              )}
+            </button>
+          )}
         </form>
       )}
     </AppShell>

@@ -24,7 +24,15 @@ const APP_PUBLIC_PATHS = [
   "/api/webhooks",
 ];
 
-// Roles that require MFA enrollment before accessing the platform
+// Roles that require MFA enrollment before accessing the platform.
+// NOTE: these keys ("owner"/"admin") don't match lib/tenant-provisioning.ts's
+// real SYSTEM_ROLES keys ("tenant_owner"/"tenant_admin") — this gate has
+// never actually fired for any provisioned tenant. Confirmed and left
+// as-is deliberately: fixing it would immediately force MFA setup on
+// existing tenant_admin/tenant_owner users who have none enrolled (verified
+// against the demo tenant — 0 of 4 users have mfa_method set). Fix this in
+// its own change, paired with a rollout plan, not silently alongside an
+// unrelated feature.
 const MFA_REQUIRED_ROLES = new Set(["owner", "admin", "financial_manager"]);
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
