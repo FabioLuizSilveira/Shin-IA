@@ -22,6 +22,7 @@ import {
   Headphones,
   Puzzle,
   MessageSquareWarning,
+  History,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -51,6 +52,7 @@ const TENANT_NAV_ITEMS = [
     label: "Pedidos de Clientes",
     icon: MessageSquareWarning,
   },
+  { href: "/tenant/activity", label: "Atividade", icon: History },
   { href: "/tenant/studio", label: "Controle de Acesso", icon: Shield },
   { href: "/tenant/ai", label: "AI Center", icon: Sparkles },
   { href: "/tenant/apps", label: "Apps", icon: Puzzle },

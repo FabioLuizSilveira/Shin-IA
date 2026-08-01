@@ -6,6 +6,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ContractDetail } from "@/components/ui/contract-detail";
+import { ExportButton } from "@/components/ui/export-button";
 import { Plus, X } from "lucide-react";
 import type { Contract, ContractStatus, ContractType, OrganizationType } from "@/types/domain";
 
@@ -169,13 +170,16 @@ export default function TenantContractsPage() {
         title="Contratos"
         description="Contratos de serviço, locação e assinatura com organizações clientes."
         action={
-          <button
-            type="button"
-            onClick={() => void openForm()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-shina-blue hover:bg-blue-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" /> Novo Contrato
-          </button>
+          <div className="flex items-center gap-2">
+            <ExportButton entity="contracts" />
+            <button
+              type="button"
+              onClick={() => void openForm()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-shina-blue hover:bg-blue-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Novo Contrato
+            </button>
+          </div>
         }
       />
 

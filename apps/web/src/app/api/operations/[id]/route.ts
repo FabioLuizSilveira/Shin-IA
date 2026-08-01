@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { logActivity } from "@/lib/activity-log";
+import { createNotification } from "@/lib/notifications/create-notification";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +74,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+
+  void logActivity(scope.db, {
+    tenantId: scope.tenantId,
+    actorId: scope.userId,
+    entityType: "operation",
+    entityId: id,
+    action: "status_changed",
+    metadata: { from: current.status, to: body.status },
+  });
+
+  // Only notify on outcomes that need attention — routine progress
+  // transitions (pending -> in_progress -> completed) would just be noise.
+  if (body.status === "cancelled" || body.status === "failed") {
+    void createNotification({
+      tenantId: scope.tenantId,
+      subject: body.status === "failed" ? "Operação falhou" : "Operação cancelada",
+      body: `A operação foi marcada como ${body.status === "failed" ? "falhou" : "cancelada"}.`,
+      priority: "high",
+    });
+  }
 
   return NextResponse.json({ data: { ok: true } });
 }

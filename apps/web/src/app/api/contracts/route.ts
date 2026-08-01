@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { logActivity } from "@/lib/activity-log";
+import { createNotification } from "@/lib/notifications/create-notification";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +90,20 @@ export async function POST(req: NextRequest) {
     .select(SELECT)
     .single();
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+
+  void logActivity(scope.db, {
+    tenantId,
+    actorId: scope.userId,
+    entityType: "contract",
+    entityId: created.id,
+    action: "created",
+    metadata: { type: body.type, organization_id: body.organization_id },
+  });
+  void createNotification({
+    tenantId,
+    subject: "Novo contrato criado",
+    body: `Um contrato de ${body.type} foi criado.`,
+  });
 
   return NextResponse.json(
     { data: flattenOrg(created as unknown as { organizations: { name: string } | null }) },

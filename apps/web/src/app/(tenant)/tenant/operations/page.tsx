@@ -7,6 +7,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { OperationDetail } from "@/components/ui/operation-detail";
 import { OperationsCalendar } from "@/components/ui/operations-calendar";
+import { ExportButton } from "@/components/ui/export-button";
 import { List, Calendar, Plus, X } from "lucide-react";
 import type { Operation, OperationStatus, OperationType } from "@/types/domain";
 
@@ -194,6 +195,7 @@ export default function TenantOperationsPage() {
                 <Calendar className="w-3.5 h-3.5" /> Calendário
               </button>
             </div>
+            <ExportButton entity="operations" />
             <button
               type="button"
               onClick={() => void openForm()}

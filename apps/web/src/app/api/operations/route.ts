@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { findResourceConflicts } from "@/lib/resource-availability";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,30 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (resourceError) return NextResponse.json({ error: resourceError.message }, { status: 500 });
   if (!resource) return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+
+  let conflicts;
+  try {
+    conflicts = await findResourceConflicts(scope.db, {
+      tenantId,
+      resourceId: body.resource_id,
+      startsAt: body.scheduled_starts_at,
+      endsAt: body.scheduled_ends_at,
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Availability check failed" },
+      { status: 500 },
+    );
+  }
+  if (conflicts.length > 0) {
+    return NextResponse.json(
+      {
+        error: "Resource is already booked in this time window",
+        conflicts,
+      },
+      { status: 409 },
+    );
+  }
 
   const { data: created, error: insertError } = await scope.db
     .from("operations")

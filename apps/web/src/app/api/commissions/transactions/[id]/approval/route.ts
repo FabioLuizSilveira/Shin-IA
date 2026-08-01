@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { logActivity } from "@/lib/activity-log";
+import { createNotification } from "@/lib/notifications/create-notification";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +91,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
   if (txError) return NextResponse.json({ error: txError.message }, { status: 500 });
+
+  void logActivity(scope.db, {
+    tenantId: scope.tenantId,
+    actorId: scope.userId,
+    entityType: "commission_transaction",
+    entityId: id,
+    action: newStatus,
+    metadata: { notes: body.notes },
+  });
+  void createNotification({
+    tenantId: scope.tenantId,
+    subject: newStatus === "approved" ? "Comissão aprovada" : "Comissão rejeitada",
+    body:
+      body.notes ||
+      `A transação de comissão foi ${newStatus === "approved" ? "aprovada" : "rejeitada"}.`,
+  });
 
   return NextResponse.json({ data: { ok: true, status: newStatus } });
 }

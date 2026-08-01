@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ExportButton } from "@/components/ui/export-button";
 import { Plus, X } from "lucide-react";
 import type { Organization, OrganizationType } from "@/types/domain";
 
@@ -150,13 +151,16 @@ export default function TenantCrmPage() {
         title="Clientes & Parceiros"
         description="Organizações clientes, fornecedoras e parceiras do tenant."
         action={
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-shina-blue hover:bg-blue-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" /> Nova Organização
-          </button>
+          <div className="flex items-center gap-2">
+            <ExportButton entity="organizations" />
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-shina-blue hover:bg-blue-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Nova Organização
+            </button>
+          </div>
         }
       />
 

@@ -1,9 +1,26 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { KpiEngine } from "@shina/reporting-engine";
 import { requireTenantScope } from "@/lib/tenant-context";
+import { createKpiDataProvider } from "@/lib/kpi-data-provider";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+// Defaults to the current calendar month — ?period=starts_at,ends_at (ISO)
+// overrides it. computeAll compares this window against the equal-length
+// window immediately before it (see kpi-data-provider.ts).
+function resolvePeriod(req: NextRequest): { start: string; end: string } {
+  const raw = req.nextUrl.searchParams.get("period");
+  if (raw) {
+    const [start, end] = raw.split(",");
+    if (start && end) return { start, end };
+  }
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
+export async function GET(req: NextRequest) {
   const scope = await requireTenantScope();
   if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
   const supabase = scope.db;
@@ -58,12 +75,18 @@ export async function GET() {
       (invoicesAmountByStatus[i.status] ?? 0) + Number(i.total_amount);
   }
 
+  const period = resolvePeriod(req);
+  const kpiEngine = new KpiEngine(createKpiDataProvider(supabase));
+  const kpis = await kpiEngine.computeAll(tenantId, period);
+
   return NextResponse.json({
     data: {
       operationsByStatus: countBy(ops, "status"),
       assetsByCategory: countBy(assets, "category"),
       contractsValueByStatus,
       invoicesAmountByStatus,
+      kpis,
+      period,
     },
   });
 }

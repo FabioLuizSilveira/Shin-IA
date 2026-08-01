@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+
+  void logActivity(scope.db, {
+    tenantId: scope.tenantId,
+    actorId: scope.userId,
+    entityType: "contract",
+    entityId: id,
+    action: "status_changed",
+    metadata: { from: current.status, to: body.status },
+  });
 
   return NextResponse.json({ data: { ok: true } });
 }

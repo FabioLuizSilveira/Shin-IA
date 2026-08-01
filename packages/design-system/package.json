@@ -21,7 +21,8 @@
     "@shina/theme": "workspace:*",
     "@shina/motion": "workspace:*",
     "@shina/flow-engine": "workspace:*",
-    "@shina/icons": "workspace:*"
+    "@shina/icons": "workspace:*",
+    "framer-motion": "^11.11.0"
   },
   "peerDependencies": {
     "react": "^18.3.0",
