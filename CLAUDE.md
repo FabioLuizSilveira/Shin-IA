@@ -24,18 +24,25 @@ All milestones through M19 are complete and merged to `main`. The platform is fe
 **Completed:**
 
 - M1: Foundation (monorepo, tooling, CI/CD) — verified solid.
-- M2–M20: Core domain packages and engines — **not what it sounds like.** 36 packages exist under
-  `packages/`, but only 8 are actually imported by any app (`billing-platform`, `commission-engine`,
-  `design-system`, `icons`, `landing`, `marketing-ai`, `theme`, `tokens`), plus 2 more transitively
-  (`flow-engine`, `illustrations`). The other ~26 range from real-and-tested-but-never-wired to
-  confirmed legacy/duplicate. See the package-by-package audit (published artifact) before touching
-  or trusting any `packages/*-engine` — several packages with the same name as a live feature
-  (`operation-engine`, `resource-engine`, `reporting-engine`, `tracking-engine`) are **not** what
-  that feature actually runs on; the live feature was built independently, inline in API routes.
-  `rule-engine`, `workflow-engine`, `auth`, `domain`, `billing-engine`, `marketplace` were archived
-  (removed) 2026-07-31 as confirmed dead/superseded code — see git history if you need to recover
-  one. `authorization`/`iam-domain`/`iam-repository`/`ai-platform`/`blueprint-runtime`/`studio`/
-  `mobile-runtime`/`tracking-engine` are coherent, real, but deliberately deferred — no current
+- M2–M20: Core domain packages and engines — **not what it sounds like.** 36 packages existed under
+  `packages/` as of the 2026-07-31 audit; only 8 were actually imported by any app at that point
+  (`billing-platform`, `commission-engine`, `design-system`, `icons`, `landing`, `marketing-ai`,
+  `theme`, `tokens`), plus 2 more transitively (`flow-engine`, `illustrations`). A follow-up pass
+  the same day plugged 4 more in where they closed a real, previously-broken gap: `resource-engine`
+  now blocks double-booking in `api/operations` (see `lib/resource-availability.ts`), `reporting-engine`'s
+  `KpiEngine` now powers `tenant/reports`' trend cards (see `lib/kpi-data-provider.ts`), `motion`
+  now drives real Framer Motion transitions in `design-system`'s `Dialog`/`Drawer`, and
+  `tracking-engine` was split — its 8 vendor GPS adapters and device-provisioning runtime were
+  archived as speculative (no tenant has asked for a named-provider integration; the generic
+  bring-your-own-webhook already covers today's need), but its `GeofenceEngine` was kept and wired
+  into the fleet-tracking webhook (`api/webhooks/fleet-location/[token]`, `api/geofences`,
+  `tenant/tracking`'s "Cercas Virtuais" section) since geofencing is provider-agnostic and closed a
+  real gap. `operation-engine` is still genuinely unwired — its 8-state lifecycle would need a
+  schema migration with no current product trigger. `rule-engine`, `workflow-engine`, `auth`,
+  `domain`, `billing-engine`, `marketplace` were archived (removed) 2026-07-31 as confirmed
+  dead/superseded code — see git history if you need to recover one.
+  `authorization`/`iam-domain`/`iam-repository`/`ai-platform`/`blueprint-runtime`/`studio`/
+  `mobile-runtime`/`operation-engine` are coherent, real, but deliberately deferred — no current
   feature needs them yet; don't force-integrate without a concrete product trigger.
 - M21: Design system (Tailwind, 15 components, 10 pages) — real, wired into both apps.
 - M22: Business features (real Supabase CRUD — operations, assets, contracts, tenants) — real; was

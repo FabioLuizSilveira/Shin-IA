@@ -16,6 +16,7 @@
     "@shina/charts": "workspace:*",
     "@shina/commission-engine": "workspace:*",
     "@shina/reporting-engine": "workspace:*",
+    "@shina/tracking-engine": "workspace:*",
     "@shina/tokens": "workspace:*",
     "@shina/theme": "workspace:*",
     "@shina/design-system": "workspace:*",

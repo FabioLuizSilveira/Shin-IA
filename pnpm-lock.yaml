@@ -233,6 +233,9 @@ importers:
       '@shina/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
+      '@shina/tracking-engine':
+        specifier: workspace:*
+        version: link:../../packages/tracking-engine
       '@supabase/ssr':
         specifier: ^0.12.0
         version: 0.12.0(@supabase/supabase-js@2.108.2)
