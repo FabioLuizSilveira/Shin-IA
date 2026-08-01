@@ -56,6 +56,7 @@ const TENANT_NAV_ITEMS = [
   { href: "/tenant/studio", label: "Controle de Acesso", icon: Shield },
   { href: "/tenant/ai", label: "AI Center", icon: Sparkles },
   { href: "/tenant/apps", label: "Apps", icon: Puzzle },
+  { href: "/tenant/settings", label: "Configurações", icon: Settings },
 ];
 
 interface SidebarProps {
