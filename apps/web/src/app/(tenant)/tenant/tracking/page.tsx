@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
-import { Copy, Check, RefreshCw, MapPin } from "lucide-react";
+import { Copy, Check, RefreshCw, MapPin, Plus, Shield, X } from "lucide-react";
 import type { FleetMapPoint } from "@/components/ui/fleet-map";
 
 const FleetMap = dynamic(() => import("@/components/ui/fleet-map").then((m) => m.FleetMap), {
@@ -23,6 +23,22 @@ interface Integration {
   last_received_at: string | null;
 }
 
+interface Geofence {
+  id: string;
+  name: string;
+  shape: "circle" | "polygon";
+  center_lat: number | null;
+  center_lng: number | null;
+  radius_meters: number | null;
+  resource_ids: string[];
+  status: "active" | "inactive";
+}
+
+interface ResourceOption {
+  id: string;
+  name: string;
+}
+
 export default function TrackingPage() {
   const [points, setPoints] = useState<FleetMapPoint[]>([]);
   const [integration, setIntegration] = useState<Integration | null>(null);
@@ -31,24 +47,88 @@ export default function TrackingPage() {
   const [providerName, setProviderName] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [geofences, setGeofences] = useState<Geofence[]>([]);
+  const [resources, setResources] = useState<ResourceOption[]>([]);
+  const [showGeofenceForm, setShowGeofenceForm] = useState(false);
+  const [gfName, setGfName] = useState("");
+  const [gfLat, setGfLat] = useState("");
+  const [gfLng, setGfLng] = useState("");
+  const [gfRadius, setGfRadius] = useState("500");
+  const [gfResourceId, setGfResourceId] = useState("");
+  const [gfSaving, setGfSaving] = useState(false);
+
+  const loadGeofences = useCallback(async () => {
+    const res = await fetch("/api/geofences");
+    const json = (await res.json()) as { data?: Geofence[] };
+    setGeofences(json.data ?? []);
+  }, []);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [pointsRes, integrationRes] = await Promise.all([
+      const [pointsRes, integrationRes, resourcesRes] = await Promise.all([
         fetch("/api/resources/locations"),
         fetch("/api/tenant-settings/fleet-integration"),
+        fetch("/api/resources"),
       ]);
       const pointsJson = (await pointsRes.json()) as { data?: FleetMapPoint[] };
       const integrationJson = (await integrationRes.json()) as { data?: Integration };
+      const resourcesJson = (await resourcesRes.json()) as { data?: ResourceOption[] };
       setPoints(pointsJson.data ?? []);
+      setResources(resourcesJson.data ?? []);
       if (integrationJson.data) {
         setIntegration(integrationJson.data);
         setProviderName(integrationJson.data.provider_name ?? "");
       }
+      await loadGeofences();
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadGeofences]);
+
+  async function handleCreateGeofence(e: React.FormEvent) {
+    e.preventDefault();
+    setGfSaving(true);
+    try {
+      const res = await fetch("/api/geofences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: gfName,
+          shape: "circle",
+          center_lat: Number(gfLat),
+          center_lng: Number(gfLng),
+          radius_meters: Number(gfRadius),
+          resource_ids: gfResourceId ? [gfResourceId] : [],
+        }),
+      });
+      if (res.ok) {
+        setShowGeofenceForm(false);
+        setGfName("");
+        setGfLat("");
+        setGfLng("");
+        setGfRadius("500");
+        setGfResourceId("");
+        await loadGeofences();
+      }
+    } finally {
+      setGfSaving(false);
+    }
+  }
+
+  async function handleToggleGeofence(gf: Geofence) {
+    await fetch(`/api/geofences/${gf.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: gf.status === "active" ? "inactive" : "active" }),
+    });
+    await loadGeofences();
+  }
+
+  async function handleDeleteGeofence(id: string) {
+    await fetch(`/api/geofences/${id}`, { method: "DELETE" });
+    await loadGeofences();
+  }
 
   useEffect(() => {
     void loadAll();
@@ -232,6 +312,138 @@ export default function TrackingPage() {
                   <RefreshCw className="w-3 h-3" /> Regenerar token
                 </button>
               </>
+            )}
+          </div>
+
+          <div className="lg:col-span-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-slate-400" />
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Cercas Virtuais
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGeofenceForm(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-shina-blue hover:bg-blue-600 text-white rounded-lg border-0 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> Nova Cerca
+              </button>
+            </div>
+
+            {showGeofenceForm && (
+              <form
+                onSubmit={(e) => void handleCreateGeofence(e)}
+                className="mb-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-800 grid grid-cols-2 md:grid-cols-5 gap-2 items-end"
+              >
+                <input
+                  required
+                  placeholder="Nome"
+                  value={gfName}
+                  onChange={(e) => setGfName(e.target.value)}
+                  className="col-span-2 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                />
+                <input
+                  required
+                  type="number"
+                  step="any"
+                  placeholder="Latitude"
+                  value={gfLat}
+                  onChange={(e) => setGfLat(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                />
+                <input
+                  required
+                  type="number"
+                  step="any"
+                  placeholder="Longitude"
+                  value={gfLng}
+                  onChange={(e) => setGfLng(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                />
+                <input
+                  required
+                  type="number"
+                  placeholder="Raio (m)"
+                  value={gfRadius}
+                  onChange={(e) => setGfRadius(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                />
+                <select
+                  value={gfResourceId}
+                  onChange={(e) => setGfResourceId(e.target.value)}
+                  className="col-span-2 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                >
+                  <option value="">Selecione o recurso monitorado</option>
+                  {resources.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={gfSaving}
+                    className="px-3 py-1.5 text-xs font-semibold bg-shina-blue hover:bg-blue-600 disabled:opacity-60 text-white rounded-lg border-0 cursor-pointer"
+                  >
+                    Criar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowGeofenceForm(false)}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 bg-transparent border-0 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {geofences.length === 0 ? (
+              <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-6">
+                Nenhuma cerca virtual configurada. Crie uma para receber alertas quando um recurso
+                entrar ou sair de uma área.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                {geofences.map((gf) => (
+                  <li key={gf.id} className="py-2.5 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                        {gf.name}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        {gf.shape === "circle"
+                          ? `Círculo de ${gf.radius_meters}m em ${gf.center_lat}, ${gf.center_lng}`
+                          : "Polígono"}{" "}
+                        · {gf.resource_ids.length} recurso(s) monitorado(s)
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => void handleToggleGeofence(gf)}
+                        className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border-0 cursor-pointer ${
+                          gf.status === "active"
+                            ? "bg-green-50 text-green-600 dark:bg-green-950/30 dark:text-green-400"
+                            : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                        }`}
+                      >
+                        {gf.status === "active" ? "Ativa" : "Inativa"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteGeofence(gf.id)}
+                        className="p-1 text-slate-300 hover:text-red-500 bg-transparent border-0 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>

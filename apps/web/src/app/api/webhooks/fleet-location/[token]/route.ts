@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { GeofenceEngine } from "@shina/tracking-engine";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createGeofenceRepository, createTrackingEventRepository } from "@/lib/geofence-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -60,12 +62,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     .maybeSingle();
   if (!resource) return NextResponse.json({ error: "Resource not found" }, { status: 404 });
 
+  // Fetch the previous fix before inserting the new one — GeofenceEngine
+  // needs both points to tell "entered" from "already inside".
+  const { data: previous } = await admin
+    .from("resource_locations")
+    .select("latitude, longitude, recorded_at")
+    .eq("tenant_id", integration.tenant_id)
+    .eq("resource_id", body.resource_id)
+    .order("recorded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const recordedAt = body.recorded_at ?? new Date().toISOString();
   const { error: insertError } = await admin.from("resource_locations").insert({
     tenant_id: integration.tenant_id,
     resource_id: body.resource_id,
     latitude: body.latitude,
     longitude: body.longitude,
-    recorded_at: body.recorded_at ?? new Date().toISOString(),
+    recorded_at: recordedAt,
     source: "webhook",
     raw_payload: body,
   });
@@ -75,6 +89,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     .from("fleet_integrations")
     .update({ last_received_at: new Date().toISOString() })
     .eq("id", integration.id);
+
+  const toTrackingPosition = (lat: number, lng: number, at: string) => ({
+    id: crypto.randomUUID(),
+    deviceId: body.resource_id!,
+    tenantId: integration.tenant_id,
+    latitude: lat,
+    longitude: lng,
+    altitude: null,
+    speed: null,
+    heading: null,
+    accuracy: null,
+    fixedAt: at,
+    receivedAt: at,
+    rawPayload: {},
+  });
+
+  const geofenceEngine = new GeofenceEngine(
+    createGeofenceRepository(admin, integration.tenant_id),
+    createTrackingEventRepository(admin, integration.tenant_id),
+  );
+  await geofenceEngine.checkPosition(
+    body.resource_id,
+    integration.tenant_id,
+    toTrackingPosition(body.latitude, body.longitude, recordedAt),
+    previous
+      ? toTrackingPosition(previous.latitude, previous.longitude, previous.recorded_at)
+      : null,
+  );
 
   return NextResponse.json({ data: { ok: true } }, { status: 201 });
 }
