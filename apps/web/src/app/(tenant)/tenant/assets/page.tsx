@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ExportButton } from "@/components/ui/export-button";
 import { Plus, X } from "lucide-react";
 import type { Asset, AssetCategory, AssetStatus } from "@/types/domain";
 
@@ -172,13 +173,16 @@ export default function TenantAssetsPage() {
         title="Ativos"
         description="Veículos, equipamentos, ferramentas e demais ativos do tenant."
         action={
-          <button
-            type="button"
-            onClick={() => void openForm()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-shina-blue hover:bg-blue-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" /> Novo Ativo
-          </button>
+          <div className="flex items-center gap-2">
+            <ExportButton entity="assets" />
+            <button
+              type="button"
+              onClick={() => void openForm()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-shina-blue hover:bg-blue-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Novo Ativo
+            </button>
+          </div>
         }
       />
 

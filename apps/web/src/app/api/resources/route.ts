@@ -3,9 +3,18 @@ import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+const BLOCKING_STATUSES = ["pending", "in_progress"];
+
+// availableFrom/availableUntil (both required together) filter out resources
+// with a conflicting operation in that window — same overlap logic as
+// lib/resource-availability.ts, used here to let the operation form only
+// offer resources that are actually free, instead of failing after submit.
+export async function GET(req: NextRequest) {
   const scope = await requireTenantScope();
   if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+
+  const availableFrom = req.nextUrl.searchParams.get("availableFrom");
+  const availableUntil = req.nextUrl.searchParams.get("availableUntil");
 
   const { data, error } = await scope.db
     .from("resources")
@@ -15,7 +24,22 @@ export async function GET() {
     .order("name", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ data });
+  if (!availableFrom || !availableUntil) {
+    return NextResponse.json({ data });
+  }
+
+  const { data: conflicting, error: conflictError } = await scope.db
+    .from("operations")
+    .select("resource_id")
+    .eq("tenant_id", scope.tenantId)
+    .in("status", BLOCKING_STATUSES)
+    .is("deleted_at", null)
+    .lt("scheduled_starts_at", availableUntil)
+    .gt("scheduled_ends_at", availableFrom);
+  if (conflictError) return NextResponse.json({ error: conflictError.message }, { status: 500 });
+
+  const busyIds = new Set((conflicting ?? []).map((r) => r.resource_id));
+  return NextResponse.json({ data: (data ?? []).filter((r) => !busyIds.has(r.id)) });
 }
 
 const VALID_TYPES = ["human", "vehicle", "equipment", "virtual"];

@@ -6,6 +6,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { InvoiceDetail } from "@/components/ui/invoice-detail";
+import { ExportButton } from "@/components/ui/export-button";
 import { CreditCard } from "lucide-react";
 import type { Invoice, InvoiceStatus } from "@/types/domain";
 
@@ -143,6 +144,7 @@ export default function TenantBillingPage() {
       <SectionHeader
         title="Faturas"
         description="Faturas emitidas para as organizações vinculadas à sua conta."
+        action={<ExportButton entity="invoices" />}
       />
 
       {error && (

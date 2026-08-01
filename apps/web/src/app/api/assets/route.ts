@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,15 @@ export async function POST(req: NextRequest) {
     .select(SELECT)
     .single();
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+
+  void logActivity(scope.db, {
+    tenantId,
+    actorId: scope.userId,
+    entityType: "asset",
+    entityId: created.id,
+    action: "created",
+    metadata: { name: body.name.trim(), category: body.category },
+  });
 
   return NextResponse.json(
     { data: flattenType(created as unknown as { asset_types: { name: string } | null }) },

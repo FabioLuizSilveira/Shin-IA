@@ -5,12 +5,48 @@ import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { DonutChart } from "@/components/ui/donut-chart";
 import { BarChart } from "@/components/ui/bar-chart";
+import { MetricCard } from "@/components/ui/metric-card";
+import { Activity, Boxes, DollarSign, Award, Gauge, Radio } from "lucide-react";
+
+interface Kpi {
+  type: "operations" | "assets" | "revenue" | "commissions" | "utilization" | "tracking";
+  label: string;
+  value: number;
+  unit: string;
+  previousValue: number | null;
+  changePercent: number | null;
+}
 
 interface TenantReports {
   operationsByStatus: Record<string, number>;
   assetsByCategory: Record<string, number>;
   contractsValueByStatus: Record<string, number>;
   invoicesAmountByStatus: Record<string, number>;
+  kpis: Kpi[];
+}
+
+const KPI_LABEL: Record<Kpi["type"], string> = {
+  operations: "Operações no período",
+  assets: "Ativos (acumulado)",
+  revenue: "Receita recebida",
+  commissions: "Comissões geradas",
+  utilization: "Utilização da frota",
+  tracking: "Veículos rastreados",
+};
+
+const KPI_ICON: Record<Kpi["type"], typeof Activity> = {
+  operations: Activity,
+  assets: Boxes,
+  revenue: DollarSign,
+  commissions: Award,
+  utilization: Gauge,
+  tracking: Radio,
+};
+
+function formatKpiValue(kpi: Kpi): string {
+  if (kpi.unit === "BRL") return brl(kpi.value);
+  if (kpi.unit === "%") return `${kpi.value}%`;
+  return String(kpi.value);
 }
 
 const OPERATION_STATUS_LABEL: Record<string, string> = {
@@ -85,6 +121,31 @@ export default function TenantReportsPage() {
         title="Relatórios"
         description="Visão consolidada de operações, ativos, contratos e faturas."
       />
+
+      {!loading && data && data.kpis.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {data.kpis.map((kpi) => {
+            const Icon = KPI_ICON[kpi.type];
+            const trend =
+              kpi.changePercent === null || kpi.changePercent === 0
+                ? "neutral"
+                : kpi.changePercent > 0
+                  ? "up"
+                  : "down";
+            return (
+              <MetricCard
+                key={kpi.type}
+                title={KPI_LABEL[kpi.type]}
+                value={formatKpiValue(kpi)}
+                change={kpi.changePercent ?? undefined}
+                changeLabel="vs. período anterior"
+                icon={<Icon className="w-5 h-5" />}
+                trend={trend}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

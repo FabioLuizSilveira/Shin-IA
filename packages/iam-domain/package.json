@@ -24,9 +24,6 @@
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@shina/domain": "workspace:*"
-  },
   "devDependencies": {
     "@shina/typescript-config": "workspace:*",
     "typescript": "^5.7.2"
