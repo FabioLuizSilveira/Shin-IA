@@ -22,7 +22,14 @@ import type {
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-const mobilityManifest = BUILT_IN_BLUEPRINTS.find((b) => b.id === "mobility")!;
+// Installer/configurator lifecycle tests below exercise install/uninstall/
+// upgrade mechanics, not the real "mobility" blueprint's business fields —
+// deliberately a local fixture with no required fields (rather than pulling
+// the real BUILT_IN_BLUEPRINTS entry, which now has real customFields for
+// the fleet/rental domain — see built-ins.ts) so these tests stay decoupled
+// from that content.
+const realMobility = BUILT_IN_BLUEPRINTS.find((b) => b.id === "mobility")!;
+const mobilityManifest: BlueprintManifest = { ...realMobility, customFields: [] };
 
 const customManifest: BlueprintManifest = {
   id: "custom-test",
@@ -519,15 +526,17 @@ describe("BlueprintRuntime", () => {
   });
 
   it("validates install config", () => {
+    // "generic-assets" has no required customFields, unlike "mobility" (see built-ins.ts) —
+    // this test is about the seeded-registry validate() path, not blueprint-specific content.
     const runtime = makeRuntime();
-    const result = runtime.validate("mobility", {});
+    const result = runtime.validate("generic-assets", {});
     expect(result.valid).toBe(true);
   });
 
   it("installs a blueprint", async () => {
     const runtime = makeRuntime(null);
-    const instance = await runtime.install("t1", "mobility", {}, "actor1");
-    expect(instance.blueprintId).toBe("mobility");
+    const instance = await runtime.install("t1", "generic-assets", {}, "actor1");
+    expect(instance.blueprintId).toBe("generic-assets");
   });
 
   it("gets version history", async () => {
