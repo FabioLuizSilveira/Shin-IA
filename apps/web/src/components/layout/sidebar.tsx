@@ -23,6 +23,7 @@ import {
   Puzzle,
   MessageSquareWarning,
   History,
+  Palette,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -56,6 +57,7 @@ const TENANT_NAV_ITEMS = [
   { href: "/tenant/studio", label: "Controle de Acesso", icon: Shield },
   { href: "/tenant/ai", label: "AI Center", icon: Sparkles },
   { href: "/tenant/apps", label: "Apps", icon: Puzzle },
+  { href: "/tenant/customization", label: "Customização", icon: Palette },
   { href: "/tenant/settings", label: "Configurações", icon: Settings },
 ];
 

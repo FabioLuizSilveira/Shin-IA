@@ -206,6 +206,9 @@ importers:
       '@shina/billing-platform':
         specifier: workspace:*
         version: link:../../packages/billing-platform
+      '@shina/blueprint-runtime':
+        specifier: workspace:*
+        version: link:../../packages/blueprint-runtime
       '@shina/charts':
         specifier: workspace:*
         version: link:../../packages/charts
@@ -227,6 +230,9 @@ importers:
       '@shina/reporting-engine':
         specifier: workspace:*
         version: link:../../packages/reporting-engine
+      '@shina/studio':
+        specifier: workspace:*
+        version: link:../../packages/studio
       '@shina/theme':
         specifier: workspace:*
         version: link:../../packages/theme

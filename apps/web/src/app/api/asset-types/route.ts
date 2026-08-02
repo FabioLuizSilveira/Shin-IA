@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireTenantScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +14,31 @@ export async function GET() {
     .eq("active", true)
     .is("deleted_at", null)
     .order("name", { ascending: true });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ data });
+}
+
+export async function POST(request: NextRequest) {
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+
+  const body = await request.json();
+  if (!body.name || !body.category) {
+    return NextResponse.json({ error: "name and category are required" }, { status: 400 });
+  }
+
+  const { data, error } = await scope.db
+    .from("asset_types")
+    .insert({
+      id: crypto.randomUUID(),
+      tenant_id: scope.tenantId,
+      name: body.name,
+      category: body.category,
+      attributes: body.attributes ?? {},
+    })
+    .select("id, name, category")
+    .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ data });
