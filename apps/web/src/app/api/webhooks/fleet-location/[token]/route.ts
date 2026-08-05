@@ -5,6 +5,28 @@ import { createGeofenceRepository, createTrackingEventRepository } from "@/lib/g
 
 export const dynamic = "force-dynamic";
 
+async function hmacSha256Hex(secret: string, payload: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(payload));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 // Called server-to-server by the tenant's own GPS/telemetry provider — no
 // Supabase session ever exists here, the webhook token in the URL is the
 // only credential. Path lives under /api/webhooks so middleware's existing
@@ -16,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
   const { data: integration, error: integrationError } = await admin
     .from("fleet_integrations")
-    .select("id, tenant_id, is_active")
+    .select("id, tenant_id, is_active, webhook_secret")
     .eq("webhook_token", token)
     .is("deleted_at", null)
     .maybeSingle();
@@ -28,6 +50,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     return NextResponse.json({ error: "Integration is inactive" }, { status: 403 });
   }
 
+  // Security fix (MÉD-16): the URL token alone doesn't cover the request
+  // body with a signature — a leaked token (proxy logs, Referer) lets an
+  // attacker inject arbitrary coordinates indefinitely. When the sender
+  // includes X-Signature (HMAC-SHA256 of the raw body, hex, using the
+  // integration's webhook_secret), it's verified and mismatches are
+  // rejected. Kept optional per-request rather than mandatory: this is a
+  // bring-your-own-webhook integration and making it mandatory today would
+  // break every already-configured external GPS provider that doesn't
+  // sign yet — see tenant-settings/fleet-integration for where the secret
+  // is exposed so a tenant can opt their provider into signing.
+  const rawBody = await req.text();
+  const signatureHeader = req.headers.get("x-signature");
+  if (signatureHeader) {
+    const expected = await hmacSha256Hex(integration.webhook_secret, rawBody);
+    if (!timingSafeEqual(expected, signatureHeader)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+  }
+
   let body: {
     resource_id?: string;
     latitude?: number;
@@ -35,7 +76,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     recorded_at?: string;
   };
   try {
-    body = (await req.json()) as typeof body;
+    body = JSON.parse(rawBody) as typeof body;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }

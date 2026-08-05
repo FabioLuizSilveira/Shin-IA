@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MFA_COOKIE_NAME, MFA_COOKIE_TTL_SECONDS, signMfaCookie } from "@/lib/auth/mfa-cookie";
+import { hashRecoveryCode } from "@/lib/auth/mfa-recovery-hash";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const codeHash = Buffer.from(body.code.trim().toUpperCase()).toString("base64");
+  const codeHash = await hashRecoveryCode(body.code);
 
   const { data: record, error: findError } = await admin
     .from("mfa_recovery_codes")
