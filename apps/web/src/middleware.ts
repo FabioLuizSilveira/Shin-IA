@@ -4,6 +4,7 @@ import { hasLiveSubscription } from "@shina/billing-platform/claims";
 import { MFA_COOKIE_NAME, verifyMfaCookie } from "@/lib/auth/mfa-cookie";
 import { decodeSessionClaims, type SessionClaims } from "@/lib/jwt-claims";
 import { IMPERSONATION_COOKIE } from "@/lib/impersonation-cookie";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 // ── Domain config ──────────────────────────────────────────────────────────────
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "shinaia.com.br";
@@ -25,15 +26,28 @@ const APP_PUBLIC_PATHS = [
 ];
 
 // Roles that require MFA enrollment before accessing the platform.
-// NOTE: these keys ("owner"/"admin") don't match lib/tenant-provisioning.ts's
-// real SYSTEM_ROLES keys ("tenant_owner"/"tenant_admin") — this gate has
-// never actually fired for any provisioned tenant. Confirmed and left
-// as-is deliberately: fixing it would immediately force MFA setup on
-// existing tenant_admin/tenant_owner users who have none enrolled (verified
-// against the demo tenant — 0 of 4 users have mfa_method set). Fix this in
-// its own change, paired with a rollout plan, not silently alongside an
-// unrelated feature.
-const MFA_REQUIRED_ROLES = new Set(["owner", "admin", "financial_manager"]);
+// Security fix (ALTO-09): this used to be ["owner", "admin",
+// "financial_manager"] — keys that never matched
+// lib/tenant-provisioning.ts's real SYSTEM_ROLES keys ("tenant_owner",
+// "tenant_admin"; "financial_manager" was never a real role at all), so
+// this gate had never actually fired for any provisioned tenant. Fixed by
+// explicit decision, accepting the blast radius: every existing
+// tenant_owner/tenant_admin without MFA enrolled (confirmed 3/3 in the
+// hosted DB at fix time) is redirected to /auth/mfa-setup on their next
+// request. No rollout/grace period — this was a deliberate choice, not an
+// oversight (see the audit's ALTO-09 finding for the pre-fix state).
+const MFA_REQUIRED_ROLES = new Set(["tenant_owner", "tenant_admin"]);
+
+// Security fix (ALTO-08): tighter budget for auth-sensitive paths (login,
+// OAuth, magic link, MFA challenge/recovery) — these are the ones brute
+// force / credential stuffing actually targets. See lib/rate-limit.ts for
+// caveats (in-memory, per-instance).
+const AUTH_PATH_PREFIXES = ["/login", "/auth", "/api/auth"];
+const AUTH_RATE_LIMIT = { maxRequests: 20, windowMs: 60_000 };
+// Looser general budget for the rest of the API surface — sized to not
+// interfere with a dashboard page firing several parallel fetches, while
+// still bounding scraping/enumeration and accidental retry storms.
+const API_RATE_LIMIT = { maxRequests: 120, windowMs: 60_000 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -84,6 +98,21 @@ export async function middleware(request: NextRequest) {
   const hostType = getHostType(hostname);
   const { pathname } = request.nextUrl;
   const isApiRoute = pathname.startsWith("/api");
+
+  // ── 0. Rate limiting on auth-sensitive paths ───────────────────────────────
+  if (AUTH_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    const { allowed, retryAfterSeconds } = checkRateLimit(
+      `auth:${clientIp(request)}`,
+      AUTH_RATE_LIMIT.maxRequests,
+      AUTH_RATE_LIMIT.windowMs,
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
+      );
+    }
+  }
 
   // ── Root / www domain ──────────────────────────────────────────────────────
   // Only the institutional landing is served here.
@@ -149,6 +178,24 @@ export async function middleware(request: NextRequest) {
         .then(({ data }) => (data.session ? decodeSessionClaims(data.session.access_token) : {}))
         .catch(() => ({}))
     : {};
+
+  // ── General API rate limiting ──────────────────────────────────────────────
+  // /api/webhooks and /api/auth already returned/were checked above — this
+  // covers the rest of the ~85 API routes. Keyed by user id when known
+  // (a shared office IP shouldn't collide into one bucket), IP otherwise.
+  if (isApiRoute) {
+    const { allowed, retryAfterSeconds } = checkRateLimit(
+      `api:${user?.id ?? clientIp(request)}`,
+      API_RATE_LIMIT.maxRequests,
+      API_RATE_LIMIT.windowMs,
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
+      );
+    }
+  }
 
   // ── 1. App subdomain "/" → login or dashboard ──────────────────────────────
   if (hostType === "app" && pathname === "/") {
