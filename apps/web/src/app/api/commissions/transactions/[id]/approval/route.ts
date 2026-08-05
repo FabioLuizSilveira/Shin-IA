@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { requireTenantScope, isReadOnlyScope, isTenantAdmin } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 import { createNotification } from "@/lib/notifications/create-notification";
 
@@ -52,6 +52,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (isReadOnlyScope(scope)) {
     return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
   }
+  // Approving a commission is a financial control action — restricted to
+  // tenant owners/admins, same gate as company settings writes.
+  if (!isTenantAdmin(scope)) {
+    return NextResponse.json(
+      { error: "Only tenant owners/admins can review commission approvals" },
+      { status: 403 },
+    );
+  }
 
   const body = (await req.json()) as { decision?: "approve" | "reject"; notes?: string };
   if (body.decision !== "approve" && body.decision !== "reject") {
@@ -60,13 +68,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: approval } = await scope.db
     .from("commission_approvals")
-    .select("id, status")
+    .select("id, status, requested_by")
     .eq("transaction_id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
   if (!approval) return NextResponse.json({ error: "Approval not found" }, { status: 404 });
   if (approval.status !== "pending") {
     return NextResponse.json({ error: "Approval is not pending" }, { status: 422 });
+  }
+  // Four-eyes principle: whoever requested the approval cannot also review it.
+  if (approval.requested_by === scope.userId) {
+    return NextResponse.json(
+      { error: "You cannot review an approval you requested yourself" },
+      { status: 403 },
+    );
   }
 
   const now = new Date().toISOString();
@@ -82,7 +97,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       notes: body.notes?.trim() || null,
       updated_at: now,
     })
-    .eq("id", approval.id);
+    .eq("id", approval.id)
+    .eq("tenant_id", scope.tenantId);
   if (approvalError) return NextResponse.json({ error: approvalError.message }, { status: 500 });
 
   const { error: txError } = await scope.db

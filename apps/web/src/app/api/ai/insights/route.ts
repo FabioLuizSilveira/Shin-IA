@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireTenantScope } from "@/lib/tenant-context";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -76,15 +77,21 @@ export async function POST(request: NextRequest) {
     period: "month" as const,
   };
 
-  // Call Supabase Edge Function
+  // Call Supabase Edge Function — authenticated with the caller's own
+  // session token, not the anon key, so the function can verify a real
+  // logged-in user is making the request (see ai-insights/index.ts).
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  const sessionClient = await createClient();
+  const {
+    data: { session },
+  } = await sessionClient.auth.getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const fnRes = await fetch(`${supabaseUrl}/functions/v1/ai-insights`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${anonKey}`,
+        Authorization: `Bearer ${session.access_token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ type: body.type, context }),

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -187,6 +188,31 @@ serve(async (req) => {
 
   if (req.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
+  }
+
+  // Security fix (CRÍT-02): the platform's default JWT verification only
+  // checks that the bearer token is a validly-signed Supabase JWT — the
+  // public anon key IS one, so it passed trivially, letting anyone with
+  // just the anon key (embedded in every page's JS bundle) call this
+  // function directly, unauthenticated, for free-form prompt injection and
+  // to burn the shared Anthropic API budget. Explicitly resolve the token
+  // to a real logged-in user via auth.getUser() and reject anything else
+  // (anon key, missing header, expired/garbage token).
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) {
+    return Response.json({ error: "Missing Authorization header" }, { status: 401 });
+  }
+  const authClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+  );
+  const {
+    data: { user },
+    error: authError,
+  } = await authClient.auth.getUser(token);
+  if (authError || !user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let payload: InsightRequest;
