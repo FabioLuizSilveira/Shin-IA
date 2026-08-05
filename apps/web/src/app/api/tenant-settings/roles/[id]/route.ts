@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { requireTenantScope, isReadOnlyScope, isTenantAdmin } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
   if (isReadOnlyScope(scope)) {
     return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
+  }
+  if (!isTenantAdmin(scope)) {
+    return NextResponse.json(
+      { error: "Only tenant owners/admins can delete roles" },
+      { status: 403 },
+    );
   }
 
   const { data: role, error: fetchError } = await scope.db

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { StudioError, type AnyStudioConfig } from "@shina/studio";
-import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { requireTenantScope, isReadOnlyScope, isTenantAdmin } from "@/lib/tenant-context";
 import { createStudioRuntime, isStudioType } from "@/lib/studio-runtime-factory";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +35,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ type
   if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
   if (isReadOnlyScope(scope)) {
     return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
+  }
+  // access_control config governs the tenant's own permission policies —
+  // unlike the other 9 studio areas (branding, forms, dashboard, etc.)
+  // this one is admin-only, same gate as tenant-settings/roles.
+  if (type === "access_control" && !isTenantAdmin(scope)) {
+    return NextResponse.json(
+      { error: "Only tenant owners/admins can edit access control" },
+      { status: 403 },
+    );
   }
 
   const body = (await req.json()) as { config?: AnyStudioConfig };

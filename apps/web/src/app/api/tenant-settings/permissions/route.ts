@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { requirePlatformRole } from "@/lib/platform-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,15 @@ export async function POST(req: NextRequest) {
   if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
   if (isReadOnlyScope(scope)) {
     return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
+  }
+  // tenant_permissions is a single catalog shared across every tenant on
+  // the platform (see the GET comment above) — a per-tenant admin gate
+  // isn't enough here, since any tenant admin would still be able to
+  // pollute every other tenant's permission catalog. This requires actual
+  // platform staff.
+  const platform = await requirePlatformRole();
+  if ("error" in platform) {
+    return NextResponse.json({ error: platform.error }, { status: platform.status });
   }
 
   const body = (await req.json()) as {
