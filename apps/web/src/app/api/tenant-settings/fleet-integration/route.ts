@@ -13,7 +13,8 @@ function generateToken(): string {
   return randomBytes(24).toString("hex");
 }
 
-const SELECT = "id, provider_name, webhook_token, is_active, last_received_at, created_at";
+const SELECT =
+  "id, provider_name, webhook_token, webhook_secret, is_active, last_received_at, created_at";
 
 // Lazily creates the tenant's fleet integration row on first access —
 // every tenant gets exactly one (unique index on tenant_id), so there's no
@@ -66,12 +67,14 @@ export async function PATCH(req: NextRequest) {
     provider_name?: string;
     is_active?: boolean;
     regenerate_token?: boolean;
+    regenerate_secret?: boolean;
   };
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.provider_name !== undefined) update.provider_name = body.provider_name.trim() || null;
   if (body.is_active !== undefined) update.is_active = body.is_active;
   if (body.regenerate_token) update.webhook_token = generateToken();
+  if (body.regenerate_secret) update.webhook_secret = generateToken();
 
   try {
     await getOrCreate(scope.db, scope.tenantId);

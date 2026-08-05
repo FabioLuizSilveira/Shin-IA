@@ -118,7 +118,20 @@ export async function POST(req: NextRequest) {
     })
     .select(SELECT)
     .single();
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertError) {
+    // Security fix (MÉD-10): the app-level conflict check above is racy
+    // (SELECT then INSERT) — this is the real guard, a GiST exclusion
+    // constraint (operations_no_resource_overlap, see migration
+    // 20260063000000) that makes a concurrently-double-booked INSERT fail
+    // at the database. Postgres code 23P01 = exclusion_violation.
+    if (insertError.code === "23P01") {
+      return NextResponse.json(
+        { error: "Resource is already booked in this time window" },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: insertError.message }, { status: 500 });
+  }
 
   return NextResponse.json(
     {

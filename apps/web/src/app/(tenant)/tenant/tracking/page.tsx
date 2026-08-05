@@ -18,6 +18,7 @@ interface Integration {
   id: string;
   provider_name: string | null;
   webhook_token: string;
+  webhook_secret: string;
   webhookUrl: string;
   is_active: boolean;
   last_received_at: string | null;
@@ -44,6 +45,7 @@ export default function TrackingPage() {
   const [integration, setIntegration] = useState<Integration | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [copiedSecret, setCopiedSecret] = useState(false);
   const [providerName, setProviderName] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -139,6 +141,34 @@ export default function TrackingPage() {
     await navigator.clipboard.writeText(integration.webhookUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleCopySecret() {
+    if (!integration) return;
+    await navigator.clipboard.writeText(integration.webhook_secret);
+    setCopiedSecret(true);
+    setTimeout(() => setCopiedSecret(false), 2000);
+  }
+
+  async function handleRegenerateSecret() {
+    if (
+      !confirm(
+        "Gerar um novo segredo invalida a assinatura configurada no provedor atual. Continuar?",
+      )
+    )
+      return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/tenant-settings/fleet-integration", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ regenerate_secret: true }),
+      });
+      const json = (await res.json()) as { data?: Integration };
+      if (json.data) setIntegration(json.data);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleSaveProvider() {
@@ -254,6 +284,44 @@ export default function TrackingPage() {
                   <p className="text-[11px] text-slate-400 mt-1">
                     POST JSON: <code>{`{ resource_id, latitude, longitude }`}</code>
                   </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Segredo de assinatura (opcional)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      type="password"
+                      value={integration.webhook_secret}
+                      className="flex-1 min-w-0 px-2.5 py-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 truncate"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleCopySecret()}
+                      className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:text-slate-700 cursor-pointer"
+                    >
+                      {copiedSecret ? (
+                        <Check className="w-3.5 h-3.5" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Se seu provedor suportar, configure-o para enviar o header{" "}
+                    <code>X-Signature</code> com o HMAC-SHA256 (hex) do corpo da requisição usando
+                    este segredo — fecha a URL contra reuso do token sozinho.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handleRegenerateSecret()}
+                    disabled={saving}
+                    className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 bg-transparent border-0 cursor-pointer disabled:opacity-60"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Regenerar segredo
+                  </button>
                 </div>
 
                 <div>
