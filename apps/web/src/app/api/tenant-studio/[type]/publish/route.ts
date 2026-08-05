@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { StudioError } from "@shina/studio";
-import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { requireTenantScope, isReadOnlyScope, isTenantAdmin } from "@/lib/tenant-context";
 import { createStudioRuntime, isStudioType } from "@/lib/studio-runtime-factory";
 import { logActivity } from "@/lib/activity-log";
 
@@ -15,6 +15,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ typ
   if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
   if (isReadOnlyScope(scope)) {
     return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
+  }
+  if (type === "access_control" && !isTenantAdmin(scope)) {
+    return NextResponse.json(
+      { error: "Only tenant owners/admins can publish access control" },
+      { status: 403 },
+    );
   }
 
   const body = (await req.json().catch(() => ({}))) as { changelog?: string };

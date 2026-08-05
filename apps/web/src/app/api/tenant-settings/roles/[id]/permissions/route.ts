@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireTenantScope, isReadOnlyScope, type TenantScope } from "@/lib/tenant-context";
+import {
+  requireTenantScope,
+  isReadOnlyScope,
+  isTenantAdmin,
+  type TenantScope,
+} from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +43,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
   if (isReadOnlyScope(scope)) {
     return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
+  }
+  if (!isTenantAdmin(scope)) {
+    return NextResponse.json(
+      { error: "Only tenant owners/admins can change role permissions" },
+      { status: 403 },
+    );
   }
   if (!(await assertOwnedRole(scope, id))) {
     return NextResponse.json({ error: "Role not found" }, { status: 404 });

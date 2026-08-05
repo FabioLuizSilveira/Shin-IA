@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decodeSessionClaims } from "@/lib/jwt-claims";
 import { IMPERSONATION_COOKIE } from "@/lib/impersonation-cookie";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,12 @@ export async function POST(req: NextRequest) {
   if (!body.tenant_id || !body.reason?.trim()) {
     return NextResponse.json({ error: "tenant_id and reason are required" }, { status: 422 });
   }
-  const accessMode = body.access_mode === "read_only" ? "read_only" : "full";
+  // Security fix (ALTO-04): full access used to be the silent default
+  // whenever access_mode was omitted — an attacker (or an integration bug)
+  // that just left the field out got the highest-privilege mode without
+  // asking for it. Read-only is now the default; full access requires an
+  // explicit, deliberate opt-in.
+  const accessMode = body.access_mode === "full" ? "full" : "read_only";
 
   const admin = createAdminClient();
 
@@ -86,6 +92,17 @@ export async function POST(req: NextRequest) {
     .select("id")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Distinct, append-only audit trail — impersonation_sessions itself gets
+  // mutated on end (status/ended_at), so it alone isn't a reliable log.
+  void logActivity(admin, {
+    tenantId: body.tenant_id,
+    actorId: session.user.id,
+    entityType: "impersonation_session",
+    entityId: created.id,
+    action: "started",
+    metadata: { accessMode, reason: body.reason.trim(), targetUserId },
+  });
 
   const cookieStore = await cookies();
   cookieStore.set(IMPERSONATION_COOKIE, created.id, {
