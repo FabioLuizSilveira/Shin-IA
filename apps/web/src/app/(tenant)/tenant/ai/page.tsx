@@ -73,6 +73,23 @@ const INSIGHT_CARDS: InsightCard[] = [
 ];
 
 // ── Markdown renderer (minimal) ───────────────────────────────────────────────
+//
+// Security fix (ALTO-03): this used to build an HTML string
+// (line.replace(/\*\*(.+?)\*\*/g, "<strong>...")) and hand it to
+// dangerouslySetInnerHTML. `text` is raw LLM completion text — anything the
+// model is coaxed into emitting (via a compromised prompt path, or just a
+// future prompt-engineering slip) would have rendered as live HTML/JS in
+// the tenant's dashboard. Only `**bold**` segments are ever meant to become
+// markup here, so this renders them as real React nodes instead — there is
+// no HTML sink at all now, sanitization isn't needed because nothing ever
+// touches innerHTML.
+function renderBoldSegments(line: string): React.ReactNode[] {
+  const parts = line.split(/(\*\*.+?\*\*)/g);
+  return parts.map((part, i) => {
+    const match = /^\*\*(.+)\*\*$/.exec(part);
+    return match ? <strong key={i}>{match[1]}</strong> : <span key={i}>{part}</span>;
+  });
+}
 
 function renderInsightText(text: string) {
   const lines = text.split("\n");
@@ -81,15 +98,12 @@ function renderInsightText(text: string) {
       {lines.map((line, i) => {
         if (!line.trim()) return <div key={i} className="h-2" />;
 
-        // Bold headers (e.g. **Title**)
-        const withBold = line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-
         // Bullet points
         if (line.trim().startsWith("- ") || line.trim().startsWith("• ")) {
           return (
             <div key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300">
               <span className="text-slate-400 shrink-0 mt-0.5">•</span>
-              <span dangerouslySetInnerHTML={{ __html: withBold.replace(/^[-•]\s+/, "") }} />
+              <span>{renderBoldSegments(line.replace(/^[-•]\s+/, ""))}</span>
             </div>
           );
         }
@@ -101,18 +115,16 @@ function renderInsightText(text: string) {
               <span className="text-blue-500 font-semibold shrink-0 w-4">
                 {line.match(/^\d+/)?.[0]}.
               </span>
-              <span dangerouslySetInnerHTML={{ __html: withBold.replace(/^\d+\.\s+/, "") }} />
+              <span>{renderBoldSegments(line.replace(/^\d+\.\s+/, ""))}</span>
             </div>
           );
         }
 
         // Regular paragraph
         return (
-          <p
-            key={i}
-            className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: withBold }}
-          />
+          <p key={i} className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+            {renderBoldSegments(line)}
+          </p>
         );
       })}
     </div>
