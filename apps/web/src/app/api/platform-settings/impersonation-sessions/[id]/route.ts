@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformRole } from "@/lib/platform-guard";
 
@@ -19,7 +20,7 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
     .select("status")
     .eq("id", id)
     .maybeSingle();
-  if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+  if (fetchError) return internalError(fetchError);
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
   if (session.status !== "active") {
     return NextResponse.json({ error: "Session is not active" }, { status: 422 });
@@ -29,7 +30,7 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
     .from("impersonation_sessions")
     .update({ status: "revoked", ended_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data: { ok: true } });
 }

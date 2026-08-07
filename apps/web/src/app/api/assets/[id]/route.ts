@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
-  if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+  if (fetchError) return internalError(fetchError);
   if (!current) return NextResponse.json({ error: "Asset not found" }, { status: 404 });
   if (current.status === "decommissioned") {
     return NextResponse.json(
@@ -38,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .update({ status: body.status, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  if (updateError) return internalError(updateError);
 
   return NextResponse.json({ data: { ok: true } });
 }

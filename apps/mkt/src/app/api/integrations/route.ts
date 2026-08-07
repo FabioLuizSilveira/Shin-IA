@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -18,7 +19,7 @@ export async function GET() {
       .from("mkt_ad_integrations")
       .select("platform, account_id, account_name, status, last_synced_at, metadata")
       .eq("workspace_id", ctx.workspaceId);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
 
     const byPlatform = new Map((data ?? []).map((row) => [row.platform, row]));
 

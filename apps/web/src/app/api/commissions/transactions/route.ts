@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import {
   CommissionCalculator,
   type CommissionPlan,
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   if (status) query = query.eq("status", status);
 
   const { data, error } = await query.order("created_at", { ascending: false }).limit(200);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data });
 }
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
     .eq("id", body.plan_id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
-  if (planError) return NextResponse.json({ error: planError.message }, { status: 500 });
+  if (planError) return internalError(planError);
   if (!planRow) return NextResponse.json({ error: "Plan not found" }, { status: 404 });
   if (planRow.status !== "active") {
     return NextResponse.json({ error: "Commission plan is not active" }, { status: 422 });
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
     .select("id, priority, condition_type, condition_value, rate_override, bonus_amount, is_active")
     .eq("plan_id", body.plan_id)
     .eq("is_active", true);
-  if (rulesError) return NextResponse.json({ error: rulesError.message }, { status: 500 });
+  if (rulesError) return internalError(rulesError);
 
   const plan: CommissionPlan = {
     id: planRow.id,
@@ -213,7 +214,7 @@ export async function POST(req: NextRequest) {
     })
     .select(SELECT)
     .single();
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertError) return internalError(insertError);
 
   await updateTargetProgress(
     scope.db,

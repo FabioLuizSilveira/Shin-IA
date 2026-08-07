@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 
@@ -24,7 +25,7 @@ export async function GET() {
     .eq("tenant_id", scope.tenantId)
     .is("deleted_at", null)
     .order("name", { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({
     data: (data as unknown as { asset_types: { name: string } | null }[]).map(flattenType),
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
-  if (branchError) return NextResponse.json({ error: branchError.message }, { status: 500 });
+  if (branchError) return internalError(branchError);
   if (!branch) {
     return NextResponse.json(
       { error: "Tenant has no branch to assign this asset to" },
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
     })
     .select(SELECT)
     .single();
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertError) return internalError(insertError);
 
   void logActivity(scope.db, {
     tenantId,

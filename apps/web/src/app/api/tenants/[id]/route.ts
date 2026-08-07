@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decodeSessionClaims } from "@/lib/jwt-claims";
@@ -32,7 +33,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();
-  if (tenantError) return NextResponse.json({ error: tenantError.message }, { status: 500 });
+  if (tenantError) return internalError(tenantError);
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
 
   const [branchesRes, usersRes, operationsRes, contractsRes] = await Promise.all([
@@ -67,7 +68,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .map((r) => r.error)
     .filter(Boolean);
   if (errors.length > 0) {
-    return NextResponse.json({ error: errors[0]?.message }, { status: 500 });
+    return internalError(errors[0]);
   }
 
   const branches = branchesRes.data ?? [];
@@ -121,7 +122,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const admin = createAdminClient();
   const { error } = await admin.from("tenants").update(update).eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data: { ok: true } });
 }

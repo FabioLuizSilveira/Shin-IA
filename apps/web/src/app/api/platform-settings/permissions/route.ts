@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformRole } from "@/lib/platform-guard";
 
@@ -15,7 +16,7 @@ export async function GET() {
     .is("deleted_at", null)
     .order("resource", { ascending: true })
     .order("action", { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data });
 }
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     })
     .select("id, key, resource, action, name, description, scope, is_system")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data }, { status: 201 });
 }

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, isTenantAdmin } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export async function GET() {
     .select("id, name, slug, plan, status, default_currency, metadata")
     .eq("id", scope.tenantId)
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data: { ...data, can_edit: isTenantAdmin(scope) } });
 }
@@ -56,7 +57,7 @@ export async function PATCH(req: NextRequest) {
     .eq("id", scope.tenantId)
     .select("id, name, slug, plan, status, default_currency, metadata")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data });
 }

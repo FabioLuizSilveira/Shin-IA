@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformRole } from "@/lib/platform-guard";
 
@@ -31,7 +32,7 @@ export async function GET() {
     .is("deleted_at", null)
     .order("started_at", { ascending: false })
     .limit(200);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   const rows = (sessions ?? []) as SessionRow[];
   const tenantIds = [...new Set(rows.map((r) => r.target_tenant_id))];

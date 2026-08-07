@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,7 +14,7 @@ export async function GET() {
       .select("*")
       .eq("id", ctx.workspaceId)
       .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
     return NextResponse.json({ data });
   } catch (e) {
     if (e instanceof MktContextError) {

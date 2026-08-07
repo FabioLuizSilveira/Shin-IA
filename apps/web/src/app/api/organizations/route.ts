@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
   if (activeOnly) query = query.eq("active", true);
 
   const { data, error } = await query.order("name", { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data });
 }
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
     })
     .select(SELECT)
     .single();
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertError) return internalError(insertError);
 
   return NextResponse.json({ data: created }, { status: 201 });
 }

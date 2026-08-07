@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -38,15 +39,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       updated_at: now,
     })
     .eq("id", id);
-  if (settlementError)
-    return NextResponse.json({ error: settlementError.message }, { status: 500 });
+  if (settlementError) return internalError(settlementError);
 
   const { error: txError } = await scope.db
     .from("commission_transactions")
     .update({ status: "paid", updated_at: now })
     .in("id", settlement.transaction_ids)
     .eq("tenant_id", scope.tenantId);
-  if (txError) return NextResponse.json({ error: txError.message }, { status: 500 });
+  if (txError) return internalError(txError);
 
   return NextResponse.json({ data: { ok: true } });
 }

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
 
@@ -40,7 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .select("*")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
     return NextResponse.json({ data });
   } catch (e) {
     if (e instanceof MktContextError) {
@@ -60,7 +61,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       .eq("id", params.id)
       .eq("workspace_id", ctx.workspaceId);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
     return NextResponse.json({ ok: true });
   } catch (e) {
     if (e instanceof MktContextError) {

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MFA_COOKIE_NAME, MFA_COOKIE_TTL_SECONDS, signMfaCookie } from "@/lib/auth/mfa-cookie";
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (findError) {
-    return NextResponse.json({ error: findError.message }, { status: 500 });
+    return internalError(findError);
   }
 
   if (!record) {

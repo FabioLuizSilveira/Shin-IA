@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformRole } from "@/lib/platform-guard";
 
@@ -14,12 +15,12 @@ export async function GET() {
     .select("id, key, name, description, is_system, created_at")
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   const { data: counts, error: countsError } = await admin
     .from("platform_role_permissions")
     .select("role_id");
-  if (countsError) return NextResponse.json({ error: countsError.message }, { status: 500 });
+  if (countsError) return internalError(countsError);
 
   const permCountByRole = new Map<string, number>();
   for (const row of counts ?? []) {
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
     })
     .select("id, key, name, description, is_system, created_at")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data: { ...data, permission_count: 0 } }, { status: 201 });
 }

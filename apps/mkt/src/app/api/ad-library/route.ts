@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
+import { sanitizePostgrestFilterValue } from "@/lib/postgrest-filter";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +25,15 @@ export async function GET(req: NextRequest) {
 
     if (platform) query = query.eq("platform", platform);
     if (brand) query = query.ilike("brand_name", `%${brand}%`);
-    if (q) query = query.or(`headline.ilike.%${q}%,body_copy.ilike.%${q}%,brand_name.ilike.%${q}%`);
+    if (q) {
+      const safeQ = sanitizePostgrestFilterValue(q);
+      query = query.or(
+        `headline.ilike.%${safeQ}%,body_copy.ilike.%${safeQ}%,brand_name.ilike.%${safeQ}%`,
+      );
+    }
 
     const { data, error } = await query;
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
     return NextResponse.json({ data });
   } catch (e) {
     if (e instanceof MktContextError) {
@@ -76,7 +83,7 @@ export async function POST(req: NextRequest) {
       .select("*")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
     return NextResponse.json({ data }, { status: 201 });
   } catch (e) {
     if (e instanceof MktContextError) {

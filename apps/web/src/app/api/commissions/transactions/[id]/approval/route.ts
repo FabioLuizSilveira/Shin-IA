@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, isTenantAdmin } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 import { createNotification } from "@/lib/notifications/create-notification";
@@ -39,7 +40,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     .insert({ tenant_id: scope.tenantId, transaction_id: id, requested_by: scope.userId })
     .select("id, status, requested_by, requested_at")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data }, { status: 201 });
 }
@@ -99,14 +100,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     })
     .eq("id", approval.id)
     .eq("tenant_id", scope.tenantId);
-  if (approvalError) return NextResponse.json({ error: approvalError.message }, { status: 500 });
+  if (approvalError) return internalError(approvalError);
 
   const { error: txError } = await scope.db
     .from("commission_transactions")
     .update({ status: newStatus, updated_at: now })
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
-  if (txError) return NextResponse.json({ error: txError.message }, { status: 500 });
+  if (txError) return internalError(txError);
 
   void logActivity(scope.db, {
     tenantId: scope.tenantId,

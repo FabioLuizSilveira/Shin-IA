@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export async function GET() {
     .select("id, email, full_name, phone_number, avatar_url")
     .eq("auth_user_id", scope.userId)
     .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
   if (!data) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
   return NextResponse.json({ data });
@@ -46,7 +47,7 @@ export async function PATCH(req: NextRequest) {
     .eq("auth_user_id", scope.userId)
     .select("id, email, full_name, phone_number, avatar_url")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data });
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function GET() {
     .eq("tenant_id", scope.tenantId)
     .order("recorded_at", { ascending: false })
     .limit(500);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   const seen = new Set<string>();
   const latest: Array<{

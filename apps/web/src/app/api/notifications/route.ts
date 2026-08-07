@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function GET() {
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(50);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data });
 }
@@ -45,7 +46,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const { error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data: { ok: true } });
 }

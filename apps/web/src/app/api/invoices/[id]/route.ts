@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 import type { InvoiceDetail } from "@/types/domain";
 
@@ -19,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
   if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
 
   const { data: lineItems, error: itemsError } = await supabase
@@ -27,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .select("id, description, quantity, unit_price_amount, unit_price_currency, sort_order")
     .eq("invoice_id", id)
     .order("sort_order", { ascending: true });
-  if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 });
+  if (itemsError) return internalError(itemsError);
 
   const detail: InvoiceDetail = {
     ...(invoice as unknown as InvoiceDetail),
@@ -65,7 +66,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
-  if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+  if (fetchError) return internalError(fetchError);
   if (!current) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
 
   const allowed = MANUAL_TRANSITIONS[current.status] ?? [];
@@ -87,7 +88,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .update(update)
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  if (updateError) return internalError(updateError);
 
   return NextResponse.json({ data: { ok: true } });
 }

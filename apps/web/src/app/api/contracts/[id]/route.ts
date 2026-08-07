@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 
@@ -18,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
   if (!data) return NextResponse.json({ error: "Contract not found" }, { status: 404 });
 
   return NextResponse.json({ data });
@@ -50,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
-  if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+  if (fetchError) return internalError(fetchError);
   if (!current) return NextResponse.json({ error: "Contract not found" }, { status: 404 });
 
   const allowed = ALLOWED_TRANSITIONS[current.status] ?? [];
@@ -66,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .update({ status: body.status, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  if (updateError) return internalError(updateError);
 
   void logActivity(scope.db, {
     tenantId: scope.tenantId,

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { MKT_MCP_TOOLS, validateDraftRequest } from "@shina/marketing-ai";
+import { sanitizePostgrestFilterValue } from "@/lib/postgrest-filter";
 
 export const dynamic = "force-dynamic";
 
@@ -136,7 +137,8 @@ export async function POST(req: NextRequest) {
         if (typeof args.brand === "string") query = query.ilike("brand_name", `%${args.brand}%`);
         if (typeof args.platform === "string") query = query.eq("platform", args.platform);
         if (typeof args.keywords === "string") {
-          query = query.or(`headline.ilike.%${args.keywords}%,body_copy.ilike.%${args.keywords}%`);
+          const safeKeywords = sanitizePostgrestFilterValue(args.keywords);
+          query = query.or(`headline.ilike.%${safeKeywords}%,body_copy.ilike.%${safeKeywords}%`);
         }
         const { data, error } = await query;
         if (error) return rpcError(rpc.id, -32000, error.message);

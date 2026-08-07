@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +73,7 @@ export async function GET(req: NextRequest) {
     .select(config.select)
     .eq("tenant_id", scope.tenantId)
     .order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   const csv = toCsv((data ?? []) as unknown as Record<string, unknown>[]);
   const filename = `${config.filename}-${new Date().toISOString().slice(0, 10)}.csv`;
