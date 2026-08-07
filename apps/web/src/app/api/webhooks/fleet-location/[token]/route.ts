@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { GeofenceEngine } from "@shina/tracking-engine";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createGeofenceRepository, createTrackingEventRepository } from "@/lib/geofence-repository";
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     .is("deleted_at", null)
     .maybeSingle();
   if (integrationError) {
-    return NextResponse.json({ error: integrationError.message }, { status: 500 });
+    return internalError(integrationError);
   }
   if (!integration) return NextResponse.json({ error: "Invalid token" }, { status: 404 });
   if (!integration.is_active) {
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     source: "webhook",
     raw_payload: body,
   });
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertError) return internalError(insertError);
 
   await admin
     .from("fleet_integrations")

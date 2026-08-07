@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import {
   requireTenantScope,
   isReadOnlyScope,
@@ -30,7 +31,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .from("tenant_role_permissions")
     .select("permission_id")
     .eq("role_id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data: (data ?? []).map((r) => r.permission_id) });
 }
@@ -63,14 +64,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { error } = await scope.db
       .from("tenant_role_permissions")
       .insert({ role_id: id, permission_id: body.permission_id });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
   } else {
     const { error } = await scope.db
       .from("tenant_role_permissions")
       .delete()
       .eq("role_id", id)
       .eq("permission_id", body.permission_id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
   }
 
   return NextResponse.json({ data: { ok: true } });

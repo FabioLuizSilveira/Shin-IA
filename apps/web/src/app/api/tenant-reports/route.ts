@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { KpiEngine } from "@shina/reporting-engine";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope } from "@/lib/tenant-context";
 import { createKpiDataProvider } from "@/lib/kpi-data-provider";
 
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
 
   const errors = [opsRes, assetsRes, contractsRes, invoicesRes].map((r) => r.error).filter(Boolean);
   if (errors.length > 0) {
-    return NextResponse.json({ error: errors[0]?.message }, { status: 500 });
+    return internalError(errors[0]);
   }
 
   const ops = opsRes.data ?? [];

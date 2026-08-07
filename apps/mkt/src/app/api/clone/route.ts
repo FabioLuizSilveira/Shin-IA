@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
 import { analyzeImage, parseJsonResponse, AIProviderError } from "@/lib/ai/anthropic";
@@ -31,7 +32,7 @@ export async function GET() {
       .eq("workspace_id", ctx.workspaceId)
       .order("created_at", { ascending: false })
       .limit(30);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
     return NextResponse.json({ data });
   } catch (e) {
     if (e instanceof MktContextError) {
@@ -129,7 +130,7 @@ Responda SOMENTE com JSON válido:
       .select("*")
       .single();
 
-    if (saveError) return NextResponse.json({ error: saveError.message }, { status: 500 });
+    if (saveError) return internalError(saveError);
 
     await supabase.from("mkt_ai_usage").insert({
       workspace_id: ctx.workspaceId,

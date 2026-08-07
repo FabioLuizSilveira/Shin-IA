@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 import { inviteRentalCustomer } from "@/lib/rental-customer-provisioning";
 import { MOBILE_APP_SCHEME } from "@/lib/domain";
@@ -20,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
-  if (contractError) return NextResponse.json({ error: contractError.message }, { status: 500 });
+  if (contractError) return internalError(contractError);
   if (!contract) return NextResponse.json({ error: "Contract not found" }, { status: 404 });
 
   const { data, error } = await scope.db
@@ -28,7 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .select("id, created_at, rental_customers(id, email, full_name, phone)")
     .eq("tenant_id", scope.tenantId)
     .eq("organization_id", contract.organization_id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data });
 }
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
-  if (contractError) return NextResponse.json({ error: contractError.message }, { status: 500 });
+  if (contractError) return internalError(contractError);
   if (!contract) return NextResponse.json({ error: "Contract not found" }, { status: 404 });
 
   try {

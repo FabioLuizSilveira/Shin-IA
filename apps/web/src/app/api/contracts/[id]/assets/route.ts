@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .eq("tenant_id", scope.tenantId)
     .eq("contract_id", id)
     .order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data });
 }
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
-  if (contractError) return NextResponse.json({ error: contractError.message }, { status: 500 });
+  if (contractError) return internalError(contractError);
   if (!contract) return NextResponse.json({ error: "Contract not found" }, { status: 404 });
 
   const { data: created, error: insertError } = await scope.db
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
     .select(SELECT)
     .single();
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertError) return internalError(insertError);
 
   return NextResponse.json({ data: created }, { status: 201 });
 }
@@ -78,7 +79,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     .eq("id", linkId)
     .eq("tenant_id", scope.tenantId)
     .eq("contract_id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data: { ok: true } });
 }

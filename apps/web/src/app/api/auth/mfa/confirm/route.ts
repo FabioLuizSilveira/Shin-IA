@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
 import { MFA_COOKIE_NAME, MFA_COOKIE_TTL_SECONDS, signMfaCookie } from "@/lib/auth/mfa-cookie";
 
@@ -20,7 +21,7 @@ export async function POST() {
 
   const { data: aal, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return internalError(error);
   }
   if (aal?.currentLevel !== "aal2") {
     return NextResponse.json({ error: "MFA not verified for this session" }, { status: 403 });

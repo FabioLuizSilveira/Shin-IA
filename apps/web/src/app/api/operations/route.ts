@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 import { findResourceConflicts } from "@/lib/resource-availability";
 
@@ -26,7 +27,7 @@ export async function GET() {
     .eq("tenant_id", scope.tenantId)
     .is("deleted_at", null)
     .order("scheduled_starts_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({
     data: (data as unknown as { resources: { name: string; type: string } | null }[]).map(
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     .eq("id", body.resource_id)
     .eq("tenant_id", tenantId)
     .maybeSingle();
-  if (resourceError) return NextResponse.json({ error: resourceError.message }, { status: 500 });
+  if (resourceError) return internalError(resourceError);
   if (!resource) return NextResponse.json({ error: "Resource not found" }, { status: 404 });
 
   let conflicts;
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+    return internalError(insertError);
   }
 
   return NextResponse.json(

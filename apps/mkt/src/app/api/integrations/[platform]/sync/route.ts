@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
 import { decryptSecret } from "@/lib/crypto";
@@ -22,7 +23,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ platfo
       .eq("platform", platform)
       .maybeSingle();
 
-    if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    if (fetchError) return internalError(fetchError);
     if (!integration || integration.status !== "connected" || !integration.access_token_enc) {
       return NextResponse.json({ error: "integration not connected" }, { status: 409 });
     }
@@ -49,7 +50,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ platfo
       .eq("workspace_id", ctx.workspaceId)
       .eq("platform", platform);
 
-    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (updateError) return internalError(updateError);
 
     return NextResponse.json({ data: insights });
   } catch (e) {

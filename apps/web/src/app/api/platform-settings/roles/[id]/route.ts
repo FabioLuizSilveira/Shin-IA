@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformRole } from "@/lib/platform-guard";
 
@@ -15,7 +16,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     .select("is_system")
     .eq("id", id)
     .maybeSingle();
-  if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+  if (fetchError) return internalError(fetchError);
   if (!role) return NextResponse.json({ error: "Role not found" }, { status: 404 });
   if (role.is_system) {
     return NextResponse.json({ error: "system roles cannot be deleted" }, { status: 422 });
@@ -25,7 +26,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     .from("platform_roles")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data: { ok: true } });
 }

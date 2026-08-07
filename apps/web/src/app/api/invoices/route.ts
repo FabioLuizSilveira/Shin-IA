@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decodeSessionClaims } from "@/lib/jwt-claims";
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
       .select(SELECT)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
     return NextResponse.json({ data: data as unknown as Invoice[] });
   }
 
@@ -43,6 +44,6 @@ export async function GET(req: NextRequest) {
     .eq("tenant_id", tenantScope.tenantId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
   return NextResponse.json({ data: data as unknown as Invoice[] });
 }

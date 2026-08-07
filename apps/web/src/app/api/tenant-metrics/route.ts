@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +47,7 @@ export async function GET() {
     .map((r) => r.error)
     .filter(Boolean);
   if (errors.length > 0) {
-    return NextResponse.json({ error: errors[0]?.message }, { status: 500 });
+    return internalError(errors[0]);
   }
 
   const ops = opsRes.data ?? [];

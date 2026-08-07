@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, type TenantScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -89,7 +90,7 @@ export async function PATCH(req: NextRequest) {
     .eq("tenant_id", scope.tenantId)
     .select(SELECT)
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({
     data: { ...data, webhookUrl: `${appUrl()}/api/webhooks/fleet-location/${data.webhook_token}` },

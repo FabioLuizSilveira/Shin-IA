@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export async function GET() {
     .select(SELECT)
     .eq("tenant_id", scope.tenantId)
     .order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data });
 }
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     .eq("branch_id", body.branch_id)
     .eq("status", "approved")
     .in("id", body.transaction_ids);
-  if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+  if (fetchError) return internalError(fetchError);
 
   if (!eligible || eligible.length !== body.transaction_ids.length) {
     return NextResponse.json(
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
     })
     .select(SELECT)
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data }, { status: 201 });
 }

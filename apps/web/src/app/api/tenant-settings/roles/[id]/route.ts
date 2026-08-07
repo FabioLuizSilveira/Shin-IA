@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, isTenantAdmin } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
-  if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+  if (fetchError) return internalError(fetchError);
   if (!role) return NextResponse.json({ error: "Role not found" }, { status: 404 });
   if (role.is_system) {
     return NextResponse.json({ error: "system roles cannot be deleted" }, { status: 422 });
@@ -34,7 +35,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data: { ok: true } });
 }

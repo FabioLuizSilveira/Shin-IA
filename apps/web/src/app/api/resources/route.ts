@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
     .eq("tenant_id", scope.tenantId)
     .is("deleted_at", null)
     .order("name", { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   if (!availableFrom || !availableUntil) {
     return NextResponse.json({ data });
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
     .is("deleted_at", null)
     .lt("scheduled_starts_at", availableUntil)
     .gt("scheduled_ends_at", availableFrom);
-  if (conflictError) return NextResponse.json({ error: conflictError.message }, { status: 500 });
+  if (conflictError) return internalError(conflictError);
 
   const busyIds = new Set((conflicting ?? []).map((r) => r.resource_id));
   return NextResponse.json({ data: (data ?? []).filter((r) => !busyIds.has(r.id)) });
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
-  if (branchError) return NextResponse.json({ error: branchError.message }, { status: 500 });
+  if (branchError) return internalError(branchError);
   if (!branch) {
     return NextResponse.json(
       { error: "Tenant has no branch to assign this resource to" },
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
     })
     .select("id, name, type, status, created_at")
     .single();
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertError) return internalError(insertError);
 
   return NextResponse.json({ data: created }, { status: 201 });
 }

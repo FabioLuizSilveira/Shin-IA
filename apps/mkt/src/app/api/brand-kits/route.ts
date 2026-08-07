@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,7 +14,7 @@ export async function GET() {
       .select("*")
       .eq("workspace_id", ctx.workspaceId)
       .order("created_at", { ascending: true });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
     return NextResponse.json({ data });
   } catch (e: any) {
     console.error("API Error in brand-kits GET:", e);
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
       .select("*")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
     return NextResponse.json({ data }, { status: 201 });
   } catch (e) {
     if (e instanceof MktContextError) {

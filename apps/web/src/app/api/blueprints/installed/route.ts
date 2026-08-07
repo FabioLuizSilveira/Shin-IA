@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope } from "@/lib/tenant-context";
 import { createBlueprintRuntime } from "@/lib/blueprint-runtime-factory";
 
@@ -14,7 +15,7 @@ export async function GET() {
     .select("*")
     .eq("tenant_id", scope.tenantId)
     .order("installed_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   const instances = (data ?? []).map((row) => ({
     id: row.id,

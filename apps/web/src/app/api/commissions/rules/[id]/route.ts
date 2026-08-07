@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, isTenantAdmin } from "@/lib/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .update({ is_active: body.is_active, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data: { ok: true } });
 }
@@ -51,7 +52,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     .delete()
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError(error);
 
   return NextResponse.json({ data: { ok: true } });
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalError } from "@/lib/api-error";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
 import { isAdPlatform } from "@/lib/integrations";
@@ -25,7 +26,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ plat
       .eq("workspace_id", ctx.workspaceId)
       .eq("platform", platform);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return internalError(error);
     return NextResponse.json({ data: { ok: true } });
   } catch (e) {
     if (e instanceof MktContextError) {
