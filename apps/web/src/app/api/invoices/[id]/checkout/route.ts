@@ -56,10 +56,14 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       metadata: { billing_account_id: invoice.billing_account_id },
     });
     customerId = customer.id;
+    // Obs-22 fix: re-scope by tenant_id even though invoice.billing_account_id
+    // was already derived from a tenant-verified invoice row above — defense
+    // in depth against this write surviving a future refactor unscoped.
     await supabase
       .from("billing_accounts")
       .update({ stripe_customer_id: customerId })
-      .eq("id", invoice.billing_account_id);
+      .eq("id", invoice.billing_account_id)
+      .eq("tenant_id", scope.tenantId);
   }
 
   const base = appUrl();
@@ -84,7 +88,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   await supabase
     .from("invoices")
     .update({ stripe_checkout_session_id: session.id, updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("tenant_id", scope.tenantId);
 
   return NextResponse.json({ data: { url: session.url } });
 }
