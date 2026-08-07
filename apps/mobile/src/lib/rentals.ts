@@ -1,5 +1,15 @@
 import { supabase } from "./supabase";
 
+// Mobile talks directly to PostgREST (see apps/mobile architecture notes) — there is
+// no Next.js API layer to sanitize errors the way lib/api-error.ts's internalError()
+// does for apps/web and apps/mkt. Raw PostgREST/Postgres errors can include RLS-denial
+// details or internal table/column names, so they're logged for debugging but never
+// forwarded verbatim to the UI.
+function toUserError(error: unknown, fallback: string): Error {
+  console.error("[rentals]", error);
+  return new Error(fallback);
+}
+
 export interface RentalAsset {
   id: string;
   quantity: number;
@@ -39,7 +49,7 @@ export async function fetchMyRentals(): Promise<Rental[]> {
     .from("contracts")
     .select(RENTAL_SELECT)
     .order("period_starts_at", { ascending: false });
-  if (error) throw error;
+  if (error) throw toUserError(error, "Não foi possível carregar seus contratos.");
   return (data ?? []) as unknown as Rental[];
 }
 
@@ -54,7 +64,7 @@ export async function fetchMyRentalCustomerId(): Promise<string> {
     .select("id")
     .eq("auth_user_id", user.id)
     .single();
-  if (error) throw error;
+  if (error) throw toUserError(error, "Não foi possível identificar seu cadastro.");
   return data.id;
 }
 
@@ -64,7 +74,7 @@ export async function fetchServiceRequests(contractId: string): Promise<ServiceR
     .select("id, type, message, status, created_at")
     .eq("contract_id", contractId)
     .order("created_at", { ascending: false });
-  if (error) throw error;
+  if (error) throw toUserError(error, "Não foi possível carregar os pedidos.");
   return data ?? [];
 }
 
@@ -82,5 +92,5 @@ export async function createServiceRequest(input: {
     type: input.type,
     message: input.message,
   });
-  if (error) throw error;
+  if (error) throw toUserError(error, "Não foi possível enviar seu pedido.");
 }
