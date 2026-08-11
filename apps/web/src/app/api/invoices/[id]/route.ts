@@ -6,7 +6,7 @@ import type { InvoiceDetail } from "@/types/domain";
 export const dynamic = "force-dynamic";
 
 const SELECT =
-  "id, billing_account_id, status, total_amount, total_currency, due_date, paid_at, created_at, billing_accounts(id, cycle, organizations(id, name))";
+  "id, billing_account_id, status, previous_status, total_amount, total_currency, due_date, paid_at, created_at, billing_accounts(id, cycle, organizations(id, name))";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -55,19 +55,44 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   const supabase = scope.db;
 
-  const body = (await req.json()) as { status?: string };
-  if (!body.status) {
-    return NextResponse.json({ error: "status is required" }, { status: 400 });
-  }
+  const body = (await req.json()) as { status?: string; undo?: boolean };
 
   const { data: current, error: fetchError } = await supabase
     .from("invoices")
-    .select("status")
+    .select("status, previous_status")
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
   if (fetchError) return internalError(fetchError);
   if (!current) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+
+  // Reverts the last manual transition (e.g. a mistaken click on "Vencida"
+  // or "Cancelada") back to whatever status the invoice was in right
+  // before it — single level, not a full history stack.
+  if (body.undo) {
+    if (!current.previous_status) {
+      return NextResponse.json({ error: "Nothing to undo" }, { status: 422 });
+    }
+    const undoUpdate: Record<string, unknown> = {
+      status: current.previous_status,
+      previous_status: null,
+      updated_at: new Date().toISOString(),
+    };
+    if (current.status === "paid") undoUpdate.paid_at = null;
+
+    const { error: undoError } = await supabase
+      .from("invoices")
+      .update(undoUpdate)
+      .eq("id", id)
+      .eq("tenant_id", scope.tenantId);
+    if (undoError) return internalError(undoError);
+
+    return NextResponse.json({ data: { ok: true } });
+  }
+
+  if (!body.status) {
+    return NextResponse.json({ error: "status is required" }, { status: 400 });
+  }
 
   const allowed = MANUAL_TRANSITIONS[current.status] ?? [];
   if (!allowed.includes(body.status)) {
@@ -79,6 +104,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const update: Record<string, unknown> = {
     status: body.status,
+    previous_status: current.status,
     updated_at: new Date().toISOString(),
   };
   if (body.status === "paid") update.paid_at = new Date().toISOString();

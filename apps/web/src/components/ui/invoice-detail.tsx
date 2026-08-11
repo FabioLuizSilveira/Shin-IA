@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Calendar, DollarSign, Building2, Receipt, Printer } from "lucide-react";
+import { X, Calendar, DollarSign, Building2, Receipt, Printer, Undo2 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { InvoiceDetail as InvoiceDetailData, InvoiceStatus } from "@/types/domain";
 
@@ -132,9 +132,26 @@ export function InvoiceDetail({ invoiceId, onClose, onStatusChange }: InvoiceDet
     onClose();
   }
 
+  async function handleUndo() {
+    if (!invoiceId) return;
+    setActing(true);
+    try {
+      await fetch(`/api/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ undo: true }),
+      });
+    } finally {
+      setActing(false);
+    }
+    onStatusChange();
+    onClose();
+  }
+
   if (!invoiceId) return null;
 
   const actions = invoice ? (ACTIONS[invoice.status] ?? null) : null;
+  const canUndo = Boolean(invoice?.previous_status);
   const lineItems = invoice?.invoice_line_items ?? [];
   const sortedItems = [...lineItems].sort((a, b) => a.sort_order - b.sort_order);
 
@@ -284,11 +301,11 @@ export function InvoiceDetail({ invoiceId, onClose, onStatusChange }: InvoiceDet
         </div>
 
         {/* Actions */}
-        {invoice && actions && (
+        {invoice && (actions || canUndo) && (
           <div className="px-6 py-4 border-t border-slate-100 space-y-2">
             <p className="text-xs font-medium text-slate-500 mb-3">Ações disponíveis</p>
             <div className="flex flex-wrap gap-2">
-              {actions.map((action) => (
+              {actions?.map((action) => (
                 <button
                   key={action.status}
                   onClick={() => void handleAction(action.status)}
@@ -298,10 +315,21 @@ export function InvoiceDetail({ invoiceId, onClose, onStatusChange }: InvoiceDet
                   {action.label}
                 </button>
               ))}
+              {canUndo && (
+                <button
+                  onClick={() => void handleUndo()}
+                  disabled={acting}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 cursor-pointer border border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
+                  title={`Voltar para ${invoiceStatusLabel[invoice.previous_status as InvoiceStatus]}`}
+                >
+                  <Undo2 className="w-4 h-4" />
+                  Desfazer
+                </button>
+              )}
             </div>
           </div>
         )}
-        {invoice && !actions && (
+        {invoice && !actions && !canUndo && (
           <div className="px-6 py-4 border-t border-slate-100">
             <p className="text-xs text-slate-400 text-center">
               Esta fatura está em estado terminal e não pode ser alterada.
