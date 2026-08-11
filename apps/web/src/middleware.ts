@@ -104,6 +104,21 @@ export async function middleware(request: NextRequest) {
     console.log("[middleware] hit:", hostname, request.nextUrl.pathname + request.nextUrl.search);
   }
 
+  // ── -1. Stray PKCE code landing outside /auth/callback ─────────────────────
+  // Confirmed in production: Supabase's magic-link/OAuth PKCE verify step
+  // does not reliably honor a custom redirect_to here — it lands on the
+  // bare site_url ("/") with a "?code=..." query no matter what redirect_to
+  // was requested (tried with and without a query string, and with both
+  // wildcard and exact-match entries in the allow-list; none changed this).
+  // Since /auth/callback is the only place that knows how to exchange that
+  // code for a session, forward it there instead of letting "/" treat it as
+  // a plain unauthenticated visit and silently drop the code.
+  if (pathname !== "/auth/callback" && request.nextUrl.searchParams.has("code")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    return NextResponse.redirect(url);
+  }
+
   // ── 0. Rate limiting on auth-sensitive paths ───────────────────────────────
   if (AUTH_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     const { allowed, retryAfterSeconds } = checkRateLimit(
