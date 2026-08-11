@@ -115,6 +115,20 @@ export default function MfaSetupPage() {
     setLoading(false);
   }
 
+  async function handleFinish() {
+    setLoading(true);
+    // The session's JWT was issued before MFA was enrolled, so it still
+    // carries the stale "mfa_enrolled: false" claim custom_access_token_hook
+    // set at login — middleware reads that claim to decide whether to
+    // redirect to this same page, so navigating without refreshing first
+    // just bounces straight back here, indistinguishable from the button
+    // doing nothing. Refreshing forces the hook to re-run and pick up the
+    // enrollment that was just recorded.
+    const supabase = createClient();
+    await supabase.auth.refreshSession();
+    router.push("/dashboard");
+  }
+
   async function handleCopyCodes() {
     await navigator.clipboard.writeText(recoveryCodes.join("\n"));
     setCopied(true);
@@ -300,10 +314,17 @@ export default function MfaSetupPage() {
               <button
                 id="mfa-setup-finish"
                 type="button"
-                onClick={() => router.push("/dashboard")}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-500 text-white font-semibold text-sm rounded-xl transition"
+                onClick={() => void handleFinish()}
+                disabled={loading}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-500 disabled:opacity-60 text-white font-semibold text-sm rounded-xl transition"
               >
-                <Check className="w-4 h-4" /> Concluir configuração
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" /> Concluir configuração
+                  </>
+                )}
               </button>
             </div>
           </div>
