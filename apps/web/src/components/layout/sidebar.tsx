@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -84,9 +85,14 @@ export function Sidebar({ onClose }: SidebarProps) {
       {/* Logo */}
       <div className="px-5 py-6 border-b border-white/10">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-shina-blue to-shina-cyan flex items-center justify-center">
-            <Zap className="w-4 h-4 text-white" />
-          </div>
+          <Image
+            src="/brand/shina-icon-square.png"
+            alt="Shinã"
+            width={32}
+            height={32}
+            className="rounded-lg"
+            priority
+          />
           <div>
             <span className="text-white font-bold text-lg font-display tracking-tight">Shinã</span>
             <span className="ml-2 text-xs font-medium text-shina-cyan bg-shina-cyan/20 px-1.5 py-0.5 rounded">
