@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
     asset_id?: string;
     scheduled_starts_at?: string;
     scheduled_ends_at?: string;
+    description?: string;
   };
 
   if (
@@ -172,6 +173,7 @@ export async function POST(req: NextRequest) {
       type: body.type,
       scheduled_starts_at: body.scheduled_starts_at,
       scheduled_ends_at: body.scheduled_ends_at,
+      description: body.description?.trim() || null,
     })
     .select(SELECT)
     .single();

@@ -34,6 +34,7 @@ export interface OperationDetail {
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+  description: string | null;
   metadata: Record<string, unknown>;
   resources: {
     id: string;

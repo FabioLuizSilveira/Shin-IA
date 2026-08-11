@@ -7,7 +7,7 @@ import { createNotification } from "@/lib/notifications/create-notification";
 export const dynamic = "force-dynamic";
 
 const SELECT =
-  "id, type, status, scheduled_starts_at, scheduled_ends_at, started_at, completed_at, created_at, metadata, resources(id, name, type, status), assets(id, name, category, status)";
+  "id, type, status, scheduled_starts_at, scheduled_ends_at, started_at, completed_at, created_at, description, metadata, resources(id, name, type, status), assets(id, name, category, status)";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -40,9 +40,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
   }
 
-  const body = (await req.json()) as { status?: string };
-  if (!body.status) {
-    return NextResponse.json({ error: "status is required" }, { status: 400 });
+  const body = (await req.json()) as { status?: string; description?: string };
+  if (!body.status && body.description === undefined) {
+    return NextResponse.json({ error: "status or description is required" }, { status: 400 });
   }
 
   const { data: current, error: fetchError } = await scope.db
@@ -54,20 +54,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (fetchError) return internalError(fetchError);
   if (!current) return NextResponse.json({ error: "Operation not found" }, { status: 404 });
 
-  const allowed = ALLOWED_TRANSITIONS[current.status] ?? [];
-  if (!allowed.includes(body.status)) {
-    return NextResponse.json(
-      { error: `cannot transition from ${current.status} to ${body.status}` },
-      { status: 422 },
-    );
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+  // The description is just a free-text note ("what actually happened") —
+  // it can be added/edited regardless of status, unlike the status field
+  // itself which follows the state machine below.
+  if (body.description !== undefined) {
+    update.description = body.description.trim() || null;
   }
 
-  const update: Record<string, unknown> = {
-    status: body.status,
-    updated_at: new Date().toISOString(),
-  };
-  if (body.status === "in_progress") update.started_at = new Date().toISOString();
-  if (body.status === "completed") update.completed_at = new Date().toISOString();
+  if (body.status) {
+    const allowed = ALLOWED_TRANSITIONS[current.status] ?? [];
+    if (!allowed.includes(body.status)) {
+      return NextResponse.json(
+        { error: `cannot transition from ${current.status} to ${body.status}` },
+        { status: 422 },
+      );
+    }
+    update.status = body.status;
+    if (body.status === "in_progress") update.started_at = new Date().toISOString();
+    if (body.status === "completed") update.completed_at = new Date().toISOString();
+  }
 
   const { error: updateError } = await scope.db
     .from("operations")
@@ -75,6 +82,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
   if (updateError) return internalError(updateError);
+
+  if (!body.status) {
+    return NextResponse.json({ data: { ok: true } });
+  }
 
   void logActivity(scope.db, {
     tenantId: scope.tenantId,
