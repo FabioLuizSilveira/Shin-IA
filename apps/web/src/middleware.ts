@@ -99,6 +99,11 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isApiRoute = pathname.startsWith("/api");
 
+  // Temporary diagnostic (magic link investigation) — remove once resolved.
+  if (pathname.startsWith("/auth") || pathname === "/login" || pathname === "/") {
+    console.log("[middleware] hit:", hostname, request.nextUrl.pathname + request.nextUrl.search);
+  }
+
   // ── 0. Rate limiting on auth-sensitive paths ───────────────────────────────
   if (AUTH_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     const { allowed, retryAfterSeconds } = checkRateLimit(
