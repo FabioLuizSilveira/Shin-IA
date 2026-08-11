@@ -1,9 +1,11 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { StudioAreaShell } from "@/components/ui/studio-area-shell";
 import { useStudioConfig } from "@/hooks/use-studio-config";
 import type { BrandingConfig } from "@shina/studio";
+import { Pencil, Loader2, ImageOff } from "lucide-react";
 
 const EMPTY: BrandingConfig = {
   companyName: "",
@@ -55,6 +57,100 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+interface LogoUploadFieldProps {
+  label: string;
+  kind: "logo" | "favicon";
+  value: string | undefined;
+  onChange: (url: string | undefined) => void;
+  specs: string;
+  previewClassName: string;
+}
+
+// Preview box with a pencil button overlaid on the corner — click it to pick
+// a file, which uploads immediately via /api/tenant-studio/branding/upload
+// and swaps config.logoUrl/faviconUrl to the resulting public URL. The
+// upload itself is a side effect outside the draft/publish flow; only the
+// resulting URL rides that flow (same field these two used to be free-text
+// inputs for).
+function LogoUploadField({
+  label,
+  kind,
+  value,
+  onChange,
+  specs,
+  previewClassName,
+}: LogoUploadFieldProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("kind", kind);
+      const res = await fetch("/api/tenant-studio/branding/upload", {
+        method: "POST",
+        body: form,
+      });
+      const json = (await res.json()) as { data?: { url: string }; error?: string };
+      if (!res.ok || !json.data) throw new Error(json.error ?? "Falha ao enviar imagem");
+      onChange(json.data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro inesperado");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <Field label={label}>
+      <div className="flex items-start gap-3">
+        <div className={`relative shrink-0 ${previewClassName}`}>
+          <div className="w-full h-full rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+            {value ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={value} alt={label} className="max-w-full max-h-full object-contain" />
+            ) : (
+              <ImageOff className="w-5 h-5 text-slate-300 dark:text-slate-600" />
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            title={`Editar ${label.toLowerCase()}`}
+            className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-shina-blue hover:bg-blue-600 disabled:opacity-60 text-white flex items-center justify-center border-2 border-white dark:border-slate-900 cursor-pointer"
+          >
+            {uploading ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <Pencil className="w-3 h-3" />
+            )}
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon"
+            onChange={(e) => void handleFile(e)}
+            className="hidden"
+          />
+        </div>
+        <div className="pt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400">{specs}</p>
+          {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+        </div>
+      </div>
+    </Field>
+  );
+}
+
 export default function BrandingStudioPage() {
   const studio = useStudioConfig<BrandingConfig>("branding", EMPTY);
   const { config, setConfig } = studio;
@@ -85,22 +181,22 @@ export default function BrandingStudioPage() {
                 />
               </Field>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Logo (URL)">
-                  <input
-                    value={config.logoUrl ?? ""}
-                    onChange={(e) => setConfig({ ...config, logoUrl: e.target.value || undefined })}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="Favicon (URL)">
-                  <input
-                    value={config.faviconUrl ?? ""}
-                    onChange={(e) =>
-                      setConfig({ ...config, faviconUrl: e.target.value || undefined })
-                    }
-                    className={inputClass}
-                  />
-                </Field>
+                <LogoUploadField
+                  label="Logo"
+                  kind="logo"
+                  value={config.logoUrl}
+                  onChange={(url) => setConfig({ ...config, logoUrl: url })}
+                  specs="PNG, SVG ou WebP com fundo transparente. Recomendado: 240×64px (proporção ~3.75:1). Até 2MB."
+                  previewClassName="w-24 h-16"
+                />
+                <LogoUploadField
+                  label="Favicon"
+                  kind="favicon"
+                  value={config.faviconUrl}
+                  onChange={(url) => setConfig({ ...config, faviconUrl: url })}
+                  specs="PNG, ICO ou SVG, formato quadrado. Recomendado: 64×64px (mín. 32×32px). Até 2MB."
+                  previewClassName="w-16 h-16"
+                />
               </div>
               <Field label="Domínio customizado">
                 <input
