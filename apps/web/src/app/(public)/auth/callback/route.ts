@@ -19,7 +19,16 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${appBase}${next}`);
     }
+    // Surface the real reason instead of a bare "?error=auth" — the most
+    // common cause is opening the magic link in a different browser/device
+    // than the one that requested it, which PKCE's code_verifier cookie
+    // can't follow (message from Supabase: "both auth code and code
+    // verifier should be non-empty").
+    console.error("[auth/callback] exchangeCodeForSession failed:", error.message);
+    return NextResponse.redirect(
+      `${appBase}/login?error=auth&reason=${encodeURIComponent(error.message)}`,
+    );
   }
 
-  return NextResponse.redirect(`${appBase}/login?error=auth`);
+  return NextResponse.redirect(`${appBase}/login?error=auth&reason=missing_code`);
 }
