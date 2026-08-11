@@ -43,6 +43,17 @@ file_size_limit = "50MiB"
 enabled = true
 site_url = "https://app.shinaia.com.br"
 additional_redirect_urls = [
+  # Exact entries first — the "/**" wildcard patterns below did not
+  # reliably match for the PKCE flow in production (magic-link/OAuth
+  # clicks kept falling back to bare site_url instead of reaching
+  # /auth/callback), so the specific paths we actually redirect to are
+  # listed explicitly as a workaround alongside the wildcards.
+  "https://app.shinaia.com.br/auth/callback",
+  "https://shinaia.com.br/auth/callback",
+  "https://mkt.shinaia.com.br/auth/callback",
+  "http://localhost:3000/auth/callback",
+  "http://localhost:3002/auth/callback",
+  "http://127.0.0.1:3000/auth/callback",
   "https://app.shinaia.com.br/**",
   "https://shinaia.com.br/**",
   "https://mkt.shinaia.com.br/**",
