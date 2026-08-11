@@ -28,6 +28,19 @@ export default function MfaSetupPage() {
     setError(null);
     const supabase = createClient();
 
+    // Clean up any unverified TOTP factor left over from an earlier
+    // attempt that never finished (e.g. the app crashed after the QR
+    // step) — Supabase rejects a new enroll() with a duplicate friendly
+    // name otherwise, and there's nothing for the user to do about a
+    // factor they never got to see.
+    const { data: existingFactors } = await supabase.auth.mfa.listFactors();
+    const staleTotp =
+      existingFactors?.all.filter((f) => f.factor_type === "totp" && f.status === "unverified") ??
+      [];
+    for (const factor of staleTotp) {
+      await supabase.auth.mfa.unenroll({ factorId: factor.id });
+    }
+
     const { data, error: enrollError } = await supabase.auth.mfa.enroll({
       factorType: "totp",
       friendlyName: "Shinã Authenticator",
