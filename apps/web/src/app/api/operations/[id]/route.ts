@@ -7,7 +7,7 @@ import { createNotification } from "@/lib/notifications/create-notification";
 export const dynamic = "force-dynamic";
 
 const SELECT =
-  "id, type, status, scheduled_starts_at, scheduled_ends_at, started_at, completed_at, created_at, metadata, resources(id, name, type, status)";
+  "id, type, status, scheduled_starts_at, scheduled_ends_at, started_at, completed_at, created_at, metadata, resources(id, name, type, status), assets(id, name, category, status)";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

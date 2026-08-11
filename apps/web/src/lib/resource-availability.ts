@@ -30,11 +30,36 @@ export async function findResourceConflicts(
     excludeOperationId?: string;
   },
 ): Promise<ResourceConflict[]> {
+  return findConflicts(db, "resource_id", params.resourceId, params);
+}
+
+// Same overlap check, keyed on the operation's linked asset instead of a
+// scheduling resource — see migration 20260066000000, which added asset_id
+// as an alternative (and, for a car rental tenant, more meaningful) link.
+export async function findAssetConflicts(
+  db: SupabaseClient,
+  params: {
+    tenantId: string;
+    assetId: string;
+    startsAt: string;
+    endsAt: string;
+    excludeOperationId?: string;
+  },
+): Promise<ResourceConflict[]> {
+  return findConflicts(db, "asset_id", params.assetId, params);
+}
+
+async function findConflicts(
+  db: SupabaseClient,
+  column: "resource_id" | "asset_id",
+  id: string,
+  params: { tenantId: string; startsAt: string; endsAt: string; excludeOperationId?: string },
+): Promise<ResourceConflict[]> {
   let query = db
     .from("operations")
     .select("id, type, scheduled_starts_at, scheduled_ends_at")
     .eq("tenant_id", params.tenantId)
-    .eq("resource_id", params.resourceId)
+    .eq(column, id)
     .in("status", BLOCKING_STATUSES)
     .is("deleted_at", null)
     // Standard interval-overlap: existing.start < new.end AND existing.end > new.start

@@ -11,6 +11,7 @@ interface CalendarOperation {
   scheduled_starts_at: string;
   scheduled_ends_at: string;
   resources: { name: string } | null;
+  assets: { name: string } | null;
 }
 
 interface OperationsCalendarProps {
@@ -290,7 +291,7 @@ export function OperationsCalendar({ onSelectOperation }: OperationsCalendarProp
                         {typeLabels[op.type] ?? op.type}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {op.resources?.name ?? "—"} · {startTime}–{endTime}
+                        {op.resources?.name ?? op.assets?.name ?? "—"} · {startTime}–{endTime}
                       </p>
                     </div>
                     <Zap className={`w-4 h-4 ${cfg.text} opacity-60 shrink-0`} />

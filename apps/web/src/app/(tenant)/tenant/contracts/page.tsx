@@ -221,7 +221,7 @@ export default function TenantContractsPage() {
                 <select
                   value={formType}
                   onChange={(e) => setFormType(e.target.value as ContractType)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 >
                   {Object.entries(TYPE_LABEL).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -237,7 +237,7 @@ export default function TenantContractsPage() {
                   required
                   value={formOrgId}
                   onChange={(e) => setFormOrgId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 >
                   <option value="">Selecione...</option>
                   {organizations.map((o) => (
@@ -257,7 +257,7 @@ export default function TenantContractsPage() {
                   step="0.01"
                   value={formValue}
                   onChange={(e) => setFormValue(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
 
@@ -268,7 +268,7 @@ export default function TenantContractsPage() {
                   type="date"
                   value={formStart}
                   onChange={(e) => setFormStart(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
 
@@ -279,7 +279,7 @@ export default function TenantContractsPage() {
                   type="date"
                   value={formEnd}
                   onChange={(e) => setFormEnd(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
 

@@ -20,7 +20,9 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await scope.db
     .from("operations")
-    .select("id, type, status, scheduled_starts_at, scheduled_ends_at, resources(name)")
+    .select(
+      "id, type, status, scheduled_starts_at, scheduled_ends_at, resources(name), assets(name)",
+    )
     .eq("tenant_id", scope.tenantId)
     .is("deleted_at", null)
     .gte("scheduled_starts_at", rangeStart)

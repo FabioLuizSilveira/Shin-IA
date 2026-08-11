@@ -333,7 +333,7 @@ export default function TrackingPage() {
                       value={providerName}
                       onChange={(e) => setProviderName(e.target.value)}
                       placeholder="Ex: Sascar, Onixsat..."
-                      className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                      className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                     />
                     <button
                       type="button"
@@ -410,7 +410,7 @@ export default function TrackingPage() {
                   placeholder="Nome"
                   value={gfName}
                   onChange={(e) => setGfName(e.target.value)}
-                  className="col-span-2 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  className="col-span-2 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                 />
                 <input
                   required
@@ -419,7 +419,7 @@ export default function TrackingPage() {
                   placeholder="Latitude"
                   value={gfLat}
                   onChange={(e) => setGfLat(e.target.value)}
-                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                 />
                 <input
                   required
@@ -428,7 +428,7 @@ export default function TrackingPage() {
                   placeholder="Longitude"
                   value={gfLng}
                   onChange={(e) => setGfLng(e.target.value)}
-                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                 />
                 <input
                   required
@@ -436,12 +436,12 @@ export default function TrackingPage() {
                   placeholder="Raio (m)"
                   value={gfRadius}
                   onChange={(e) => setGfRadius(e.target.value)}
-                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                 />
                 <select
                   value={gfResourceId}
                   onChange={(e) => setGfResourceId(e.target.value)}
-                  className="col-span-2 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  className="col-span-2 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                 >
                   <option value="">Selecione o recurso monitorado</option>
                   {resources.map((r) => (
