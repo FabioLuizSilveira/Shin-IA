@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
+  // Temporary diagnostic (magic link investigation) — remove once resolved.
+  console.log("[auth/callback] hit:", request.url);
   const code = searchParams.get("code");
   // Only allow internal paths — a full URL here would be an open redirect.
   const rawNext = searchParams.get("next");
