@@ -191,6 +191,7 @@ export interface Invoice {
   id: string;
   billing_account_id: string;
   status: InvoiceStatus;
+  previous_status?: InvoiceStatus | null;
   total_amount: number;
   total_currency: string;
   due_date: string;
