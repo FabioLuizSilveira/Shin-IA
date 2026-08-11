@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Sparkles, Eye, EyeOff } from "lucide-react";
 import { Suspense } from "react";
 
@@ -13,6 +14,12 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Supabase returns the same generic "Invalid login credentials" for a
+  // wrong password and for an email with no account at all (by design, to
+  // avoid user enumeration) — so this can't be told apart from a typo'd
+  // password. We treat it as "maybe no account yet" and point at signup
+  // instead of just repeating the confusing raw Supabase message.
+  const [noAccount, setNoAccount] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -25,12 +32,17 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setNoAccount(false);
 
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      setError(error.message);
+      if (error.message === "Invalid login credentials") {
+        setNoAccount(true);
+      } else {
+        setError(error.message);
+      }
       setLoading(false);
       return;
     }
@@ -94,6 +106,21 @@ function LoginForm() {
                 </button>
               </div>
             </div>
+
+            {noAccount && (
+              <div className="px-4 py-3 rounded-xl bg-mkt-primary/10 border border-mkt-primary/20 text-sm">
+                <p className="text-slate-200">
+                  Não tem conta ainda?{" "}
+                  <Link href="/signup" className="text-mkt-primary font-semibold hover:underline">
+                    Vamos começar
+                  </Link>
+                  .
+                </p>
+                <p className="text-slate-500 text-xs mt-1">
+                  Ou confira se o e-mail e a senha estão corretos.
+                </p>
+              </div>
+            )}
 
             {error && (
               <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
