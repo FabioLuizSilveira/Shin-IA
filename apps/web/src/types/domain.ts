@@ -21,6 +21,8 @@ export interface Operation {
   scheduled_ends_at: string;
   resource_name?: string;
   resource_type?: string;
+  asset_name?: string;
+  asset_category?: string;
 }
 
 export interface OperationDetail {
@@ -37,6 +39,12 @@ export interface OperationDetail {
     id: string;
     name: string;
     type: string;
+    status: string;
+  } | null;
+  assets: {
+    id: string;
+    name: string;
+    category: string;
     status: string;
   } | null;
 }

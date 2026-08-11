@@ -18,6 +18,12 @@ interface ResourceOption {
   status: string;
 }
 
+interface AssetOption {
+  id: string;
+  name: string;
+  category: string;
+}
+
 type OperationRow = Operation & Record<string, unknown>;
 
 const TYPE_LABEL: Record<OperationType, string> = {
@@ -59,10 +65,14 @@ export default function TenantOperationsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [resources, setResources] = useState<ResourceOption[]>([]);
+  const [assets, setAssets] = useState<AssetOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formType, setFormType] = useState<OperationType>("delivery");
-  const [formResourceId, setFormResourceId] = useState("");
+  // Value is "asset:<id>" or "resource:<id>" — a single dropdown covering
+  // both link targets (assets preferred, fleet resources as fallback for
+  // GPS-tracked vehicles that aren't in the assets inventory).
+  const [formLink, setFormLink] = useState("");
   const [formStart, setFormStart] = useState("");
   const [formEnd, setFormEnd] = useState("");
 
@@ -84,10 +94,18 @@ export default function TenantOperationsPage() {
   async function openForm() {
     setFormError(null);
     setShowForm(true);
+    if (assets.length === 0) {
+      const res = await fetch("/api/assets");
+      const json = (await res.json()) as { data?: AssetOption[] };
+      setAssets(json.data ?? []);
+    }
     if (resources.length === 0) {
       const res = await fetch("/api/resources");
       const json = (await res.json()) as { data?: ResourceOption[] };
-      setResources(json.data ?? []);
+      // Only vehicle-type resources are "frota" (GPS-tracked) — the other
+      // types (human/equipment/virtual) aren't a fit now that operations
+      // link to assets directly for anything physical.
+      setResources((json.data ?? []).filter((r) => r.type === "vehicle"));
     }
   }
 
@@ -96,12 +114,14 @@ export default function TenantOperationsPage() {
     setSubmitting(true);
     setFormError(null);
     try {
+      const [linkType, linkId] = formLink.split(":");
       const res = await fetch("/api/operations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: formType,
-          resource_id: formResourceId,
+          asset_id: linkType === "asset" ? linkId : undefined,
+          resource_id: linkType === "resource" ? linkId : undefined,
           scheduled_starts_at: formStart ? new Date(formStart).toISOString() : undefined,
           scheduled_ends_at: formEnd ? new Date(formEnd).toISOString() : undefined,
         }),
@@ -109,7 +129,7 @@ export default function TenantOperationsPage() {
       const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json.error ?? "Falha ao criar operação");
       setShowForm(false);
-      setFormResourceId("");
+      setFormLink("");
       setFormStart("");
       setFormEnd("");
       await loadOperations();
@@ -128,8 +148,8 @@ export default function TenantOperationsPage() {
     },
     {
       key: "resource",
-      label: "Recurso",
-      render: (row: OperationRow) => row.resource_name ?? "—",
+      label: "Ativo / Frota",
+      render: (row: OperationRow) => row.asset_name ?? row.resource_name ?? "—",
     },
     {
       key: "status",
@@ -249,7 +269,7 @@ export default function TenantOperationsPage() {
                 <select
                   value={formType}
                   onChange={(e) => setFormType(e.target.value as OperationType)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 >
                   {Object.entries(TYPE_LABEL).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -260,19 +280,34 @@ export default function TenantOperationsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Recurso</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">
+                  Ativo ou recurso de frota
+                </label>
                 <select
                   required
-                  value={formResourceId}
-                  onChange={(e) => setFormResourceId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  value={formLink}
+                  onChange={(e) => setFormLink(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 >
                   <option value="">Selecione...</option>
-                  {resources.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.type})
-                    </option>
-                  ))}
+                  {assets.length > 0 && (
+                    <optgroup label="Ativos">
+                      {assets.map((a) => (
+                        <option key={a.id} value={`asset:${a.id}`}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {resources.length > 0 && (
+                    <optgroup label="Frota (rastreada)">
+                      {resources.map((r) => (
+                        <option key={r.id} value={`resource:${r.id}`}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
 
@@ -285,7 +320,7 @@ export default function TenantOperationsPage() {
                   type="datetime-local"
                   value={formStart}
                   onChange={(e) => setFormStart(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
 
@@ -298,7 +333,7 @@ export default function TenantOperationsPage() {
                   type="datetime-local"
                   value={formEnd}
                   onChange={(e) => setFormEnd(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
 

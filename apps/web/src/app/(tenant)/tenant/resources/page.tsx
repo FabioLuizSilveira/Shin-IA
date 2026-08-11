@@ -197,7 +197,7 @@ export default function TenantResourcesPage() {
                   required
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div>
@@ -205,7 +205,7 @@ export default function TenantResourcesPage() {
                 <select
                   value={formType}
                   onChange={(e) => setFormType(e.target.value as ResourceType)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 >
                   {Object.entries(TYPE_LABEL).map(([value, label]) => (
                     <option key={value} value={value}>

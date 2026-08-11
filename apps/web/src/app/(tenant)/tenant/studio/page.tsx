@@ -304,7 +304,7 @@ export default function TenantStudioPage() {
                   required
                   value={roleName}
                   onChange={(e) => setRoleName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div>
@@ -314,7 +314,7 @@ export default function TenantStudioPage() {
                 <input
                   value={roleKey}
                   onChange={(e) => setRoleKey(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div>
@@ -324,7 +324,7 @@ export default function TenantStudioPage() {
                 <input
                   value={roleDescription}
                   onChange={(e) => setRoleDescription(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
               {formError && (
@@ -372,7 +372,7 @@ export default function TenantStudioPage() {
                   required
                   value={permResource}
                   onChange={(e) => setPermResource(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div>
@@ -383,7 +383,7 @@ export default function TenantStudioPage() {
                   required
                   value={permAction}
                   onChange={(e) => setPermAction(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div>
@@ -392,7 +392,7 @@ export default function TenantStudioPage() {
                   required
                   value={permName}
                   onChange={(e) => setPermName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
               {formError && (

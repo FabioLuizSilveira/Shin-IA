@@ -294,7 +294,7 @@ export default function TenantAssetsPage() {
                   required
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div>
@@ -302,7 +302,7 @@ export default function TenantAssetsPage() {
                 <select
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value as AssetCategory)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 >
                   {Object.entries(CATEGORY_LABEL).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -317,7 +317,7 @@ export default function TenantAssetsPage() {
                   required
                   value={formTypeId}
                   onChange={(e) => setFormTypeId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 >
                   <option value="">Selecione...</option>
                   {assetTypes
@@ -336,7 +336,7 @@ export default function TenantAssetsPage() {
                 <input
                   value={formSerial}
                   onChange={(e) => setFormSerial(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
               {formError && (

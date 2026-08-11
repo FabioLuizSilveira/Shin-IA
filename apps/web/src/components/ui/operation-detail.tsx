@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
-import { X, Clock, User, CheckCircle2, AlertCircle, Play, Ban } from "lucide-react";
+import { X, Clock, User, Car, CheckCircle2, AlertCircle, Play, Ban } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 interface OperationData {
@@ -16,6 +16,7 @@ interface OperationData {
   created_at: string;
   metadata: Record<string, unknown>;
   resources: { id: string; name: string; type: string; status: string } | null;
+  assets: { id: string; name: string; category: string; status: string } | null;
 }
 
 interface OperationAction {
@@ -225,10 +226,26 @@ export function OperationDetail({ operationId, onClose, onStatusChange }: Operat
                 )}
               </div>
 
-              {/* Resource */}
+              {/* Asset */}
+              {op.assets && (
+                <div>
+                  <p className="text-xs text-slate-500 mb-2">Ativo</p>
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                    <div className="w-8 h-8 rounded-full bg-shina-blue/10 flex items-center justify-center">
+                      <Car className="w-4 h-4 text-shina-blue" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{op.assets.name}</p>
+                      <p className="text-xs text-slate-500">{op.assets.category}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Resource (frota) */}
               {op.resources && (
                 <div>
-                  <p className="text-xs text-slate-500 mb-2">Recurso</p>
+                  <p className="text-xs text-slate-500 mb-2">Recurso de frota</p>
                   <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
                     <div className="w-8 h-8 rounded-full bg-shina-blue/10 flex items-center justify-center">
                       <User className="w-4 h-4 text-shina-blue" />
