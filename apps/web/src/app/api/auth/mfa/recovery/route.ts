@@ -30,13 +30,27 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient();
+  const { data: profile, error: profileError } = await admin
+    .from("user_profiles")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .single();
+  if (profileError || !profile) {
+    return internalError(profileError ?? new Error("user_profiles row not found"));
+  }
+
   const codeHash = await hashRecoveryCode(body.code);
 
+  // Security fix: this used to query a "code_hash" column that has never
+  // existed on mfa_recovery_codes (the real column is "code") and compared
+  // against auth.users.id instead of user_profiles.id — every redemption
+  // attempt failed with a Postgres "column does not exist" error. Fixed to
+  // match the actual schema (see migrations/20260025000000_mfa_recovery_codes.sql).
   const { data: record, error: findError } = await admin
     .from("mfa_recovery_codes")
     .select("id")
-    .eq("user_id", user.id)
-    .eq("code_hash", codeHash)
+    .eq("user_id", profile.id)
+    .eq("code", codeHash)
     .eq("used", false)
     .maybeSingle();
 
