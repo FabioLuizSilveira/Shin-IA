@@ -75,6 +75,7 @@ export default function TenantOperationsPage() {
   const [formLink, setFormLink] = useState("");
   const [formStart, setFormStart] = useState("");
   const [formEnd, setFormEnd] = useState("");
+  const [formDescription, setFormDescription] = useState("");
 
   const loadOperations = useCallback(async () => {
     setLoading(true);
@@ -124,6 +125,7 @@ export default function TenantOperationsPage() {
           resource_id: linkType === "resource" ? linkId : undefined,
           scheduled_starts_at: formStart ? new Date(formStart).toISOString() : undefined,
           scheduled_ends_at: formEnd ? new Date(formEnd).toISOString() : undefined,
+          description: formDescription || undefined,
         }),
       });
       const json = (await res.json()) as { error?: string };
@@ -132,6 +134,7 @@ export default function TenantOperationsPage() {
       setFormLink("");
       setFormStart("");
       setFormEnd("");
+      setFormDescription("");
       await loadOperations();
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Erro inesperado");
@@ -333,6 +336,19 @@ export default function TenantOperationsPage() {
                   type="datetime-local"
                   value={formEnd}
                   onChange={(e) => setFormEnd(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">
+                  Descrição (opcional)
+                </label>
+                <textarea
+                  rows={3}
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder="O que precisa ser feito ou o que foi feito nesta operação..."
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>

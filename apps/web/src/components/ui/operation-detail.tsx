@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
-import { X, Clock, User, Car, CheckCircle2, AlertCircle, Play, Ban } from "lucide-react";
+import { X, Clock, User, Car, CheckCircle2, AlertCircle, Play, Ban, Save } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 interface OperationData {
@@ -14,6 +14,7 @@ interface OperationData {
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+  description: string | null;
   metadata: Record<string, unknown>;
   resources: { id: string; name: string; type: string; status: string } | null;
   assets: { id: string; name: string; category: string; status: string } | null;
@@ -118,6 +119,9 @@ export function OperationDetail({ operationId, onClose, onStatusChange }: Operat
   const [op, setOp] = useState<OperationData | null>(null);
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState(false);
+  const [description, setDescription] = useState("");
+  const [savingDescription, setSavingDescription] = useState(false);
+  const [descriptionSaved, setDescriptionSaved] = useState(false);
 
   useEffect(() => {
     if (!operationId) {
@@ -127,7 +131,10 @@ export function OperationDetail({ operationId, onClose, onStatusChange }: Operat
     setLoading(true);
     fetch(`/api/operations/${operationId}`)
       .then((r) => r.json())
-      .then((j: { data: OperationData }) => setOp(j.data))
+      .then((j: { data: OperationData }) => {
+        setOp(j.data);
+        setDescription(j.data.description ?? "");
+      })
       .catch(() => setOp(null))
       .finally(() => setLoading(false));
   }, [operationId]);
@@ -146,6 +153,24 @@ export function OperationDetail({ operationId, onClose, onStatusChange }: Operat
     }
     onStatusChange();
     onClose();
+  }
+
+  async function handleSaveDescription() {
+    if (!operationId) return;
+    setSavingDescription(true);
+    setDescriptionSaved(false);
+    try {
+      await fetch(`/api/operations/${operationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description }),
+      });
+      setOp((prev) => (prev ? { ...prev, description: description || null } : prev));
+      setDescriptionSaved(true);
+      setTimeout(() => setDescriptionSaved(false), 2000);
+    } finally {
+      setSavingDescription(false);
+    }
   }
 
   if (!operationId) return null;
@@ -257,6 +282,34 @@ export function OperationDetail({ operationId, onClose, onStatusChange }: Operat
                   </div>
                 </div>
               )}
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs text-slate-500 mb-2">
+                  Descrição — o que foi feito
+                </label>
+                <textarea
+                  rows={4}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Registre aqui detalhes ou o resultado desta operação..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-shina-blue/40"
+                />
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveDescription()}
+                    disabled={savingDescription || description === (op.description ?? "")}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    {savingDescription ? "Salvando..." : "Salvar descrição"}
+                  </button>
+                  {descriptionSaved && (
+                    <span className="text-xs text-green-600 font-medium">Salvo!</span>
+                  )}
+                </div>
+              </div>
 
               {/* Created */}
               <div>
