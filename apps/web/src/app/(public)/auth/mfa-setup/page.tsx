@@ -23,21 +23,41 @@ export default function MfaSetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  async function registerAndGenerateCodes(factorId: string) {
+    await fetch("/api/auth/mfa/enroll", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ factorId, method: "totp" }),
+    });
+    const codesRes = await fetch("/api/auth/mfa/recovery-codes", { method: "POST" });
+    const codesJson = (await codesRes.json()) as { codes?: string[] };
+    setRecoveryCodes(codesJson.codes ?? []);
+    setStep("recovery_codes");
+  }
+
   async function handleEnrollStart() {
     setLoading(true);
     setError(null);
     const supabase = createClient();
 
-    // Clean up any unverified TOTP factor left over from an earlier
-    // attempt that never finished (e.g. the app crashed after the QR
-    // step) — Supabase rejects a new enroll() with a duplicate friendly
-    // name otherwise, and there's nothing for the user to do about a
-    // factor they never got to see.
     const { data: existingFactors } = await supabase.auth.mfa.listFactors();
-    const staleTotp =
-      existingFactors?.all.filter((f) => f.factor_type === "totp" && f.status === "unverified") ??
-      [];
-    for (const factor of staleTotp) {
+    const totpFactors = existingFactors?.all.filter((f) => f.factor_type === "totp") ?? [];
+
+    // A factor that already reached "verified" means an earlier attempt
+    // completed the TOTP challenge but crashed before our own /api/auth/mfa
+    // routes existed to record it — the user already scanned a real QR code
+    // and doesn't need to do it again. Repair the missing DB rows instead of
+    // making them redo the authenticator-app setup from scratch.
+    const alreadyVerified = totpFactors.find((f) => f.status === "verified");
+    if (alreadyVerified) {
+      await registerAndGenerateCodes(alreadyVerified.id);
+      setLoading(false);
+      return;
+    }
+
+    // Anything left unverified is a genuinely abandoned attempt (crashed
+    // before the user ever saw/scanned the QR code) — safe to discard.
+    for (const factor of totpFactors) {
       await supabase.auth.mfa.unenroll({ factorId: factor.id });
     }
 
@@ -91,18 +111,7 @@ export default function MfaSetupPage() {
       return;
     }
 
-    // Register enrollment in our DB
-    await fetch("/api/auth/mfa/enroll", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ factorId: qrData.factorId, method: "totp" }),
-    });
-
-    // Generate recovery codes
-    const codesRes = await fetch("/api/auth/mfa/recovery-codes", { method: "POST" });
-    const codesJson = (await codesRes.json()) as { codes?: string[] };
-    setRecoveryCodes(codesJson.codes ?? []);
-    setStep("recovery_codes");
+    await registerAndGenerateCodes(qrData.factorId);
     setLoading(false);
   }
 
