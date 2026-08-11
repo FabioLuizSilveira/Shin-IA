@@ -9,8 +9,6 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Mail } from "lucide-react";
 
-const NEXT_AFTER_LOGIN = "/dashboard"; // middleware redireciona por papel
-
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
@@ -62,7 +60,14 @@ export function AuthOptions() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=${NEXT_AFTER_LOGIN}`,
+          // No "?next=" query string on the redirect target — /auth/callback
+          // already defaults to /dashboard when next is absent, and a
+          // bare-path redirect_to is the one most reliably matched against
+          // Supabase's allow-list for the PKCE flow (a query string on
+          // redirect_to caused it to silently fall back to the bare
+          // site_url in production, skipping /auth/callback entirely and
+          // landing on /login with an orphaned, unprocessed ?code=).
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) throw error;
@@ -82,7 +87,7 @@ export function AuthOptions() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${NEXT_AFTER_LOGIN}`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) throw error;
