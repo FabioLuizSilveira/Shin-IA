@@ -25,100 +25,107 @@ export function Navbar() {
   const [loginOpen, setLoginOpen] = useState(false);
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 liquid-glass border-b border-white/5">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-2.5 no-underline group">
-            <Image
-              src="/brand/shina-ia-symbol.png"
-              alt="Shinã IA"
-              width={32}
-              height={34}
-              className="rounded-lg"
-              priority
-            />
-            <span className="text-lg font-body font-semibold text-white tracking-tight">
-              Shinã IA
-            </span>
-          </Link>
+    <>
+      <header className="fixed top-0 inset-x-0 z-50 liquid-glass border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <Link href="/" className="flex items-center gap-2.5 no-underline group">
+              <Image
+                src="/brand/shina-ia-symbol.png"
+                alt="Shinã IA"
+                width={32}
+                height={34}
+                className="rounded-lg"
+                priority
+              />
+              <span className="text-lg font-body font-semibold text-white tracking-tight">
+                Shinã IA
+              </span>
+            </Link>
 
-          <nav className="hidden md:flex items-center gap-6">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-sm font-body font-medium text-white/70 hover:text-white transition-colors no-underline"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
+            <nav className="hidden md:flex items-center gap-6">
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm font-body font-medium text-white/70 hover:text-white transition-colors no-underline"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
 
-          <div className="hidden md:flex items-center gap-3">
-            <button
-              type="button"
-              id="nav-login"
-              onClick={() => setLoginOpen(true)}
-              className="px-4 py-2 text-white/80 hover:text-white text-sm font-body font-semibold bg-transparent border-0 cursor-pointer transition-colors"
-            >
-              Entrar
-            </button>
-            <a
-              href={DEMO_URL}
-              id="nav-cta"
-              className="inline-flex items-center gap-1.5 px-4 py-2 liquid-glass-strong text-white text-sm font-body font-semibold rounded-full transition-colors no-underline"
-            >
-              Agendar Demo
-            </a>
-          </div>
-
-          <button
-            type="button"
-            id="nav-mobile-menu"
-            onClick={() => setOpen(!open)}
-            className="md:hidden p-2 text-white/70 hover:text-white transition-colors bg-transparent border-0 cursor-pointer"
-            aria-label="Menu"
-          >
-            {open ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        </div>
-      </div>
-
-      {open && (
-        <div className="md:hidden border-t border-white/5 liquid-glass">
-          <div className="px-4 py-4 space-y-2">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className="block px-3 py-2 text-sm font-body font-medium text-white/80 hover:text-white hover:bg-white/5 rounded-lg transition-colors no-underline"
-              >
-                {link.label}
-              </Link>
-            ))}
-            <div className="pt-3 border-t border-white/5 space-y-2">
+            <div className="hidden md:flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  setOpen(false);
-                  setLoginOpen(true);
-                }}
-                className="block w-full px-3 py-2.5 text-white/80 hover:text-white text-sm font-body font-semibold bg-white/5 rounded-xl text-center border-0 cursor-pointer"
+                id="nav-login"
+                onClick={() => setLoginOpen(true)}
+                className="px-4 py-2 text-white/80 hover:text-white text-sm font-body font-semibold bg-transparent border-0 cursor-pointer transition-colors"
               >
                 Entrar
               </button>
               <a
                 href={DEMO_URL}
-                className="block px-3 py-2.5 liquid-glass-strong text-white text-sm font-body font-semibold rounded-xl text-center no-underline"
+                id="nav-cta"
+                className="inline-flex items-center gap-1.5 px-4 py-2 liquid-glass-strong text-white text-sm font-body font-semibold rounded-full transition-colors no-underline"
               >
                 Agendar Demo
               </a>
             </div>
+
+            <button
+              type="button"
+              id="nav-mobile-menu"
+              onClick={() => setOpen(!open)}
+              className="md:hidden p-2 text-white/70 hover:text-white transition-colors bg-transparent border-0 cursor-pointer"
+              aria-label="Menu"
+            >
+              {open ? <X size={20} /> : <Menu size={20} />}
+            </button>
           </div>
         </div>
-      )}
 
+        {open && (
+          <div className="md:hidden border-t border-white/5 liquid-glass">
+            <div className="px-4 py-4 space-y-2">
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                  className="block px-3 py-2 text-sm font-body font-medium text-white/80 hover:text-white hover:bg-white/5 rounded-lg transition-colors no-underline"
+                >
+                  {link.label}
+                </Link>
+              ))}
+              <div className="pt-3 border-t border-white/5 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setLoginOpen(true);
+                  }}
+                  className="block w-full px-3 py-2.5 text-white/80 hover:text-white text-sm font-body font-semibold bg-white/5 rounded-xl text-center border-0 cursor-pointer"
+                >
+                  Entrar
+                </button>
+                <a
+                  href={DEMO_URL}
+                  className="block px-3 py-2.5 liquid-glass-strong text-white text-sm font-body font-semibold rounded-xl text-center no-underline"
+                >
+                  Agendar Demo
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+      </header>
+
+      {/* Rendered as a sibling of <header>, not a descendant — <header> has
+        the liquid-glass class, whose backdrop-filter establishes a new
+        containing block for descendant `position: fixed` elements, which
+        was collapsing this modal into the header's own 64px-tall box
+        instead of centering it in the viewport. */}
       {loginOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
           <div
@@ -143,6 +150,6 @@ export function Navbar() {
           </div>
         </div>
       )}
-    </header>
+    </>
   );
 }

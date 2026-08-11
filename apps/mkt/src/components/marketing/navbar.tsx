@@ -56,7 +56,7 @@ export function Navbar() {
               Crie sua conta
             </Link>
             <Link
-              href="/signup"
+              href="/login"
               id="nav-cta"
               className="inline-flex items-center gap-1.5 px-4 py-2 liquid-glass-strong text-white text-sm font-body font-semibold rounded-full transition-colors no-underline"
             >
@@ -97,7 +97,7 @@ export function Navbar() {
                 Crie sua conta
               </Link>
               <Link
-                href="/signup"
+                href="/login"
                 className="block px-3 py-2.5 liquid-glass-strong text-white text-sm font-body font-semibold rounded-xl text-center no-underline"
               >
                 Entrar
