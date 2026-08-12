@@ -103,7 +103,7 @@ export function Sidebar({ onClose }: SidebarProps) {
       </div>
 
       {/* Nav */}
-      <ul className="flex-1 py-4 px-3 space-y-0.5 list-none m-0 p-3">
+      <ul className="sidebar-scroll flex-1 min-h-0 overflow-y-auto py-4 px-3 space-y-0.5 list-none m-0 p-3">
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive = pathname.startsWith(href);
           return (
