@@ -1,7 +1,9 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { Search, Sun, Moon, Menu } from "lucide-react";
 import { NotificationBell } from "@/components/ui/notification-dropdown";
+import { PlatformNotificationBell } from "@/components/ui/platform-notification-bell";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { useTheme } from "@/lib/theme/theme-context";
 
@@ -12,6 +14,8 @@ interface TopbarProps {
 
 export function Topbar({ title, onMenuClick }: TopbarProps) {
   const { theme, toggleTheme } = useTheme();
+  const pathname = usePathname();
+  const isPlatform = pathname.startsWith("/platform");
 
   return (
     <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between px-6 flex-shrink-0">
@@ -51,7 +55,7 @@ export function Topbar({ title, onMenuClick }: TopbarProps) {
         >
           {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
-        <NotificationBell />
+        {isPlatform ? <PlatformNotificationBell /> : <NotificationBell />}
         <WorkspaceSwitcher />
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-shina-blue to-shina-cyan flex items-center justify-center text-white text-xs font-bold ml-1">
           T

@@ -144,77 +144,79 @@ export default function CustomerRequestsPage() {
             Nenhum pedido registrado.
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-950 text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              <tr>
-                <th className="px-6 py-3 text-left font-medium">Cliente</th>
-                <th className="px-6 py-3 text-left font-medium">Organização</th>
-                <th className="px-6 py-3 text-left font-medium">Tipo</th>
-                <th className="px-6 py-3 text-left font-medium">Mensagem</th>
-                <th className="px-6 py-3 text-left font-medium">Status</th>
-                <th className="px-6 py-3 text-left font-medium">Criado em</th>
-                <th className="px-6 py-3 text-left font-medium"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-              {visible.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                  <td className="px-6 py-3 font-medium text-slate-900 dark:text-slate-100">
-                    {r.rental_customers?.full_name || r.rental_customers?.email || "—"}
-                  </td>
-                  <td className="px-6 py-3 text-slate-600 dark:text-slate-400">
-                    {r.contracts?.organizations?.name ?? "—"}
-                  </td>
-                  <td className="px-6 py-3 text-slate-600 dark:text-slate-400">
-                    {TYPE_LABEL[r.type] ?? r.type}
-                  </td>
-                  <td className="px-6 py-3 text-slate-500 dark:text-slate-400 max-w-xs truncate">
-                    {r.message}
-                  </td>
-                  <td className="px-6 py-3">
-                    <span
-                      className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLOR[r.status]}`}
-                    >
-                      {STATUS_LABEL[r.status]}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    {formatDateTime(r.created_at)}
-                  </td>
-                  <td className="px-6 py-3">
-                    {r.status === "pending" && (
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => void handleReview(r.id, "approved")}
-                          disabled={reviewingId === r.id}
-                          className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-transparent border-0 cursor-pointer disabled:opacity-60"
-                        >
-                          Aprovar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleReview(r.id, "rejected")}
-                          disabled={reviewingId === r.id}
-                          className="text-xs font-semibold text-red-600 hover:text-red-700 bg-transparent border-0 cursor-pointer disabled:opacity-60"
-                        >
-                          Rejeitar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleReview(r.id, "resolved")}
-                          disabled={reviewingId === r.id}
-                          className="text-xs font-semibold text-slate-600 hover:text-slate-800 bg-transparent border-0 cursor-pointer disabled:opacity-60"
-                        >
-                          Resolver
-                        </button>
-                      </div>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-950 text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <tr>
+                  <th className="px-6 py-3 text-left font-medium">Cliente</th>
+                  <th className="px-6 py-3 text-left font-medium">Organização</th>
+                  <th className="px-6 py-3 text-left font-medium">Tipo</th>
+                  <th className="px-6 py-3 text-left font-medium">Mensagem</th>
+                  <th className="px-6 py-3 text-left font-medium">Status</th>
+                  <th className="px-6 py-3 text-left font-medium">Criado em</th>
+                  <th className="px-6 py-3 text-left font-medium"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                {visible.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                    <td className="px-6 py-3 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                      {r.rental_customers?.full_name || r.rental_customers?.email || "—"}
+                    </td>
+                    <td className="px-6 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                      {r.contracts?.organizations?.name ?? "—"}
+                    </td>
+                    <td className="px-6 py-3 text-slate-600 dark:text-slate-400">
+                      {TYPE_LABEL[r.type] ?? r.type}
+                    </td>
+                    <td className="px-6 py-3 text-slate-500 dark:text-slate-400 max-w-xs truncate">
+                      {r.message}
+                    </td>
+                    <td className="px-6 py-3">
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLOR[r.status]}`}
+                      >
+                        {STATUS_LABEL[r.status]}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                      {formatDateTime(r.created_at)}
+                    </td>
+                    <td className="px-6 py-3">
+                      {r.status === "pending" && (
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => void handleReview(r.id, "approved")}
+                            disabled={reviewingId === r.id}
+                            className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-transparent border-0 cursor-pointer disabled:opacity-60"
+                          >
+                            Aprovar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleReview(r.id, "rejected")}
+                            disabled={reviewingId === r.id}
+                            className="text-xs font-semibold text-red-600 hover:text-red-700 bg-transparent border-0 cursor-pointer disabled:opacity-60"
+                          >
+                            Rejeitar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleReview(r.id, "resolved")}
+                            disabled={reviewingId === r.id}
+                            className="text-xs font-semibold text-slate-600 hover:text-slate-800 bg-transparent border-0 cursor-pointer disabled:opacity-60"
+                          >
+                            Resolver
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </AppShell>
