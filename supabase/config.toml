@@ -61,6 +61,13 @@ additional_redirect_urls = [
   "http://localhost:3000/**",
   "http://localhost:3002/**",
   "http://localhost:3003/**",
+  # apps/mobile (Expo) — the rental-customer native app. Standalone/dev-client
+  # builds use the registered "shinacustomer" scheme; Expo Go dev sessions
+  # instead get an "exp://<lan-ip>:8081/--/..." redirect from
+  # expo-auth-session's makeRedirectUri(), which changes with the dev
+  # machine's LAN IP — wildcarded here since it can't be pinned to one value.
+  "shinacustomer://**",
+  "exp://**",
 ]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
