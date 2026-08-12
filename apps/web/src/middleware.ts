@@ -23,6 +23,7 @@ const APP_PUBLIC_PATHS = [
   "/api/onboarding",
   "/api/auth",
   "/api/webhooks",
+  "/rentals/login",
 ];
 
 // Roles that require MFA enrollment before accessing the platform.
@@ -71,6 +72,18 @@ function isSitePath(pathname: string): boolean {
 /** Returns true when the path is public within the app subdomain */
 function isAppPublicPath(pathname: string): boolean {
   return APP_PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+}
+
+// A rental customer's session carries neither platform_role nor tenant_id
+// (see supabase/migrations/20260055000000_rental_customers.sql — that model
+// is deliberately claims-free). Landing such a user on /tenant/dashboard
+// used to cause a redirect loop: the /tenant guard (2.5) bounces them to
+// /login (no tenant_id), which then bounces right back here. Route them to
+// their own portal instead.
+function homeForUser(claims: SessionClaims): string {
+  if (claims.platform_role) return "/platform/dashboard";
+  if (claims.tenant_id) return "/tenant/dashboard";
+  return "/rentals";
 }
 
 // Supabase call, bounded so a DNS/network hiccup reaching the auth API fails
@@ -221,7 +234,7 @@ export async function middleware(request: NextRequest) {
   if (hostType === "app" && pathname === "/") {
     const url = request.nextUrl.clone();
     if (user) {
-      url.pathname = claims.platform_role ? "/platform/dashboard" : "/tenant/dashboard";
+      url.pathname = homeForUser(claims);
     } else {
       url.pathname = "/login";
     }
@@ -290,7 +303,7 @@ export async function middleware(request: NextRequest) {
   // ── 3. Authenticated on /login or /dashboard → role-based redirect ─────────
   if (user && (pathname === "/login" || pathname === "/dashboard")) {
     const url = request.nextUrl.clone();
-    url.pathname = claims.platform_role ? "/platform/dashboard" : "/tenant/dashboard";
+    url.pathname = homeForUser(claims);
     return NextResponse.redirect(url);
   }
 
