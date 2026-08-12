@@ -55,6 +55,7 @@ const TENANT_NAV_ITEMS = [
     icon: MessageSquareWarning,
   },
   { href: "/tenant/activity", label: "Atividade", icon: History },
+  { href: "/tenant/support", label: "Suporte", icon: Headphones },
   { href: "/tenant/studio", label: "Controle de Acesso", icon: Shield },
   { href: "/tenant/ai", label: "AI Center", icon: Sparkles },
   { href: "/tenant/apps", label: "Apps", icon: Puzzle },
