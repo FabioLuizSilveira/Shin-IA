@@ -1,10 +1,12 @@
 "use client";
 
-// Lets a user who has both a Platform tenant/staff role AND a live Shinã MKT
-// subscription switch products without a second login — the shared auth
-// cookie (see lib/supabase/{client,server}.ts) already carries the session
-// across app.$ROOT_DOMAIN and mkt.$ROOT_DOMAIN, so this is just a link.
-// Renders nothing if the user only has access to one product.
+// Lets a user with 2+ distinct products (platform admin, tenant portal,
+// live Shinã MKT subscription) switch between them without a second login —
+// the shared auth cookie (see lib/supabase/{client,server}.ts) already
+// carries the session across app.$ROOT_DOMAIN and mkt.$ROOT_DOMAIN, so this
+// is just a link. Renders nothing if the user only has access to one
+// product. See also apps/web's /choose-workspace, shown once right after
+// login for the same set of accounts.
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { decodeSessionClaims, hasLiveSubscription } from "@shina/billing-platform/claims";
@@ -12,7 +14,7 @@ import { appUrl } from "@/lib/domain";
 import { ChevronDown, LayoutGrid, Check } from "lucide-react";
 
 interface Workspace {
-  key: "platform" | "mkt";
+  key: "platform" | "tenant" | "mkt";
   label: string;
   href: string;
 }
@@ -29,8 +31,11 @@ export function WorkspaceSwitcher() {
       if (cancelled || !data.session) return;
       const claims = decodeSessionClaims(data.session.access_token);
       const list: Workspace[] = [];
-      if (claims.tenant_id || claims.platform_role) {
-        list.push({ key: "platform", label: "Plataforma", href: appUrl("/dashboard") });
+      if (claims.platform_role) {
+        list.push({ key: "platform", label: "Administração", href: appUrl("/platform/dashboard") });
+      }
+      if (claims.tenant_id) {
+        list.push({ key: "tenant", label: "Portal do Tenant", href: appUrl("/tenant/dashboard") });
       }
       if (hasLiveSubscription(claims.mkt_subscription_status)) {
         list.push({ key: "mkt", label: "Shinã MKT", href: "/dashboard" });

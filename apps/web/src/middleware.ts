@@ -86,6 +86,20 @@ function homeForUser(claims: SessionClaims): string {
   return "/rentals";
 }
 
+// How many distinct products this session can reach: platform admin,
+// tenant portal, and Shinã MKT (a live subscription, decoupled from
+// tenant_id/platform_role — see hasLiveSubscription). A user who was never
+// meant to juggle products (the overwhelming majority) sees none of this —
+// only accounts holding 2+ go through /choose-workspace instead of being
+// silently dropped into whichever homeForUser() picks first.
+function accessCount(claims: SessionClaims): number {
+  let count = 0;
+  if (claims.platform_role) count++;
+  if (claims.tenant_id) count++;
+  if (hasLiveSubscription(claims.mkt_subscription_status)) count++;
+  return count;
+}
+
 // Supabase call, bounded so a DNS/network hiccup reaching the auth API fails
 // fast instead of hanging the middleware until Vercel's hard 25s timeout —
 // same fix already applied to apps/mkt/src/middleware.ts after a production
@@ -234,7 +248,7 @@ export async function middleware(request: NextRequest) {
   if (hostType === "app" && pathname === "/") {
     const url = request.nextUrl.clone();
     if (user) {
-      url.pathname = homeForUser(claims);
+      url.pathname = accessCount(claims) > 1 ? "/choose-workspace" : homeForUser(claims);
     } else {
       url.pathname = "/login";
     }
@@ -303,7 +317,7 @@ export async function middleware(request: NextRequest) {
   // ── 3. Authenticated on /login or /dashboard → role-based redirect ─────────
   if (user && (pathname === "/login" || pathname === "/dashboard")) {
     const url = request.nextUrl.clone();
-    url.pathname = homeForUser(claims);
+    url.pathname = accessCount(claims) > 1 ? "/choose-workspace" : homeForUser(claims);
     return NextResponse.redirect(url);
   }
 
