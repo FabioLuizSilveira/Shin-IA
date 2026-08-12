@@ -8,6 +8,7 @@
 // their one destination.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { decodeSessionClaims, hasLiveSubscription } from "@shina/billing-platform/claims";
 import { mktUrl } from "@/lib/domain";
@@ -91,7 +92,14 @@ export default function ChooseWorkspacePage() {
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4 py-8">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-shina-blue to-shina-cyan mx-auto mb-3" />
+          <Image
+            src="/brand/shina-icon-square.png"
+            alt="Shinã"
+            width={48}
+            height={48}
+            className="rounded-2xl mx-auto mb-3"
+            priority
+          />
           <h1 className="text-xl font-bold text-white">Para onde você quer ir?</h1>
           <p className="text-sm text-slate-400 mt-1">
             Sua conta tem acesso a mais de um espaço da Shinã.
