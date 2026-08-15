@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { internalError } from "@/lib/api-error";
-import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { requireTenantScope, isReadOnlyScope, hasTenantPermission } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 import { createNotification } from "@/lib/notifications/create-notification";
 import { OperationContractGate } from "@shina/tenant-contract-engine";
+import { ALLOWED_TRANSITIONS, resolveOperationContractId } from "@/lib/operation-transitions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,12 +28,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({ data });
 }
 
-// Matches components/ui/operation-detail.tsx's ACTIONS map exactly.
-const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  pending: ["in_progress", "cancelled"],
-  in_progress: ["completed", "cancelled", "failed"],
-};
-
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const scope = await requireTenantScope();
@@ -44,6 +39,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = (await req.json()) as { status?: string; description?: string };
   if (!body.status && body.description === undefined) {
     return NextResponse.json({ error: "status or description is required" }, { status: 400 });
+  }
+
+  // Wave 2 Phase B: closes a real gap the mobile audit surfaced — the
+  // "operations:write" permission already existed in the catalog but this
+  // route never checked it (only 6 routes in the whole app called
+  // hasTenantPermission() before this session). Without this, the mobile
+  // allowedActions computation would have promised a check this route
+  // didn't actually enforce.
+  if (body.status && !(await hasTenantPermission(scope, "operations:write"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { data: current, error: fetchError } = await scope.db
@@ -79,17 +84,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Only the customer side gates: an operator is typically the tenant's
     // own employee or the equipment owner, never a release precondition.
     if (body.status === "in_progress") {
-      const { data: requirement } = await scope.db
-        .from("tenant_contract_requirements")
-        .select("contract_id")
-        .eq("operation_id", id)
-        .eq("party_type", "customer")
-        .order("resolved_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const contractId = await resolveOperationContractId(scope.db, id);
 
       const gateResult = await OperationContractGate.check(scope.db, {
-        contractId: requirement?.contract_id ?? null,
+        contractId,
       });
       if (gateResult.blocked) {
         void logActivity(scope.db, {
@@ -105,7 +103,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           { status: 422 },
         );
       }
-      if (requirement?.contract_id) {
+      if (contractId) {
         void logActivity(scope.db, {
           tenantId: scope.tenantId,
           actorId: scope.userId,

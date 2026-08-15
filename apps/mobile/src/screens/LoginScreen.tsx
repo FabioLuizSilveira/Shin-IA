@@ -22,6 +22,15 @@ export function LoginScreen() {
   const [sent, setSent] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  // Google OAuth: unlike signInWithOtp, GoTrue has no equivalent
+  // "don't create a user" flag for OAuth providers — a first-time Google
+  // login always creates an auth.users row. This can't be blocked client-
+  // side. The actual guardrail lives server-side: /api/mobile/bootstrap
+  // resolves userType via real membership (user_profiles/rental_customers/
+  // operators), never via "an auth user exists" — a Google login with no
+  // membership row anywhere comes back userType: "unprovisioned" and gets
+  // zero operational access, regardless of how the auth identity was
+  // created (Wave 0.1/0.2).
   async function handleGoogleLogin() {
     setGoogleLoading(true);
     try {
@@ -44,9 +53,16 @@ export function LoginScreen() {
     if (!email.trim()) return;
     setSending(true);
     try {
+      // Security guardrail (Wave 0.1): shouldCreateUser: false means this
+      // never creates a new auth.users row — only an email that already has
+      // an account (created via staff invite, e.g. inviteRentalCustomer())
+      // can complete a magic-link sign-in. Free self-signup previously
+      // possible here (any typed email got a working login) is closed by
+      // this flag alone; Supabase returns the same "email sent" response
+      // either way, so this doesn't leak which emails have accounts.
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        options: { emailRedirectTo: redirectTo },
+        options: { emailRedirectTo: redirectTo, shouldCreateUser: false },
       });
       if (error) throw error;
       setSent(true);

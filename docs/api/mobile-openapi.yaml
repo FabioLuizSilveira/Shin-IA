@@ -1,0 +1,1165 @@
+openapi: 3.1.0
+info:
+  title: Shinã Mobile API Contract
+  version: 0.1.0-audit
+  description: >
+    Contrato oficial entre o backend Shinã e os clientes mobile/Emergent.
+    Este documento é o resultado de uma auditoria do backend real — nenhum
+    endpoint marcado `x-shina-status: proposed` foi implementado. Ver
+    docs/api/MOBILE_API_AUDIT.md para a auditoria completa e
+    docs/adr/ADR_MOBILE_BFF.md para a decisão de onde o BFF mobile deve
+    viver (recomendação: dentro de apps/web, não apps/api, para o
+    lançamento inicial — pendente de aprovação humana).
+    Todas as rotas `implemented`/`partial` documentadas aqui existem hoje
+    em apps/web/src/app/api/**. As rotas `proposed` sob /mobile/* ainda
+    não existem em nenhum lugar do repositório.
+  contact:
+    name: Shinã Platform
+servers:
+  - url: https://api.shinaia.com.br
+    description: >
+      Alvo de produção conforme arquitetura desejada pelo usuário. Este
+      domínio ainda não está operacional — hoje as rotas implementadas
+      vivem em apps/web (deploy Vercel), não em api.shinaia.com.br. Ver ADR.
+  - url: https://app.shinaia.com.br
+    description: Host real onde as rotas implementadas hoje respondem (apps/web).
+
+tags:
+  - name: bootstrap
+    description: Inicialização do app após autenticação
+  - name: dashboard
+    description: Agregação de contadores/alertas por identidade (Wave 2)
+  - name: customers
+    description: Self-context do cliente autenticado (Wave 2)
+  - name: operations
+    description: Ciclo de vida de operações
+  - name: assets
+    description: Ativos e tipos de ativo
+  - name: resources
+    description: Recursos internos do tenant (veículos, equipe)
+  - name: contracts
+    description: Contratos Tenant×Cliente/Operador (locação/serviço)
+  - name: customer-contracts
+    description: Contratos vistos pelo cliente final
+  - name: operators
+    description: Operadores/motoristas
+  - name: organizations
+    description: Clientes/organizações do tenant
+  - name: tracking
+    description: Rastreamento de frota e geofencing
+  - name: billing
+    description: Faturas e assinatura comercial
+  - name: notifications
+    description: Notificações in-app
+  - name: reporting
+    description: Métricas e relatórios
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ── Bootstrap (IMPLEMENTED — Wave 1) ────────────────────────────────────
+  /api/mobile/bootstrap:
+    get:
+      operationId: getMobileBootstrap
+      summary: Inicializa o app após autenticação
+      description: >
+        Resolve userType (tenant_user/customer/operator/unprovisioned)
+        inteiramente server-side a partir das claims do JWT (custom_access_
+        token_hook) e das tabelas rental_customers/rental_customer_
+        organizations/operators — nunca a partir de qualquer valor enviado
+        pelo cliente. Um usuário autenticado sem nenhum vínculo válido
+        (auto-cadastro via Google OAuth, por exemplo — o único caminho que
+        ainda cria um auth.users sem exigir convite, já que shouldCreateUser:
+        false bloqueia o self-signup por magic-link) recebe userType:
+        "unprovisioned" e nenhum dado de tenant algum.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/bootstrap/route.ts
+        handler: GET
+        auth: "requireMobileContext() — apps/web/src/lib/mobile-context.ts"
+      tags: [bootstrap]
+      responses:
+        "200":
+          description: Contexto de inicialização do app
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BootstrapResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Wave 2 — Core Mobile Integration (IMPLEMENTED) ──────────────────────
+  # Real justification for a separate /api/mobile/* surface (not aesthetics):
+  # the existing staff-only routes (/api/operations, /api/assets,
+  # /api/operators, /api/organizations) are hard-gated to requireTenantScope,
+  # which structurally rejects customer/operator identities (no tenant_id
+  # claim, no active impersonation). tenant_user mobile usage reuses those
+  # existing routes directly — see the "reused, not duplicated" notes below.
+  /api/mobile/dashboard:
+    get:
+      operationId: getMobileDashboard
+      summary: Agregação de contadores/alertas por identidade (Wave 2 Phase A)
+      description: >
+        tenant_user recebe contadores de operações/ativos, resumo financeiro
+        (gateado por tenant.dashboard.financial) e alertas de
+        contract.operation_blocked; customer recebe contadores de operações/
+        contratos/documentos pendentes escopados por
+        rental_customer_organizations; operator recebe contadores de
+        operator_assignments.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/dashboard/route.ts
+        handler: GET
+        auth: "requireMobileContext() — apps/web/src/lib/mobile-context.ts"
+      tags: [dashboard]
+      responses:
+        "200":
+          description: Contadores/alertas escopados à identidade
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: userType unprovisioned
+
+  /api/mobile/operations:
+    get:
+      operationId: listMobileOperations
+      summary: Lista operações visíveis à identidade (Wave 2 Phase B)
+      description: >
+        tenant_user filtra por tenant_id (mesmo escopo de /api/operations)
+        com filtros adicionais (branchId, operatorId, organizationId);
+        customer/operator são escopados via
+        resolveOperationsVisibility() — customer por
+        rental_customer_organizations -> contracts.organization_id ->
+        tenant_contract_requirements.operation_id, operator por
+        operator_assignments.operator_id -> operation_id (ambas relações já
+        existentes, nenhuma nova).
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/operations/route.ts
+        handler: GET
+        auth: "requireMobileContext()"
+      tags: [operations]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, in_progress, completed, cancelled, failed] }
+        - name: dateFrom
+          in: query
+          schema: { type: string, format: date-time }
+        - name: dateTo
+          in: query
+          schema: { type: string, format: date-time }
+        - name: assetId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: branchId
+          in: query
+          description: tenant_user only
+          schema: { type: string, format: uuid }
+        - name: operatorId
+          in: query
+          description: tenant_user only
+          schema: { type: string, format: uuid }
+        - name: organizationId
+          in: query
+          description: tenant_user only
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Lista de operações visíveis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Operation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: userType unprovisioned
+
+  /api/mobile/operations/{id}:
+    get:
+      operationId: getMobileOperationDetail
+      summary: Detalhe de operação com allowedActions server-computed (Wave 2 Phase B)
+      description: >
+        allowedActions é sempre um preview computado no servidor a partir do
+        mesmo ALLOWED_TRANSITIONS/hasTenantPermission("operations:write")/
+        OperationContractGate usados por PATCH /api/operations/{id} —
+        extraídos para apps/web/src/lib/operation-transitions.ts
+        especificamente para que os dois nunca divirjam. Sempre [] para
+        customer/operator (view-only nesta wave, sem rota de mutação para
+        essas duas identidades). Mesma resposta para "não existe" e
+        "pertence a outro tenant/cliente/operador" (higiene IDOR — nunca
+        confirma a existência de dado alheio). trackingSummary é a última
+        posição conhecida (resource_locations), não histórico (gap MOB-003,
+        fora de escopo).
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/operations/[id]/route.ts
+        handler: GET
+        auth: "requireMobileContext()"
+      tags: [operations]
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+      responses:
+        "200":
+          description: Operação + allowedActions + contractGate + trackingSummary
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/mobile/assets:
+    get:
+      operationId: listMobileAssets
+      summary: Lista ativos visíveis à identidade (Wave 2 Phase C)
+      description: >
+        Blueprint-friendly por construção — filtros e select tocam só
+        colunas genéricas (category, status, asset_type_id), nunca um branch
+        hardcoded por tipo de ativo/blueprint. tenant_user vê todos os
+        ativos do tenant; operator via operator_assignments.asset_id;
+        customer via rental_customer_organizations -> contracts ->
+        contract_assets.asset_id (a relação já existente e correta para
+        "quais ativos este contrato cobre" — mesma tabela já usada por
+        /api/contracts/{id}/assets e pelo portal do cliente,
+        lib/rentals-portal.ts).
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/assets/route.ts
+        handler: GET
+        auth: "requireMobileContext()"
+      tags: [assets]
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string, enum: [vehicle, equipment, tool, property, technology] }
+        - name: status
+          in: query
+          schema: { type: string, enum: [available, in_use, maintenance, decommissioned] }
+        - name: branchId
+          in: query
+          description: tenant_user only
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Lista de ativos visíveis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Asset"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: userType unprovisioned
+
+  /api/mobile/assets/{id}:
+    get:
+      operationId: getMobileAssetDetail
+      summary: Detalhe de um ativo (Wave 2 Phase C)
+      description: >
+        Sem trackingSummary (diferente de /api/mobile/operations/{id}) —
+        assets e resources são tabelas separadas e sem relação neste schema
+        (resource_locations é indexado por resource_id, nada liga uma linha
+        de assets a um resource_id); inventar esse vínculo está fora de
+        escopo desta wave. Mesma higiene IDOR do detalhe de operação.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/assets/[id]/route.ts
+        handler: GET
+        auth: "requireMobileContext()"
+      tags: [assets]
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+      responses:
+        "200":
+          description: Ativo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Asset"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/mobile/customers/me:
+    get:
+      operationId: getMobileCustomerSelf
+      summary: Perfil/organizações/contratos do cliente autenticado (Wave 2 Phase D)
+      description: >
+        Self-context apenas — usa somente context.customerId, resolvido
+        server-side a partir de auth.uid() por requireMobileContext(), nunca
+        um customer_id enviado pelo cliente. A listagem de clientes por
+        staff do tenant já existe e é reutilizada, não duplicada — ver
+        GET /api/organizations.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/customers/me/route.ts
+        handler: GET
+        auth: "requireMobileContext()"
+      tags: [customers]
+      responses:
+        "200":
+          description: Perfil, organizações vinculadas e contratos
+        "403":
+          description: userType diferente de customer
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/mobile/operators/me:
+    get:
+      operationId: getMobileOperatorSelf
+      summary: Perfil/atribuições do operador autenticado (Wave 2 Phase D)
+      description: >
+        Self-context apenas — usa somente context.operatorId, resolvido
+        server-side por requireMobileContext(), nunca um operator_id enviado
+        pelo cliente. A listagem de operadores por staff do tenant já existe
+        e é reutilizada, não duplicada — ver GET /api/operators.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/operators/me/route.ts
+        handler: GET
+        auth: "requireMobileContext()"
+      tags: [operators]
+      responses:
+        "200":
+          description: Perfil e atribuições (operator_assignments)
+        "403":
+          description: userType diferente de operator
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Operations (IMPLEMENTED — staff-only, reused directly by tenant_user mobile) ──
+  /api/operations:
+    get:
+      operationId: listOperations
+      summary: Lista operações do tenant
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/operations/route.ts
+        handler: GET
+        auth: requireTenantScope
+      tags: [operations]
+      responses:
+        "200":
+          description: Lista de operações
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Operation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createOperation
+      summary: Cria uma operação
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/operations/route.ts
+        handler: POST
+        auth: requireTenantScope
+      tags: [operations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperationCreateRequest"
+      responses:
+        "201":
+          description: Operação criada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Operation"
+        "409":
+          description: Conflito de agenda (double-booking)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /api/operations/{id}:
+    get:
+      operationId: getOperation
+      summary: Detalhe de uma operação
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/operations/[id]/route.ts
+        handler: GET
+        auth: requireTenantScope
+      tags: [operations]
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+      responses:
+        "200":
+          description: Operação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Operation"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateOperation
+      summary: Atualiza status/descrição de uma operação
+      description: >
+        Transição de status validada por máquina de estados
+        (pending -> in_progress|cancelled, in_progress ->
+        completed|cancelled|failed). A transição pending -> in_progress é
+        adicionalmente gateada por OperationContractGate quando a operação
+        tem um contrato dinâmico associado (aceite do cliente + documentos
+        aprovados + billing satisfeito).
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/operations/[id]/route.ts
+        handler: PATCH
+        auth: requireTenantScope
+      tags: [operations]
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [in_progress, completed, cancelled, failed]
+                description:
+                  type: string
+      responses:
+        "200":
+          description: Atualizado
+        "422":
+          description: Transição inválida ou requisito de contrato não satisfeito
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Assets (IMPLEMENTED) ────────────────────────────────────────────────
+  /api/assets:
+    get:
+      operationId: listAssets
+      summary: Lista ativos do tenant
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/assets/route.ts
+        handler: GET
+        auth: requireTenantScope
+      tags: [assets]
+      responses:
+        "200":
+          description: Lista de ativos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Asset"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Resources / Tracking (IMPLEMENTED + PARTIAL) ────────────────────────
+  /api/resources/locations:
+    get:
+      operationId: getResourceLocations
+      summary: Última posição conhecida por recurso
+      description: >
+        PARTIAL — retorna apenas a última posição de cada recurso, não um
+        histórico. Ver gap MOB-003 para a rota de histórico proposta.
+      x-shina-status: partial
+      x-shina-source:
+        file: apps/web/src/app/api/resources/locations/route.ts
+        handler: GET
+        auth: requireTenantScope
+      tags: [tracking]
+      responses:
+        "200":
+          description: Últimas posições
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TrackingPosition"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /mobile/tracking/{resourceId}/history:
+    get:
+      operationId: getResourceTrackingHistory
+      summary: Histórico de posições de um recurso
+      description: GAP MOB-003. Endpoint proposto, não implementado.
+      x-shina-status: proposed
+      tags: [tracking]
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: since
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Histórico de posições
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TrackingPosition"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Contracts (staff-facing, IMPLEMENTED) ───────────────────────────────
+  /api/contracts:
+    get:
+      operationId: listContracts
+      summary: Lista contratos do tenant
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/contracts/route.ts
+        handler: GET
+        auth: requireTenantScope
+      tags: [contracts]
+      responses:
+        "200":
+          description: Lista de contratos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Contract"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Customer Contracts (cliente final, IMPLEMENTED) ─────────────────────
+  /api/customer-contracts/{id}/accept:
+    post:
+      operationId: acceptCustomerContract
+      summary: Cliente aceita um contrato
+      description: >
+        accepted_at, ip_address, user_agent e document_hash são sempre
+        derivados server-side — nunca aceitos do corpo da requisição. O
+        único campo opcional aceito do cliente é dataProcessingConsent, e
+        só é honrado quando a base jurídica configurada pelo tenant for
+        "consent" (nunca inferido, sempre configuração explícita).
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/customer-contracts/[id]/accept/route.ts
+        handler: POST
+        auth: "supabase.auth.getUser() + verificação manual rental_customers→rental_customer_organizations"
+      tags: [customer-contracts]
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dataProcessingConsent:
+                  type: boolean
+      responses:
+        "201":
+          description: Aceite registrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      acceptanceId: { type: string, format: uuid }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          description: Contrato não possui requisito jurídico dinâmico associado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /api/customer-contracts/{id}/documents:
+    get:
+      operationId: listCustomerContractDocuments
+      summary: Lista documentos exigidos e enviados pelo cliente
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/customer-contracts/[id]/documents/route.ts
+        handler: GET
+      tags: [customer-contracts]
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+      responses:
+        "200":
+          description: Requisitos e documentos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      requirements:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Document"
+                      documents:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Document"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: uploadCustomerContractDocument
+      summary: Cliente envia um documento exigido
+      description: >
+        Upload sempre mediado por esta rota (multipart/form-data) — o
+        bucket contract-documents é privado, sem storage.objects RLS; a
+        autorização vive inteiramente aqui, nunca em URL assinada
+        client-side.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/customer-contracts/[id]/documents/route.ts
+        handler: POST
+      tags: [customer-contracts]
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                requirement_id:
+                  type: string
+                  format: uuid
+              required: [file, requirement_id]
+      responses:
+        "201":
+          description: Documento registrado (status pending)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /mobile/customer-contracts/{id}/documents/{documentId}/url:
+    get:
+      operationId: getCustomerContractDocumentUrl
+      summary: URL assinada para download de um documento enviado
+      description: GAP MOB-004. Endpoint proposto, não implementado.
+      x-shina-status: proposed
+      tags: [customer-contracts]
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+        - name: documentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: URL assinada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      url: { type: string, format: uri }
+                      expiresAt: { type: string, format: date-time }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Operators (IMPLEMENTED) ─────────────────────────────────────────────
+  /api/operators:
+    get:
+      operationId: listOperators
+      summary: Lista operadores do tenant
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/operators/route.ts
+        handler: GET
+        auth: requireTenantScope
+      tags: [operators]
+      responses:
+        "200":
+          description: Lista de operadores
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Operator"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Organizations (IMPLEMENTED) ─────────────────────────────────────────
+  /api/organizations:
+    get:
+      operationId: listOrganizations
+      summary: Lista organizações/clientes do tenant
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/organizations/route.ts
+        handler: GET
+        auth: requireTenantScope
+      tags: [organizations]
+      responses:
+        "200":
+          description: Lista de organizações
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Organization"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Billing (IMPLEMENTED) ───────────────────────────────────────────────
+  /api/invoices:
+    get:
+      operationId: listInvoices
+      summary: Lista faturas do tenant
+      description: >
+        Leitura segura para mobile — preço/valor sempre lido de
+        invoices.total_amount, nunca confiado de um campo enviado pelo
+        cliente em nenhuma rota mutável relacionada.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/invoices/route.ts
+        handler: GET
+        auth: requireTenantScope
+      tags: [billing]
+      responses:
+        "200":
+          description: Lista de faturas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Invoice"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/commercial/plans:
+    get:
+      operationId: listCommercialPlans
+      summary: Catálogo público de planos
+      description: Rota pública (sem sessão) — usada em onboarding pré-tenant.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/commercial/plans/route.ts
+        handler: GET
+        auth: "nenhuma — catálogo público, só plan_versions status=published"
+      security: []
+      tags: [billing]
+      parameters:
+        - name: product
+          in: query
+          required: true
+          schema: { type: string, enum: [platform, mkt] }
+      responses:
+        "200":
+          description: Planos publicados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  # ── Notifications (PARTIAL) ─────────────────────────────────────────────
+  /api/notifications:
+    get:
+      operationId: listNotifications
+      summary: Lista notificações
+      description: >
+        PARTIAL — hoje é broadcast por tenant
+        (recipient_external_ref="tenant:<id>"), não há targeting por
+        usuário apesar da coluna person_id existir no schema. Ver gap
+        MOB-006.
+      x-shina-status: partial
+      x-shina-source:
+        file: apps/web/src/app/api/notifications/route.ts
+        handler: GET
+        auth: requireTenantScope
+      tags: [notifications]
+      responses:
+        "200":
+          description: Lista de notificações
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /mobile/devices/register:
+    post:
+      operationId: registerDeviceForPush
+      summary: Registra um device token para push notifications
+      description: >
+        GAP MOB-007. Endpoint proposto — nenhuma tabela de device token
+        existe hoje em todo o repositório (busca por device_token/
+        push_token/fcm/apns/expo_push retornou zero resultados).
+      x-shina-status: proposed
+      tags: [notifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, platform]
+              properties:
+                token: { type: string }
+                platform: { type: string, enum: [ios, android] }
+      responses:
+        "201":
+          description: Token registrado
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Token de sessão Supabase Auth (GoTrue). tenant_id/tenant_role/
+        platform_role/entitlements vêm embutidos no JWT via
+        custom_access_token_hook (Postgres, security definer) — nunca são
+        aceitos de header/body separado. rental_customers e operators não
+        carregam claim de tenant no JWT (a hook não tem conhecimento
+        dessas tabelas) — o backend resolve tenant/organização para essas
+        identidades via consulta, não via claim.
+
+  parameters:
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Unauthorized:
+      description: Sessão ausente ou inválida
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    NotFound:
+      description: Recurso não encontrado ou fora do escopo do tenant
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    ValidationError:
+      description: Corpo da requisição inválido
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+
+  schemas:
+    ApiError:
+      type: object
+      description: >
+        Formato PROPOSTO (Fase 11) — o padrão real hoje em produção é
+        {"error": "mensagem"} (string plana), confirmado em todas as
+        rotas lidas nesta auditoria via NextResponse.json({error:...}).
+        Este envelope aninhado com code/request_id NÃO está implementado;
+        adotá-lo exigiria uma migração coordenada de todas as ~90 rotas
+        existentes, fora do escopo desta auditoria.
+      x-shina-status: proposed
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: string }
+      required: [error]
+
+    ApiErrorCurrent:
+      type: object
+      description: Formato real, implementado, usado por todas as rotas hoje.
+      x-shina-status: implemented
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    Pagination:
+      type: object
+      description: >
+        Nenhum padrão de paginação consistente foi confirmado nas rotas
+        lidas (a maioria retorna a lista completa sem cursor/offset).
+        Recomendação (Fase 12, não implementada): cursor pagination para
+        mobile, dado datasets mutáveis como operations/tracking history.
+      x-shina-status: proposed
+      properties:
+        nextCursor: { type: [string, "null"] }
+        hasMore: { type: boolean }
+
+    BootstrapResponse:
+      type: object
+      x-shina-status: implemented
+      description: >
+        userType é resolvido inteiramente server-side (nunca a partir de
+        input do cliente). tenant é sempre null para customer (um cliente
+        pode pertencer a mais de um tenant via rental_customer_organizations
+        — não existe "o" tenant dele) e para unprovisioned. organizations só
+        é preenchido quando userType=customer.
+      properties:
+        schemaVersion:
+          type: integer
+          description: Incrementado sempre que o contrato do bootstrap mudar de forma incompatível.
+        user:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            email: { type: [string, "null"] }
+            userType:
+              type: string
+              enum: [tenant_user, customer, operator, unprovisioned]
+        tenant:
+          type: [object, "null"]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            slug: { type: string }
+        branding:
+          type: [object, "null"]
+          description: >
+            Config publicada real via StudioRuntime.getPublished("branding",
+            tenantId). null quando o tenant não publicou branding
+            customizado, ou {"name": "Shinã"} para unprovisioned.
+        roles:
+          type: array
+          items: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+          description: Permissões efetivas já resolvidas — a UI só usa para esconder ações, nunca como defesa.
+        entitlements:
+          type: array
+          items: { type: string }
+        features:
+          type: object
+          additionalProperties: { type: boolean }
+        organizations:
+          type: array
+          description: Só presente quando user.userType = "customer".
+          items:
+            type: object
+            properties:
+              organizationId: { type: string, format: uuid }
+              tenantId: { type: string, format: uuid }
+
+    Operation:
+      type: object
+      x-shina-status: implemented
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [delivery, pickup, maintenance, inspection, transfer]
+        status:
+          type: string
+          enum: [pending, in_progress, completed, cancelled, failed]
+        scheduled_starts_at: { type: string, format: date-time }
+        scheduled_ends_at: { type: string, format: date-time }
+        started_at: { type: [string, "null"], format: date-time }
+        completed_at: { type: [string, "null"], format: date-time }
+        description: { type: [string, "null"] }
+        resources:
+          type: [object, "null"]
+        assets:
+          type: [object, "null"]
+
+    OperationCreateRequest:
+      type: object
+      x-shina-status: implemented
+      required: [type, resource_id, scheduled_starts_at, scheduled_ends_at]
+      properties:
+        type:
+          type: string
+          enum: [delivery, pickup, maintenance, inspection, transfer]
+        resource_id: { type: string, format: uuid }
+        asset_id: { type: [string, "null"], format: uuid }
+        scheduled_starts_at: { type: string, format: date-time }
+        scheduled_ends_at: { type: string, format: date-time }
+        description: { type: [string, "null"] }
+
+    Asset:
+      type: object
+      x-shina-status: implemented
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        category:
+          type: string
+          enum: [vehicle, equipment, tool, property, technology]
+        status:
+          type: string
+          enum: [available, in_use, maintenance, decommissioned]
+
+    Operator:
+      type: object
+      x-shina-status: implemented
+      properties:
+        id: { type: string, format: uuid }
+        full_name: { type: string }
+        document: { type: [string, "null"] }
+        phone: { type: [string, "null"] }
+        email: { type: [string, "null"] }
+        status: { type: string, enum: [active, inactive] }
+
+    Organization:
+      type: object
+      x-shina-status: implemented
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type:
+          type: string
+          enum: [customer, supplier, partner, internal]
+        document: { type: string }
+
+    Contract:
+      type: object
+      x-shina-status: implemented
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [service, rental, lease, subscription, one_time]
+        status:
+          type: string
+          enum: [draft, active, expired, terminated, suspended]
+        value_amount: { type: number }
+        value_currency: { type: string }
+        period_starts_at: { type: string, format: date-time }
+        period_ends_at: { type: string, format: date-time }
+        template_id: { type: [string, "null"], format: uuid }
+        snapshot_id: { type: [string, "null"], format: uuid }
+
+    Document:
+      type: object
+      x-shina-status: implemented
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        label: { type: string }
+        is_mandatory: { type: boolean }
+        status:
+          type: [string, "null"]
+          enum: [pending, approved, rejected, null]
+        original_filename: { type: [string, "null"] }
+
+    TrackingPosition:
+      type: object
+      x-shina-status: partial
+      description: Estrutura real de resource_locations, exposta hoje só como "última posição".
+      properties:
+        resource_id: { type: string, format: uuid }
+        latitude: { type: number }
+        longitude: { type: number }
+        recorded_at: { type: string, format: date-time }
+        source: { type: [string, "null"] }
+
+    Invoice:
+      type: object
+      x-shina-status: implemented
+      properties:
+        id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [draft, issued, paid, overdue, cancelled, voided]
+        total_amount: { type: number }
+        total_currency: { type: string }
+        due_date: { type: string, format: date }
+        paid_at: { type: [string, "null"], format: date-time }
+
+    Notification:
+      type: object
+      x-shina-status: partial
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: string }
+        body: { type: string }
+        priority: { type: string, enum: [low, normal, high, critical] }
+        status: { type: string }
+        read_at: { type: [string, "null"], format: date-time }

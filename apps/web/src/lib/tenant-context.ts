@@ -116,6 +116,38 @@ export async function hasTenantPermission(scope: TenantScope, key: string): Prom
   return !!grant;
 }
 
+// Lists every permission key actually granted to this user, for surfacing
+// in UI (e.g. mobile bootstrap) — never used as an authorization decision
+// itself, only hasTenantPermission()'s per-action check is. tenant_owner/
+// tenant_admin implicitly hold the whole catalog (same short-circuit as
+// hasTenantPermission), so their effective list is every key that exists;
+// any other role's list is exactly what's been granted via tenant/studio.
+export async function getEffectiveTenantPermissions(scope: TenantScope): Promise<string[]> {
+  if (scope.isImpersonating && scope.accessMode !== "full") return [];
+  if (scope.tenantRole && TENANT_ADMIN_ROLES.has(scope.tenantRole)) {
+    const { data } = await scope.db.from("tenant_permissions").select("key").is("deleted_at", null);
+    return (data ?? []).map((p) => p.key);
+  }
+
+  const { data: userRoles } = await scope.db
+    .from("tenant_user_roles")
+    .select("role_id")
+    .eq("tenant_id", scope.tenantId)
+    .eq("user_id", scope.userId)
+    .is("deleted_at", null);
+  const roleIds = (userRoles ?? []).map((r) => r.role_id);
+  if (roleIds.length === 0) return [];
+
+  const { data: grants } = await scope.db
+    .from("tenant_role_permissions")
+    .select("tenant_permissions!inner(key)")
+    .in("role_id", roleIds);
+  const keys = (grants ?? []).map(
+    (g) => (g as unknown as { tenant_permissions: { key: string } }).tenant_permissions.key,
+  );
+  return Array.from(new Set(keys));
+}
+
 // Security fix (Obs-21): scope.db is always the service-role admin client
 // (see the comment above requireTenantScope) — it bypasses RLS entirely,
 // so a route's own `.eq("tenant_id", scope.tenantId)` is the *only* thing
