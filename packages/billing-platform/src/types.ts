@@ -44,6 +44,8 @@ export interface CreateCheckoutParams {
   cancelUrl: string;
   /** Extra metadata forwarded to the gateway (e.g. refundEligibleUntil). */
   metadata?: Record<string, string>;
+  /** Free trial length in days — omitted/0 means no trial (immediate charge). */
+  trialPeriodDays?: number;
 }
 
 export interface CreatePortalParams {
@@ -71,6 +73,14 @@ export interface BillingProvider {
     product: SubscriptionProduct,
   ): Promise<PlatformSubscription | null>;
   cancelSubscription(subscriptionId: string): Promise<void>;
+  /**
+   * Changes an active subscription's price in place (upgrade/downgrade) —
+   * proration handled by the gateway. Does NOT write plan_key/plan_version
+   * to platform_subscriptions itself; the caller updates our own DB row
+   * once this resolves, same "gateway confirms, then we sync" posture as
+   * cancelSubscription.
+   */
+  updateSubscription(subscriptionId: string, params: { priceId: string }): Promise<void>;
   /** Verifies + processes a raw webhook payload idempotently. */
   syncWebhook(rawBody: string, signature: string): Promise<SyncWebhookResult>;
 }

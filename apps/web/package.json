@@ -14,6 +14,7 @@
     "@sentry/nextjs": "^10.60.0",
     "@shina/billing-platform": "workspace:*",
     "@shina/blueprint-runtime": "workspace:*",
+    "@shina/commercial-platform": "workspace:*",
     "@shina/charts": "workspace:*",
     "@shina/commission-engine": "workspace:*",
     "@shina/reporting-engine": "workspace:*",

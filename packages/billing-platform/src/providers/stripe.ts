@@ -73,6 +73,7 @@ export class StripeBillingProvider implements BillingProvider {
       metadata: { product: params.product, plan: params.planKey, ...params.metadata },
       subscription_data: {
         metadata: { product: params.product, plan: params.planKey, ...params.metadata },
+        ...(params.trialPeriodDays ? { trial_period_days: params.trialPeriodDays } : {}),
       },
       allow_promotion_codes: true,
     });
@@ -112,6 +113,24 @@ export class StripeBillingProvider implements BillingProvider {
     // Cancellation is finalized by the customer.subscription.deleted webhook,
     // not here — the DB status only changes when the gateway confirms.
     await this.stripe.subscriptions.cancel(sub.stripe_subscription_id);
+  }
+
+  async updateSubscription(subscriptionId: string, params: { priceId: string }): Promise<void> {
+    const { data: sub } = await this.db
+      .from("platform_subscriptions")
+      .select("stripe_subscription_id")
+      .eq("id", subscriptionId)
+      .maybeSingle();
+    if (!sub?.stripe_subscription_id) throw new Error("Subscription has no gateway id");
+
+    const stripeSub = await this.stripe.subscriptions.retrieve(sub.stripe_subscription_id);
+    const itemId = stripeSub.items.data[0]?.id;
+    if (!itemId) throw new Error("Stripe subscription has no items to update");
+
+    await this.stripe.subscriptions.update(sub.stripe_subscription_id, {
+      items: [{ id: itemId, price: params.priceId }],
+      proration_behavior: "create_prorations",
+    });
   }
 
   async syncWebhook(rawBody: string, signature: string): Promise<SyncWebhookResult> {

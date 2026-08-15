@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
-import { syncStripeEvent } from "@shina/billing-platform";
+import { activateFromWebhook, type WebhookEventLike } from "@shina/commercial-platform";
 import { stripe } from "@/lib/stripe/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type Stripe from "stripe";
 
 // Webhook do Stripe. Toda liberação de acesso acontece AQUI (nunca na
-// página de sucesso do checkout): syncStripeEvent processa o evento de
-// forma idempotente (platform_billing_events.stripe_event_id) e cria/
-// atualiza platform_customers + platform_subscriptions vinculados ao
-// auth_user_id que /api/checkout colocou em client_reference_id.
+// página de sucesso do checkout): activateFromWebhook valida o
+// ContractAcceptance/PlanVersion/CommercialTermsSnapshot referenciados pelo
+// checkout (Fase C do Unified Commercial Flow) e só então delega pro já
+// testado syncStripeEvent, que cria/atualiza platform_customers +
+// platform_subscriptions vinculados ao auth_user_id que /api/checkout
+// colocou em client_reference_id — mesma lógica de sempre, não duplicada.
 //
 // customer.subscription.deleted mantém, além da sincronização, a garantia
 // de reembolso em 14 dias (metadados da assinatura, ver /api/checkout).
@@ -32,7 +34,9 @@ export async function POST(request: Request) {
   // Provisionamento/sincronização de assinatura (idempotente).
   const admin = createAdminClient();
   try {
-    const sync = await syncStripeEvent(admin, event, { defaultProduct: "mkt" });
+    const sync = await activateFromWebhook(admin, event as unknown as WebhookEventLike, {
+      defaultProduct: "mkt",
+    });
     if (sync.duplicate) {
       return NextResponse.json({ received: true, duplicate: true });
     }

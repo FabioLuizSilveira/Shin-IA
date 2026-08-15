@@ -11,6 +11,7 @@ export interface SessionClaims {
   mfa_enrolled?: boolean;
   platform_subscription_status?: string | null;
   mkt_subscription_status?: string | null;
+  platform_contract_current?: boolean;
 }
 
 export function decodeSessionClaims(accessToken: string): SessionClaims {

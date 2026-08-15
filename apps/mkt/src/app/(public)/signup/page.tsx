@@ -5,26 +5,37 @@
 // /api/checkout e /api/webhooks/stripe): sem conta grátis, cobrança
 // imediata com reembolso garantido em até 14 dias em caso de cancelamento.
 //
+// Fase C (Unified Commercial Flow): planos vêm de /api/commercial/plans
+// (plan_versions, produto "mkt") em vez do array PLANS hardcoded de antes,
+// e o checkout exige aceite do contrato MKT antes de prosseguir — ver
+// ContractAcceptModal abaixo, mesmo padrão de campos do onboarding da
+// Platform (apps/web/src/components/ui/onboarding-wizard.tsx Step 5).
+//
 // Pré-requisitos para funcionar em produção (fora do escopo deste código):
 // 1. Google e Facebook configurados como provedores OAuth no painel do
 //    Supabase (Authentication → Providers) — client id/secret de cada um.
-// 2. Produtos e preços criados no Stripe para Starter/Pro/Business, com os
-//    price IDs em STRIPE_PRICE_STARTER / STRIPE_PRICE_PRO / STRIPE_PRICE_BUSINESS.
-// 3. STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET configurados no ambiente.
+// 2. STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET configurados no ambiente.
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowRight } from "@shina/icons";
 
-const PLANS = [
-  { id: "starter", name: "Starter", price: "R$149/mês" },
-  { id: "pro", name: "Pro", price: "R$399/mês" },
-  { id: "business", name: "Business", price: "R$999/mês" },
-] as const;
+interface PlanOption {
+  id: string;
+  key: string;
+  name: string;
+  price_cents: number;
+  currency: string;
+  billing_cycle: string;
+}
 
-type PlanId = (typeof PLANS)[number]["id"];
+interface ContractInfo {
+  id: string;
+  title: string;
+  content: string;
+}
 
 export default function SignupPage() {
   return (
@@ -34,18 +45,175 @@ export default function SignupPage() {
   );
 }
 
+function ContractAcceptModal({
+  planVersionId,
+  onAccepted,
+  onClose,
+}: {
+  planVersionId: string;
+  onAccepted: () => void;
+  onClose: () => void;
+}) {
+  const [contract, setContract] = useState<ContractInfo | null>(null);
+  const [name, setName] = useState("");
+  const [role, setRole] = useState("");
+  const [document, setDocument] = useState("");
+  const [declaredAuthority, setDeclaredAuthority] = useState(false);
+  const [contractAccepted, setContractAccepted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/commercial/contract")
+      .then((res) => res.json() as Promise<{ data?: ContractInfo; error?: string }>)
+      .then((json) => {
+        if (json.data) setContract(json.data);
+      })
+      .catch(() => setError("Não foi possível carregar o contrato."));
+  }, []);
+
+  async function handleAccept() {
+    if (!name.trim() || !role.trim() || !declaredAuthority || !contractAccepted) {
+      setError("Preencha todos os campos e marque os dois checkboxes.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/commercial/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planVersionId,
+          representativeName: name,
+          representativeRole: role,
+          representativeDocument: document || undefined,
+          declaredAuthority,
+        }),
+      });
+      if (!res.ok) {
+        const json = (await res.json()) as { error?: string };
+        throw new Error(json.error ?? "Erro ao aceitar o contrato.");
+      }
+      onAccepted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+      <div className="w-full max-w-md liquid-glass-strong rounded-3xl p-6 max-h-[90vh] overflow-y-auto">
+        <h2 className="font-heading italic text-2xl text-white mb-4">Contrato de Serviço</h2>
+
+        <div className="h-32 overflow-y-auto px-3 py-2.5 rounded-xl bg-white/5 text-xs text-white/70 leading-relaxed mb-4">
+          {contract ? (
+            <>
+              <p className="font-semibold text-white/90 mb-1">{contract.title}</p>
+              {contract.content}
+            </>
+          ) : (
+            "Carregando..."
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <input
+            type="text"
+            placeholder="Seu nome completo"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/40"
+          />
+          <input
+            type="text"
+            placeholder="Cargo (ex: Sócio-diretor)"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/40"
+          />
+          <input
+            type="text"
+            placeholder="CPF (opcional)"
+            value={document}
+            onChange={(e) => setDocument(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/40"
+          />
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={declaredAuthority}
+              onChange={(e) => setDeclaredAuthority(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-xs text-white/70">
+              Declaro possuir poderes suficientes para aceitar este instrumento em nome da
+              organização.
+            </span>
+          </label>
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={contractAccepted}
+              onChange={(e) => setContractAccepted(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-xs text-white/70">
+              Li e aceito o Contrato de Serviço e as condições do plano selecionado.
+            </span>
+          </label>
+        </div>
+
+        {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
+
+        <div className="flex gap-2 mt-5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 rounded-full text-sm font-semibold text-white/70 hover:text-white transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleAccept()}
+            disabled={submitting}
+            className="flex-1 px-4 py-2.5 bg-white text-black rounded-full font-semibold text-sm hover:bg-white/90 transition-colors disabled:opacity-50"
+          >
+            {submitting ? "Enviando..." : "Aceitar e continuar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SignupForm() {
   const searchParams = useSearchParams();
-  const initialPlan = (searchParams.get("plan") as PlanId | null) ?? "starter";
-  const [plan, setPlan] = useState<PlanId>(
-    PLANS.some((p) => p.id === initialPlan) ? initialPlan : "starter",
-  );
+  const [plans, setPlans] = useState<PlanOption[] | null>(null);
+  const [plan, setPlan] = useState<string>(searchParams.get("plan") ?? "");
   const [loading, setLoading] = useState<"google" | "facebook" | "checkout" | null>(null);
   const [error, setError] = useState<string | null>(
     searchParams.get("error") === "auth"
       ? "Não foi possível concluir o login. Tente novamente."
       : null,
   );
+  const [pendingAcceptance, setPendingAcceptance] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/commercial/plans")
+      .then((res) => res.json() as Promise<{ data?: PlanOption[] }>)
+      .then((json) => {
+        const list = json.data ?? [];
+        setPlans(list);
+        if (!plan && list.length > 0) setPlan(list[0].key);
+      })
+      .catch(() => setError("Não foi possível carregar os planos."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleOAuth(provider: "google" | "facebook") {
     setError(null);
@@ -72,7 +240,12 @@ function SignupForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as { url?: string; error?: string; planVersionId?: string };
+      if (res.status === 403 && data.error === "acceptance_required" && data.planVersionId) {
+        setPendingAcceptance(data.planVersionId);
+        setLoading(null);
+        return;
+      }
       if (!res.ok || !data.url) {
         throw new Error(data.error ?? "Não foi possível iniciar o checkout.");
       }
@@ -92,17 +265,22 @@ function SignupForm() {
         </p>
 
         <div className="grid grid-cols-3 gap-2 mb-6">
-          {PLANS.map((p) => (
+          {(plans ?? []).map((p) => (
             <button
               key={p.id}
               type="button"
-              onClick={() => setPlan(p.id)}
+              onClick={() => setPlan(p.key)}
               className={`rounded-xl px-2 py-3 text-center transition-colors ${
-                plan === p.id ? "liquid-glass-strong" : "liquid-glass hover:bg-white/5"
+                plan === p.key ? "liquid-glass-strong" : "liquid-glass hover:bg-white/5"
               }`}
             >
               <p className="font-body text-sm font-semibold text-white">{p.name}</p>
-              <p className="font-body text-xs text-white/60">{p.price}</p>
+              <p className="font-body text-xs text-white/60">
+                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: p.currency }).format(
+                  p.price_cents / 100,
+                )}
+                /mês
+              </p>
             </button>
           ))}
         </div>
@@ -135,7 +313,7 @@ function SignupForm() {
         <button
           type="button"
           onClick={() => void handleCheckout()}
-          disabled={loading !== null}
+          disabled={loading !== null || !plan}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white text-black rounded-full font-body font-semibold text-sm hover:bg-white/90 transition-colors disabled:opacity-50"
         >
           {loading === "checkout" ? "Redirecionando…" : "Continuar para pagamento"}
@@ -151,6 +329,17 @@ function SignupForm() {
           </Link>
         </p>
       </div>
+
+      {pendingAcceptance && (
+        <ContractAcceptModal
+          planVersionId={pendingAcceptance}
+          onClose={() => setPendingAcceptance(null)}
+          onAccepted={() => {
+            setPendingAcceptance(null);
+            void handleCheckout();
+          }}
+        />
+      )}
     </div>
   );
 }

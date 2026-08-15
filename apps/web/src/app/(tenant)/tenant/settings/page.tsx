@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
-import { User, Building2, Check, Lock } from "lucide-react";
+import { User, Building2, Check, Lock, Scale, CreditCard } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -174,6 +175,18 @@ export default function TenantSettingsPage() {
         >
           <Building2 className="w-3.5 h-3.5" /> Empresa
         </button>
+        <Link
+          href="/tenant/settings/legal"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-0 border-b-2 border-transparent text-slate-500 hover:text-slate-700 no-underline"
+        >
+          <Scale className="w-3.5 h-3.5" /> Jurídico
+        </Link>
+        <Link
+          href="/tenant/settings/billing"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-0 border-b-2 border-transparent text-slate-500 hover:text-slate-700 no-underline"
+        >
+          <CreditCard className="w-3.5 h-3.5" /> Assinatura
+        </Link>
       </div>
 
       {loading ? (

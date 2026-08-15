@@ -77,6 +77,45 @@ export function isTenantAdmin(scope: TenantScope): boolean {
   return scope.tenantRole !== null && TENANT_ADMIN_ROLES.has(scope.tenantRole);
 }
 
+// First real consumer of tenant_role_permissions for actual access control
+// (Unified Commercial Flow, Fase H) — every other route in this codebase
+// checks a hardcoded role key via isTenantAdmin()/tenantRole comparisons;
+// the tenant_permissions/tenant_role_permissions catalog previously only
+// fed the tenant/studio admin UI (assigning permissions to custom roles had
+// zero effect anywhere). tenant_owner/tenant_admin always pass (matches
+// TENANT_ADMIN_ROLES's existing "owns everything" semantics) without a DB
+// round trip; any other role is checked for real against the permission
+// grant. Full-access impersonation bypasses like isTenantAdmin(); read-only
+// impersonation never grants a mutating permission like this one.
+export async function hasTenantPermission(scope: TenantScope, key: string): Promise<boolean> {
+  if (scope.isImpersonating) return scope.accessMode === "full";
+  if (scope.tenantRole && TENANT_ADMIN_ROLES.has(scope.tenantRole)) return true;
+
+  // Two queries, not one PostgREST embed: tenant_user_roles and
+  // tenant_role_permissions share a `role_id` column but there's no direct
+  // FK between the two tables (both separately reference tenant_roles), so
+  // PostgREST can't infer that join — confirmed the hard way, a
+  // single-query embed here silently matched nothing.
+  const { data: userRoles } = await scope.db
+    .from("tenant_user_roles")
+    .select("role_id")
+    .eq("tenant_id", scope.tenantId)
+    .eq("user_id", scope.userId)
+    .is("deleted_at", null);
+  const roleIds = (userRoles ?? []).map((r) => r.role_id);
+  if (roleIds.length === 0) return false;
+
+  const { data: grant } = await scope.db
+    .from("tenant_role_permissions")
+    .select("role_id, tenant_permissions!inner(key)")
+    .in("role_id", roleIds)
+    .eq("tenant_permissions.key", key)
+    .limit(1)
+    .maybeSingle();
+
+  return !!grant;
+}
+
 // Security fix (Obs-21): scope.db is always the service-role admin client
 // (see the comment above requireTenantScope) — it bypasses RLS entirely,
 // so a route's own `.eq("tenant_id", scope.tenantId)` is the *only* thing
