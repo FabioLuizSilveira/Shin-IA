@@ -1,0 +1,171 @@
+{
+  "app_name": "Gestão de Aluguel de Carros",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "A professional, highly legible, and native-feeling interface that bridges enterprise fleet management with a consumer-friendly rental experience.",
+  "color": {
+    "surface": "#F9F9F7",
+    "onSurface": "#1C1C1E",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#3A3A3C",
+    "surfaceTertiary": "#F2F2F0",
+    "onSurfaceTertiary": "#636366",
+    "surfaceInverse": "#2C2C2E",
+    "onSurfaceInverse": "#F9F9F7",
+    "brand": "#5B6B46",
+    "brandPrimary": "#4A5D23",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#7C8E64",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#E7EBE1",
+    "onBrandTertiary": "#314013",
+    "success": "#34C759",
+    "onSuccess": "#FFFFFF",
+    "warning": "#FF9500",
+    "onWarning": "#FFFFFF",
+    "error": "#FF3B30",
+    "onError": "#FFFFFF",
+    "info": "#5AC8FA",
+    "onInfo": "#FFFFFF",
+    "border": "#E5E5EA",
+    "borderStrong": "#C7C7CC",
+    "divider": "#E5E5EA"
+  },
+  "typography": {
+    "displayFontFamily": "Plus Jakarta Sans",
+    "textFontFamily": "Plus Jakarta Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous vertical breathing room. Clear grouping. Intentional padding. Thumb-zone focus.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Ionicons",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Bottom tab bar when content scrolls behind it",
+      "Sticky headers over scrolling content",
+      "Featured/hero cards frosted glass overlay on brand-tinted or photo backdrop"
+    ],
+    "dont's": [
+      "Form fields",
+      "Body text regions",
+      "General list rows"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Auth / Role Selection",
+      "purpose": "Secure entry point with explicit path selection for Locador (Owner) vs Locatário (Renter).",
+      "states": {
+        "loading": "Centered brand spinner",
+        "empty": "N/A",
+        "error": "Standard alert toast with Retry"
+      },
+      "layout": "Full-bleed background image with a vertical gradient scrim (transparent to surfaceInverse) at the bottom. The content sits in the bottom 40%: App logo/title, subtitle, and two large pill buttons for role selection, stacked vertically."
+    },
+    {
+      "name": "Locador Dashboard (Owner)",
+      "purpose": "A modular control center for the fleet manager showing real-time metrics, alerts, and quick actions.",
+      "states": {
+        "loading": "Skeleton of metric cards and list rows",
+        "empty": "Illustration of a parked car, 'Adicione seu primeiro veículo' (Add your first vehicle) + CTA",
+        "error": "Readable error message with a 'Tentar Novamente' button"
+      },
+      "layout": "Safe area header. Top section features a horizontal scroll of metric cards (Total earnings, Active Rentals, Pending Maintenance) using brandTertiary tints. Below, a 'Veículos Ativos' (Active Vehicles) modular list. Status badges (success/warning) indicate vehicle health/contract status. Bottom sticky tab bar with glass effect."
+    },
+    {
+      "name": "Locatário Home (Renter Marketplace)",
+      "purpose": "Browse available cars for rent with high-quality imagery and upfront pricing.",
+      "states": {
+        "loading": "Skeleton car cards",
+        "empty": "Empty road illustration, 'Nenhum carro disponível no momento' + Filter reset CTA",
+        "error": "Network error state + Retry"
+      },
+      "layout": "Search/Filter bar at the top (sticky with glass effect). Below, a stacked list of large car cards (surfaceSecondary). Each card has a prominent image, title (Make/Model), features as small chips, and a right-aligned price. The layout uses generous lg padding and avoids dense data."
+    },
+    {
+      "name": "Car Details & Booking",
+      "purpose": "Provides full vehicle information, maintenance status, and initiates the digital contract process.",
+      "states": {
+        "loading": "Image skeleton and text skeletons",
+        "empty": "N/A",
+        "error": "Failed to load details + Retry CTA"
+      },
+      "layout": "Hero image at the top with a back button (glass circle). Scrolling content below: Title, status badge, specs grid (2-col), maintenance log preview, and contract terms. A fixed bottom container (surface or glass) houses the primary CTA ('Assinar Contrato' / 'Book Now') spanning 100% width, respecting safe area."
+    },
+    {
+      "name": "Contract & Maintenance Tracker (Shared)",
+      "purpose": "View active contract terms, payment history, and scheduled maintenance.",
+      "states": {
+        "loading": "List skeletons",
+        "empty": "Illustration of documents, 'Nenhum contrato ativo'",
+        "error": "Failed to load contract + Retry"
+      },
+      "layout": "Tabbed view or segmented control (Contracts | Payments | Maintenance). List items use leading icons in brandTertiary tinted squares. Payment statuses use clear success/error text colors. For tracking, a visual timeline or progress tracker indicates the contract lifecycle or maintenance schedule."
+    }
+  ],
+  "images": {
+    "auth_bg": {
+      "url": "https://images.pexels.com/photos/29566884/pexels-photo-29566884.jpeg",
+      "alt": "Luxury car interior with red steering wheel"
+    },
+    "empty_road": {
+      "url": "https://images.unsplash.com/photo-1512036849132-48508f294900",
+      "alt": "Empty road between trees with cloudy sky"
+    },
+    "car_placeholder": {
+      "url": "https://images.pexels.com/photos/19868893/pexels-photo-19868893.jpeg",
+      "alt": "Side view of a black minimalist SUV"
+    },
+    "dashboard_hero": {
+      "url": "https://images.unsplash.com/photo-1625690180114-5530b1304127?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBjYXIlMjBkYXNoYm9hcmQlMjBzY3JlZW58ZW58MHx8fHwxNzg2ODE2NDg1fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Modern car dashboard screen"
+    },
+    "contract_keys": {
+      "url": "https://images.unsplash.com/photo-1533558701576-23c65e0272fb",
+      "alt": "Person holding Mercedes-Benz fob"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Design Identity: Adopt the '1 iOS-Native Clean' personality. Do NOT use ANY blue, indigo, or purple. Use the provided Moss Green (#4A5D23) for all primary branding/accents.",
+    "Navigation Structure: Implement two distinct tab-based navigation trees based on the user's role (Locador vs. Locatário) determined at Auth.",
+    "Role - Locador: Focus on a dashboard UI. Use a modular card layout for top-level metrics, keeping data highly legible and utilizing status colors (success, warning) for fleet health and contract alerts.",
+    "Role - Locatário: Focus on an e-commerce/marketplace feel. The home screen should prominently feature high-quality car images, clear pricing, and a smooth booking flow.",
+    "Glassmorphism: Use Expo's blur for the bottom tab bar and sticky headers. For hero images with text overlays (like the Auth screen), absolutely implement a vertical gradient scrim (transparent to surfaceInverse) to guarantee WCAG text contrast.",
+    "Spacing & Interaction: Ensure all primary actions (like 'Assinar Contrato') are housed in a sticky bottom container that clears the safe area. Hit targets must be at least 44x44pt.",
+    "Visual Hierarchy: Rely on font size and spacing for hierarchy instead of heavy font weights (max 500 weight). Use Plus Jakarta Sans throughout, ensuring a clean, modern aesthetic."
+  ]
+}
