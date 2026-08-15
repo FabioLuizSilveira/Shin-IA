@@ -28,20 +28,32 @@ export interface OnboardingStep2 {
 }
 
 export interface OnboardingStep3 {
-  adminEmail: string;
-  adminFullName: string;
-}
-
-export interface OnboardingStep4 {
   blueprintId: BlueprintId;
 }
 
+// Login-first flow (Unified Commercial Flow): the authenticated user IS the
+// tenant admin/representative — no separate "invite an admin" step anymore.
+// Their email comes from the session; only display name + legal
+// representative fields are collected, in Step 5.
+export interface OnboardingStep4 {
+  planVersionId: string;
+}
+
+export interface OnboardingStep5 {
+  representativeName: string;
+  representativeRole: string;
+  representativeDocument?: string;
+  declaredAuthority: boolean;
+  contractAccepted: boolean;
+}
+
 export interface OnboardingState {
-  step: 1 | 2 | 3 | 4;
+  step: 1 | 2 | 3 | 4 | 5;
   step1: Partial<OnboardingStep1>;
   step2: Partial<OnboardingStep2>;
   step3: Partial<OnboardingStep3>;
   step4: Partial<OnboardingStep4>;
+  step5: Partial<OnboardingStep5>;
 }
 
 export interface OnboardingPayload {
@@ -49,6 +61,7 @@ export interface OnboardingPayload {
   step2: OnboardingStep2;
   step3: OnboardingStep3;
   step4: OnboardingStep4;
+  step5: OnboardingStep5;
 }
 
 export const SEGMENT_LABELS: Record<TenantSegment, string> = {

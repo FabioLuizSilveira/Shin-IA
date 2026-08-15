@@ -19,8 +19,13 @@ const SITE_PATHS = ["/", "/pricing", "/contact", "/about", "/demo"];
 const APP_PUBLIC_PATHS = [
   "/login",
   "/auth",
+  // /onboarding (the page) stays public so an unauthenticated visitor can
+  // land on it and see the login step (Unified Commercial Flow: login
+  // happens first, inside the wizard). /api/onboarding/* is deliberately
+  // NOT public anymore — /complete and /status both require a real session
+  // now that contract_acceptances.user_id is never null.
   "/onboarding",
-  "/api/onboarding",
+  "/api/commercial",
   "/api/auth",
   "/api/webhooks",
   "/rentals/login",
@@ -311,6 +316,25 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/tenant/billing";
     url.searchParams.set("upgrade", "1");
+    return NextResponse.redirect(url);
+  }
+
+  // ── 2.7. Material contract re-acceptance gate ───────────────────────────────
+  // item 23: a new contract_version flagged material_change=true blocks
+  // sensitive admin pages until re-accepted — but never blocks billing (so a
+  // tenant can still see/pay invoices), the reaccept page itself, or data
+  // export/regularization routes (item 10's explicit carve-out).
+  if (
+    user &&
+    claims.tenant_id &&
+    !isApiRoute &&
+    claims.platform_contract_current === false &&
+    pathname.startsWith("/tenant") &&
+    !pathname.startsWith("/tenant/billing") &&
+    !pathname.startsWith("/tenant/legal")
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/tenant/legal/reaccept";
     return NextResponse.redirect(url);
   }
 

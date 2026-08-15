@@ -16,6 +16,7 @@ const PUBLIC_PATHS = [
   "/api/auth",
   "/api/mcp",
   "/api/checkout",
+  "/api/commercial",
   "/api/webhooks",
 ];
 

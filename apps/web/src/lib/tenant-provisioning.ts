@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { provisionPlatformSubscription } from "@/lib/platform-subscription";
+import {
+  recordContractAcceptance,
+  createCommercialCheckout,
+  type RepresentativeInfo,
+  type RequestContext,
+} from "@shina/commercial-platform";
+import { createBillingProvider } from "@shina/billing-platform";
 
 // System roles every tenant gets on creation — mirrors what the demo tenant
 // (Acme Logística) already has. tenant_roles is a PER-TENANT table (each
@@ -19,6 +26,23 @@ const SYSTEM_ROLES = [
   { key: "operations_manager", name: "Operations Manager" },
 ] as const;
 
+// Present only for the public, login-first onboarding flow (Unified
+// Commercial Flow). Absent for the platform-staff "create tenant" action
+// (/api/tenants POST), which stays exactly as it was: instant activation,
+// no checkout — that path is the deliberate manual/enterprise-vetted
+// equivalent of billing_mode "manual_contract" (item 26), not something this
+// refactor forces through Stripe.
+export interface CommercialOnboardingInput {
+  userId: string;
+  email: string;
+  planVersionId: string;
+  representative: RepresentativeInfo;
+  request: RequestContext;
+  /** tenantId is appended as ?tenant_id=... once known (created inside this function). */
+  successUrlBase: string;
+  cancelUrl: string;
+}
+
 export interface ProvisionTenantInput {
   name: string;
   slug: string;
@@ -30,35 +54,42 @@ export interface ProvisionTenantInput {
   tenantMetadata?: Record<string, unknown>;
   adminEmail: string;
   adminFullName: string;
-  /** Redirect after the admin accepts the invite email. */
+  /** Redirect after the admin accepts the invite email (non-commercial path only). */
   inviteRedirectTo: string;
+  commercial?: CommercialOnboardingInput;
 }
 
 export interface ProvisionTenantResult {
   tenantId: string;
   slug: string;
   inviteSent: boolean;
+  /** Present only when `commercial` was supplied — send the caller here next. */
+  checkoutUrl?: string;
 }
 
-// Single provisioning path for both the public onboarding wizard and the
-// platform-staff "create tenant" action — previously two independent,
-// diverging implementations (see git history of api/tenants and
-// api/onboarding/complete). Always invites the admin by email (magic-link
-// style) rather than setting a password directly: the public login UI has
-// no password field since the Shinã Identity passwordless-login change, so
-// a directly-set password would have been permanently unusable.
+// Single provisioning path for the public onboarding wizard, the
+// platform-staff "create tenant" action, AND (new) the commercial-flow
+// checkout gate. Always invites the admin by email (magic-link style)
+// rather than setting a password directly EXCEPT in the commercial-flow
+// case, where the caller is already an authenticated auth.users row
+// (login-first — see onboarding-wizard.tsx's AuthGate) and inviting them
+// again would be redundant/wrong.
 export async function provisionTenant(
   admin: SupabaseClient,
   input: ProvisionTenantInput,
 ): Promise<ProvisionTenantResult> {
   const tenantId = crypto.randomUUID();
+  // Commercial-flow tenants start pending_payment — real activation only
+  // happens when the Stripe webhook confirms (item 16: "webhook é fonte de
+  // verdade"), never here and never from a success-page redirect.
+  const initialStatus = input.commercial ? "pending_payment" : input.status;
 
   const { error: tenantError } = await admin.from("tenants").insert({
     id: tenantId,
     name: input.name,
     slug: input.slug,
     plan: input.plan,
-    status: input.status,
+    status: initialStatus,
     metadata: input.tenantMetadata ?? {},
   });
   if (tenantError) throw new Error(`tenant insert failed: ${tenantError.message}`);
@@ -92,48 +123,65 @@ export async function provisionTenant(
     await admin.from("tenants").delete().eq("id", tenantId);
     throw new Error(`system roles insert failed: ${rolesError.message}`);
   }
+  const ownerRoleId = roleRows.find((r) => r.key === "tenant_owner")!.id;
   const adminRoleId = roleRows.find((r) => r.key === "tenant_admin")!.id;
 
-  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
-    input.adminEmail,
-    {
-      data: { full_name: input.adminFullName, tenant_id: tenantId, role: "tenant_admin" },
-      redirectTo: input.inviteRedirectTo,
-    },
-  );
+  let authUserId: string | null = null;
+  let inviteSent = false;
 
-  let authUserId = inviteData?.user?.id ?? null;
-  if (inviteError) {
-    // Most common cause: the email already has an auth.users row (e.g. an
-    // existing platform user being made an admin of a new tenant) — link
-    // the existing user instead of failing the whole provisioning flow.
-    const { data: userList } = await admin.auth.admin.listUsers();
-    authUserId = userList?.users?.find((u) => u.email === input.adminEmail)?.id ?? null;
+  if (input.commercial) {
+    // Already a real, authenticated identity — no invite round trip needed.
+    authUserId = input.commercial.userId;
+  } else {
+    const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
+      input.adminEmail,
+      {
+        data: { full_name: input.adminFullName, tenant_id: tenantId, role: "tenant_admin" },
+        redirectTo: input.inviteRedirectTo,
+      },
+    );
+
+    authUserId = inviteData?.user?.id ?? null;
+    if (inviteError) {
+      // Most common cause: the email already has an auth.users row (e.g. an
+      // existing platform user being made an admin of a new tenant) — link
+      // the existing user instead of failing the whole provisioning flow.
+      const { data: userList } = await admin.auth.admin.listUsers();
+      authUserId = userList?.users?.find((u) => u.email === input.adminEmail)?.id ?? null;
+    }
+    inviteSent = !inviteError;
   }
 
-  if (authUserId) {
-    const profileId = crypto.randomUUID();
-    const { error: profileError } = await admin.from("user_profiles").insert({
-      id: profileId,
-      tenant_id: tenantId,
-      auth_user_id: authUserId,
-      email: input.adminEmail,
-      full_name: input.adminFullName,
-      status: "active",
-    });
-    if (!profileError) {
-      await admin
-        .from("tenant_user_roles")
-        .insert({
-          id: crypto.randomUUID(),
-          tenant_id: tenantId,
-          user_id: profileId,
-          role_id: adminRoleId,
-        });
-    } else {
-      console.error("[tenant-provisioning] profile insert failed:", profileError);
-    }
+  if (!authUserId) {
+    console.error("[tenant-provisioning] could not resolve an auth user for", input.adminEmail);
+    return { tenantId, slug: input.slug, inviteSent };
+  }
 
+  const profileId = crypto.randomUUID();
+  const { error: profileError } = await admin.from("user_profiles").insert({
+    id: profileId,
+    tenant_id: tenantId,
+    auth_user_id: authUserId,
+    email: input.adminEmail,
+    full_name: input.adminFullName,
+    status: "active",
+  });
+  // The commercial-flow representative becomes tenant_owner (they're the one
+  // who accepted the contract on the org's behalf); the staff-assisted path
+  // keeps its existing tenant_admin default.
+  const roleForAdmin = input.commercial ? ownerRoleId : adminRoleId;
+  if (!profileError) {
+    await admin.from("tenant_user_roles").insert({
+      id: crypto.randomUUID(),
+      tenant_id: tenantId,
+      user_id: profileId,
+      role_id: roleForAdmin,
+    });
+  } else {
+    console.error("[tenant-provisioning] profile insert failed:", profileError);
+  }
+
+  if (!input.commercial) {
     await provisionPlatformSubscription(admin, {
       authUserId,
       email: input.adminEmail,
@@ -141,9 +189,40 @@ export async function provisionTenant(
       planKey: input.plan,
       status: input.status,
     });
-  } else {
-    console.error("[tenant-provisioning] could not resolve an auth user for", input.adminEmail);
+    return { tenantId, slug: input.slug, inviteSent };
   }
 
-  return { tenantId, slug: input.slug, inviteSent: !inviteError };
+  // ── Commercial flow: accept -> snapshot -> checkout. No subscription row
+  // exists until the webhook creates one (see api/webhooks/stripe-commercial).
+  try {
+    const acceptance = await recordContractAcceptance(admin, {
+      tenantId,
+      userId: input.commercial.userId,
+      product: "platform",
+      planVersionId: input.commercial.planVersionId,
+      representative: input.commercial.representative,
+      request: input.commercial.request,
+    });
+
+    const billingProvider = createBillingProvider(admin);
+    const { url } = await createCommercialCheckout(admin, billingProvider, {
+      tenantId,
+      userId: input.commercial.userId,
+      email: input.commercial.email,
+      product: "platform",
+      planVersionId: input.commercial.planVersionId,
+      contractAcceptanceId: acceptance.contractAcceptanceId,
+      commercialTermsSnapshotId: acceptance.commercialTermsSnapshotId,
+      successUrl: `${input.commercial.successUrlBase}?tenant_id=${tenantId}`,
+      cancelUrl: input.commercial.cancelUrl,
+    });
+
+    return { tenantId, slug: input.slug, inviteSent, checkoutUrl: url };
+  } catch (err) {
+    // Roll back the pending tenant entirely — a tenant stuck in
+    // pending_payment with no way to ever reach checkout is worse than no
+    // tenant at all.
+    await admin.from("tenants").delete().eq("id", tenantId);
+    throw err;
+  }
 }

@@ -1,21 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 import {
   Building2,
   MapPin,
   UserPlus,
   Layers,
+  CreditCard,
+  FileText,
   CheckCircle2,
   ArrowRight,
   ArrowLeft,
+  Loader2,
+  Mail,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import type {
   OnboardingState,
   OnboardingStep1,
   OnboardingStep2,
   OnboardingStep3,
   OnboardingStep4,
+  OnboardingStep5,
   BlueprintId,
   TenantSegment,
 } from "@/types/onboarding";
@@ -24,8 +31,9 @@ import { SEGMENT_LABELS, BLUEPRINT_OPTIONS } from "@/types/onboarding";
 const STEPS = [
   { number: 1, label: "Empresa", icon: Building2 },
   { number: 2, label: "Sede", icon: MapPin },
-  { number: 3, label: "Admin", icon: UserPlus },
-  { number: 4, label: "Blueprint", icon: Layers },
+  { number: 3, label: "Blueprint", icon: Layers },
+  { number: 4, label: "Plano", icon: CreditCard },
+  { number: 5, label: "Contrato", icon: FileText },
 ];
 
 const BRAZIL_STATES = [
@@ -66,6 +74,122 @@ function formatCNPJ(value: string) {
     .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
     .replace(/\.(\d{3})(\d)/, ".$1/$2")
     .replace(/(\d{4})(\d)/, "$1-$2");
+}
+
+// ─── Step 0: Authentication (login-first — Unified Commercial Flow) ────────
+// No company/contract data is collected before the person is a real,
+// identified auth.users row — this is what makes contract_acceptances.user_id
+// always non-null downstream (no more anonymous-onboarding exception).
+
+function AuthGate({ onAuthenticated }: { onAuthenticated: (session: Session) => void }) {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState<"google" | "magic" | null>(null);
+  const [magicSent, setMagicSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleGoogle() {
+    setLoading("google");
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
+      });
+      if (error) throw error;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao iniciar login.");
+      setLoading(null);
+    }
+  }
+
+  async function handleMagicLink(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading("magic");
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
+      });
+      if (error) throw error;
+      setMagicSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao enviar o link.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Crie sua conta</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          Antes de configurar sua empresa, identifique-se — é você quem vai assinar o contrato em
+          nome da organização.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <button
+          type="button"
+          onClick={() => void handleGoogle()}
+          disabled={loading !== null}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-900 text-sm font-semibold rounded-xl border border-slate-200 cursor-pointer transition disabled:opacity-60"
+        >
+          {loading === "google" && <Loader2 className="w-4 h-4 animate-spin" />}
+          Continuar com Google
+        </button>
+
+        <div className="flex items-center gap-3 py-1">
+          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+          <span className="text-xs text-slate-400">ou</span>
+          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+        </div>
+
+        {magicSent ? (
+          <div className="px-4 py-3 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900 rounded-xl text-sm text-green-700 dark:text-green-300 text-center">
+            Link enviado! Verifique seu e-mail para continuar.
+          </div>
+        ) : (
+          <form onSubmit={(e) => void handleMagicLink(e)} className="space-y-2">
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu@email.com.br"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            />
+            <button
+              type="submit"
+              disabled={loading !== null}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
+            >
+              {loading === "magic" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Mail className="w-4 h-4" />
+              )}
+              Continuar com e-mail
+            </button>
+          </form>
+        )}
+
+        {error && (
+          <div className="px-4 py-2.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-xl text-sm text-red-700 dark:text-red-300">
+            {error}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // onAuthenticated is invoked by the parent's onAuthStateChange listener,
+  // not from here — keeping this component pure UI/trigger only.
+  void onAuthenticated;
 }
 
 // ─── Step 1: Company Data ───────────────────────────────────────────────────
@@ -243,71 +367,16 @@ function validateStep2(d: Partial<OnboardingStep2>): string | null {
   return null;
 }
 
-// ─── Step 3: Admin Invite ───────────────────────────────────────────────────
+// ─── Step 3: Blueprint ──────────────────────────────────────────────────────
 
 function Step3({
-  data,
-  onChange,
-}: {
-  data: Partial<OnboardingStep3>;
-  onChange: (d: Partial<OnboardingStep3>) => void;
-}) {
-  return (
-    <div className="space-y-5">
-      <div className="p-4 bg-blue-50 dark:bg-blue-950/50 rounded-xl border border-blue-100 dark:border-blue-900">
-        <p className="text-sm text-blue-700 dark:text-blue-300">
-          O administrador terá acesso total à plataforma e poderá convidar outros usuários. Um email
-          de acesso será enviado automaticamente.
-        </p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-          Nome completo <span className="text-red-500">*</span>
-        </label>
-        <input
-          id="ob-admin-name"
-          type="text"
-          placeholder="Ex: João Silva"
-          value={data.adminFullName ?? ""}
-          onChange={(e) => onChange({ ...data, adminFullName: e.target.value })}
-          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-          Email <span className="text-red-500">*</span>
-        </label>
-        <input
-          id="ob-admin-email"
-          type="email"
-          placeholder="admin@suaempresa.com.br"
-          value={data.adminEmail ?? ""}
-          onChange={(e) => onChange({ ...data, adminEmail: e.target.value })}
-          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-        />
-      </div>
-    </div>
-  );
-}
-
-function validateStep3(d: Partial<OnboardingStep3>): string | null {
-  if (!d.adminFullName?.trim()) return "Nome do administrador é obrigatório.";
-  if (!d.adminEmail?.trim() || !d.adminEmail.includes("@")) return "Email inválido.";
-  return null;
-}
-
-// ─── Step 4: Blueprint ──────────────────────────────────────────────────────
-
-function Step4({
   data,
   segment,
   onChange,
 }: {
-  data: Partial<OnboardingStep4>;
+  data: Partial<OnboardingStep3>;
   segment: TenantSegment | undefined;
-  onChange: (d: Partial<OnboardingStep4>) => void;
+  onChange: (d: Partial<OnboardingStep3>) => void;
 }) {
   const recommended = BLUEPRINT_OPTIONS.filter((b) =>
     segment ? b.segments.includes(segment) : false,
@@ -406,8 +475,223 @@ function BlueprintCard({
   );
 }
 
-function validateStep4(d: Partial<OnboardingStep4>): string | null {
+function validateStep3(d: Partial<OnboardingStep3>): string | null {
   if (!d.blueprintId) return "Selecione um blueprint para continuar.";
+  return null;
+}
+
+// ─── Step 4: Plan ───────────────────────────────────────────────────────────
+
+interface PlanOption {
+  id: string;
+  name: string;
+  price_cents: number;
+  currency: string;
+  billing_cycle: string;
+  trial_days: number;
+  included_features: string[];
+}
+
+function Step4({
+  data,
+  onChange,
+}: {
+  data: Partial<OnboardingStep4>;
+  onChange: (d: Partial<OnboardingStep4>) => void;
+}) {
+  const [plans, setPlans] = useState<PlanOption[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/commercial/plans?product=platform")
+      .then((res) => res.json() as Promise<{ data?: PlanOption[]; error?: string }>)
+      .then((json) => {
+        if (json.error) throw new Error(json.error);
+        setPlans(json.data ?? []);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, []);
+
+  function formatPrice(cents: number, currency: string) {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(cents / 100);
+  }
+
+  if (error) return <p className="text-sm text-red-600 dark:text-red-400">{error}</p>;
+  if (!plans) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {plans.map((plan) => (
+        <button
+          key={plan.id}
+          id={`ob-plan-${plan.id}`}
+          type="button"
+          onClick={() => onChange({ planVersionId: plan.id })}
+          className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all ${
+            data.planVersionId === plan.id
+              ? "border-blue-500 bg-blue-50 dark:bg-blue-950/60 shadow-sm"
+              : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{plan.name}</p>
+            {data.planVersionId === plan.id && (
+              <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+            )}
+          </div>
+          <p className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+            {formatPrice(plan.price_cents, plan.currency)}
+            <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
+              {" "}
+              /{plan.billing_cycle === "yearly" ? "ano" : "mês"}
+            </span>
+          </p>
+          {plan.trial_days > 0 && (
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+              {plan.trial_days} dias grátis
+            </p>
+          )}
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
+            {plan.included_features.join(" · ")}
+          </p>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function validateStep4(d: Partial<OnboardingStep4>): string | null {
+  if (!d.planVersionId) return "Selecione um plano para continuar.";
+  return null;
+}
+
+// ─── Step 5: Contract ───────────────────────────────────────────────────────
+
+interface ContractInfo {
+  id: string;
+  title: string;
+  content: string;
+}
+
+function Step5({
+  data,
+  onChange,
+}: {
+  data: Partial<OnboardingStep5>;
+  onChange: (d: Partial<OnboardingStep5>) => void;
+}) {
+  const [contract, setContract] = useState<ContractInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/commercial/contract?product=platform")
+      .then((res) => res.json() as Promise<{ data?: ContractInfo; error?: string }>)
+      .then((json) => {
+        if (json.error) throw new Error(json.error);
+        if (json.data) setContract(json.data);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+      <div className="h-40 overflow-y-auto px-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+        {contract ? (
+          <>
+            <p className="font-semibold text-slate-800 dark:text-slate-200 mb-1">
+              {contract.title}
+            </p>
+            {contract.content}
+          </>
+        ) : (
+          <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+          Seu nome completo <span className="text-red-500">*</span>
+        </label>
+        <input
+          id="ob-representative-name"
+          type="text"
+          placeholder="Ex: João Silva"
+          value={data.representativeName ?? ""}
+          onChange={(e) => onChange({ ...data, representativeName: e.target.value })}
+          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+          Cargo <span className="text-red-500">*</span>
+        </label>
+        <input
+          id="ob-representative-role"
+          type="text"
+          placeholder="Ex: Sócio-diretor"
+          value={data.representativeRole ?? ""}
+          onChange={(e) => onChange({ ...data, representativeRole: e.target.value })}
+          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+          CPF <span className="text-slate-400 text-xs">(opcional)</span>
+        </label>
+        <input
+          id="ob-representative-document"
+          type="text"
+          placeholder="000.000.000-00"
+          value={data.representativeDocument ?? ""}
+          onChange={(e) => onChange({ ...data, representativeDocument: e.target.value })}
+          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+        />
+      </div>
+
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input
+          id="ob-declared-authority"
+          type="checkbox"
+          checked={data.declaredAuthority ?? false}
+          onChange={(e) => onChange({ ...data, declaredAuthority: e.target.checked })}
+          className="mt-0.5"
+        />
+        <span className="text-sm text-slate-600 dark:text-slate-400">
+          Declaro possuir poderes suficientes para aceitar este instrumento em nome da organização.
+        </span>
+      </label>
+
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input
+          id="ob-contract-accepted"
+          type="checkbox"
+          checked={data.contractAccepted ?? false}
+          onChange={(e) => onChange({ ...data, contractAccepted: e.target.checked })}
+          className="mt-0.5"
+        />
+        <span className="text-sm text-slate-600 dark:text-slate-400">
+          Li e aceito o Contrato-Mestre e as condições do plano selecionado.
+        </span>
+      </label>
+    </div>
+  );
+}
+
+function validateStep5(d: Partial<OnboardingStep5>): string | null {
+  if (!d.representativeName?.trim()) return "Informe seu nome completo.";
+  if (!d.representativeRole?.trim()) return "Informe seu cargo.";
+  if (!d.declaredAuthority) return "É necessário declarar poderes de representação.";
+  if (!d.contractAccepted) return "É necessário aceitar o contrato para continuar.";
   return null;
 }
 
@@ -425,7 +709,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
           <div key={step.number} className="flex items-center">
             <div className="flex flex-col items-center">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
                   isCompleted
                     ? "bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-blue-900"
                     : isActive
@@ -433,10 +717,14 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
                       : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
                 }`}
               >
-                {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-4 h-4" />}
+                {isCompleted ? (
+                  <CheckCircle2 className="w-4 h-4" />
+                ) : (
+                  <Icon className="w-3.5 h-3.5" />
+                )}
               </div>
               <span
-                className={`text-xs font-medium mt-1.5 ${
+                className={`text-[10px] font-medium mt-1.5 ${
                   isActive
                     ? "text-blue-600 dark:text-blue-400"
                     : isCompleted
@@ -449,7 +737,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
             </div>
             {idx < STEPS.length - 1 && (
               <div
-                className={`w-16 h-0.5 mx-1 mb-5 transition-all duration-300 ${
+                className={`w-8 h-0.5 mx-1 mb-5 transition-all duration-300 ${
                   currentStep > step.number ? "bg-blue-500" : "bg-slate-200 dark:bg-slate-700"
                 }`}
               />
@@ -468,16 +756,26 @@ interface OnboardingWizardProps {
 }
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [state, setState] = useState<OnboardingState>({
     step: 1,
     step1: {},
     step2: {},
     step3: {},
     step4: {},
+    step5: {},
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   function handleNext() {
     setError(null);
@@ -486,13 +784,14 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (state.step === 1) validationError = validateStep1(state.step1);
     else if (state.step === 2) validationError = validateStep2(state.step2);
     else if (state.step === 3) validationError = validateStep3(state.step3);
+    else if (state.step === 4) validationError = validateStep4(state.step4);
 
     if (validationError) {
       setError(validationError);
       return;
     }
 
-    if (state.step < 4) {
+    if (state.step < 5) {
       setState((prev) => ({ ...prev, step: (prev.step + 1) as OnboardingState["step"] }));
     }
   }
@@ -505,7 +804,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }
 
   async function handleSubmit() {
-    const validationError = validateStep4(state.step4);
+    const validationError = validateStep5(state.step5);
     if (validationError) {
       setError(validationError);
       return;
@@ -521,19 +820,18 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           step2: state.step2,
           step3: state.step3,
           step4: state.step4,
+          step5: state.step5,
         }),
       });
 
-      if (!res.ok) {
-        const json = (await res.json()) as { error?: string };
-        throw new Error(json.error ?? "Erro ao finalizar onboarding.");
-      }
+      const json = (await res.json()) as { checkoutUrl?: string; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Erro ao finalizar onboarding.");
+      if (!json.checkoutUrl) throw new Error("Checkout não retornou uma URL válida.");
 
-      setDone(true);
-      setTimeout(() => {
-        onComplete?.();
-        window.location.href = "/dashboard";
-      }, 2500);
+      onComplete?.();
+      // Real activation only happens after the webhook confirms payment —
+      // Stripe Checkout is the next stop, not the dashboard (item 34).
+      window.location.href = json.checkoutUrl;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro inesperado. Tente novamente.";
       setError(msg);
@@ -542,30 +840,16 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
   }
 
-  // ── Success screen ──
-  if (done) {
+  if (session === undefined) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
-        <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center animate-bounce-once">
-          <CheckCircle2 className="w-10 h-10 text-green-600 dark:text-green-400" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-          Configuração concluída!
-        </h2>
-        <p className="text-slate-500 dark:text-slate-400 max-w-xs">
-          Sua plataforma está pronta. Redirecionando para o dashboard...
-        </p>
-        <div className="flex gap-1.5 mt-2">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"
-              style={{ animationDelay: `${i * 0.2}s` }}
-            />
-          ))}
-        </div>
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
       </div>
     );
+  }
+
+  if (!session) {
+    return <AuthGate onAuthenticated={() => undefined} />;
   }
 
   return (
@@ -594,19 +878,29 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         )}
         {state.step === 3 && (
           <>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Administrador</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              Escolha um Blueprint
+            </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Defina o usuário administrador da plataforma.
+              Configuração inicial baseada no seu segmento.
             </p>
           </>
         )}
         {state.step === 4 && (
           <>
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-              Escolha um Blueprint
+              Escolha seu plano
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Configuração inicial baseada no seu segmento.
+              Você poderá mudar de plano a qualquer momento depois.
+            </p>
+          </>
+        )}
+        {state.step === 5 && (
+          <>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Contrato</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              Revise e aceite antes de prosseguir para o pagamento.
             </p>
           </>
         )}
@@ -621,14 +915,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           <Step2 data={state.step2} onChange={(d) => setState((s) => ({ ...s, step2: d }))} />
         )}
         {state.step === 3 && (
-          <Step3 data={state.step3} onChange={(d) => setState((s) => ({ ...s, step3: d }))} />
+          <Step3
+            data={state.step3}
+            segment={state.step1.segment}
+            onChange={(d) => setState((s) => ({ ...s, step3: d }))}
+          />
         )}
         {state.step === 4 && (
-          <Step4
-            data={state.step4}
-            segment={state.step1.segment}
-            onChange={(d) => setState((s) => ({ ...s, step4: d }))}
-          />
+          <Step4 data={state.step4} onChange={(d) => setState((s) => ({ ...s, step4: d }))} />
+        )}
+        {state.step === 5 && (
+          <Step5 data={state.step5} onChange={(d) => setState((s) => ({ ...s, step5: d }))} />
         )}
       </div>
 
@@ -655,7 +952,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           Voltar
         </button>
 
-        {state.step < 4 ? (
+        {state.step < 5 ? (
           <button
             id="ob-next"
             type="button"
@@ -676,12 +973,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             {loading ? (
               <>
                 <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                Configurando...
+                Redirecionando...
               </>
             ) : (
               <>
-                <CheckCircle2 className="w-4 h-4" />
-                Finalizar configuração
+                <UserPlus className="w-4 h-4" />
+                Aceitar e ir para pagamento
               </>
             )}
           </button>

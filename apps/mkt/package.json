@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@shina/billing-platform": "workspace:*",
+    "@shina/commercial-platform": "workspace:*",
     "@shina/marketing-ai": "workspace:*",
     "@shina/tokens": "workspace:*",
     "@shina/theme": "workspace:*",

@@ -6,6 +6,7 @@ import {
   type OnboardingStep2,
   type OnboardingStep3,
   type OnboardingStep4,
+  type OnboardingStep5,
   type TenantSegment,
   type BlueprintId,
 } from "../../types/onboarding";
@@ -28,13 +29,20 @@ function validateStep2(d: Partial<OnboardingStep2>): string | null {
 }
 
 function validateStep3(d: Partial<OnboardingStep3>): string | null {
-  if (!d.adminFullName?.trim()) return "Nome do administrador é obrigatório.";
-  if (!d.adminEmail?.trim() || !d.adminEmail.includes("@")) return "Email inválido.";
+  if (!d.blueprintId) return "Selecione um blueprint para continuar.";
   return null;
 }
 
 function validateStep4(d: Partial<OnboardingStep4>): string | null {
-  if (!d.blueprintId) return "Selecione um blueprint para continuar.";
+  if (!d.planVersionId) return "Selecione um plano para continuar.";
+  return null;
+}
+
+function validateStep5(d: Partial<OnboardingStep5>): string | null {
+  if (!d.representativeName?.trim()) return "Informe seu nome completo.";
+  if (!d.representativeRole?.trim()) return "Informe seu cargo.";
+  if (!d.declaredAuthority) return "É necessário declarar poderes de representação.";
+  if (!d.contractAccepted) return "É necessário aceitar o contrato para continuar.";
   return null;
 }
 
@@ -130,33 +138,52 @@ describe("validateStep2 — Main Branch", () => {
   });
 });
 
-describe("validateStep3 — Admin Invite", () => {
-  it("passes with valid data", () => {
-    expect(
-      validateStep3({ adminFullName: "João Silva", adminEmail: "joao@empresa.com" }),
-    ).toBeNull();
-  });
-
-  it("requires admin name", () => {
-    expect(validateStep3({ adminFullName: "", adminEmail: "joao@empresa.com" })).toMatch(/nome/i);
-  });
-
-  it("requires @ in email", () => {
-    expect(validateStep3({ adminFullName: "João", adminEmail: "noemail" })).toMatch(/email/i);
-  });
-
-  it("requires non-empty email", () => {
-    expect(validateStep3({ adminFullName: "João", adminEmail: "" })).toMatch(/email/i);
-  });
-});
-
-describe("validateStep4 — Blueprint", () => {
+describe("validateStep3 — Blueprint", () => {
   it("passes when blueprintId is set", () => {
-    expect(validateStep4({ blueprintId: "logistics_truck" })).toBeNull();
+    expect(validateStep3({ blueprintId: "logistics_truck" })).toBeNull();
   });
 
   it("fails when blueprintId is missing", () => {
-    expect(validateStep4({})).toMatch(/blueprint/i);
+    expect(validateStep3({})).toMatch(/blueprint/i);
+  });
+});
+
+describe("validateStep4 — Plan", () => {
+  it("passes when planVersionId is set", () => {
+    expect(validateStep4({ planVersionId: "pv-1" })).toBeNull();
+  });
+
+  it("fails when planVersionId is missing", () => {
+    expect(validateStep4({})).toMatch(/plano/i);
+  });
+});
+
+describe("validateStep5 — Contract", () => {
+  const valid: OnboardingStep5 = {
+    representativeName: "João Silva",
+    representativeRole: "Sócio-diretor",
+    declaredAuthority: true,
+    contractAccepted: true,
+  };
+
+  it("passes with valid data", () => {
+    expect(validateStep5(valid)).toBeNull();
+  });
+
+  it("requires representative name", () => {
+    expect(validateStep5({ ...valid, representativeName: "" })).toMatch(/nome/i);
+  });
+
+  it("requires representative role", () => {
+    expect(validateStep5({ ...valid, representativeRole: "" })).toMatch(/cargo/i);
+  });
+
+  it("requires declared authority", () => {
+    expect(validateStep5({ ...valid, declaredAuthority: false })).toMatch(/poderes/i);
+  });
+
+  it("requires contract acceptance", () => {
+    expect(validateStep5({ ...valid, contractAccepted: false })).toMatch(/aceitar/i);
   });
 });
 

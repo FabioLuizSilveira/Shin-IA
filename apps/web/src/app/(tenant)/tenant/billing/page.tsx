@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable } from "@/components/ui/data-table";
@@ -144,7 +145,17 @@ export default function TenantBillingPage() {
       <SectionHeader
         title="Faturas"
         description="Faturas emitidas para as organizações vinculadas à sua conta."
-        action={<ExportButton entity="invoices" />}
+        action={
+          <div className="flex items-center gap-2">
+            <Link
+              href="/tenant/billing/upgrade"
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-shina-blue text-white hover:bg-blue-600 transition no-underline"
+            >
+              Mudar de plano
+            </Link>
+            <ExportButton entity="invoices" />
+          </div>
+        }
       />
 
       {error && (
