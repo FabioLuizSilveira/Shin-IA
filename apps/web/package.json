@@ -19,6 +19,7 @@
     "@shina/commission-engine": "workspace:*",
     "@shina/reporting-engine": "workspace:*",
     "@shina/tracking-engine": "workspace:*",
+    "@shina/tenant-contract-engine": "workspace:*",
     "@shina/studio": "workspace:*",
     "@shina/tokens": "workspace:*",
     "@shina/theme": "workspace:*",

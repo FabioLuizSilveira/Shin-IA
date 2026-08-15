@@ -3,6 +3,7 @@ import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 import { createNotification } from "@/lib/notifications/create-notification";
+import { OperationContractGate } from "@shina/tenant-contract-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,50 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         { status: 422 },
       );
     }
+
+    // OperationContractGate — pending -> in_progress is the real "release
+    // the operation" moment in this 5-state enum (the spec's separate
+    // approved/scheduled states don't exist here, documented deviation).
+    // Only the customer side gates: an operator is typically the tenant's
+    // own employee or the equipment owner, never a release precondition.
+    if (body.status === "in_progress") {
+      const { data: requirement } = await scope.db
+        .from("tenant_contract_requirements")
+        .select("contract_id")
+        .eq("operation_id", id)
+        .eq("party_type", "customer")
+        .order("resolved_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const gateResult = await OperationContractGate.check(scope.db, {
+        contractId: requirement?.contract_id ?? null,
+      });
+      if (gateResult.blocked) {
+        void logActivity(scope.db, {
+          tenantId: scope.tenantId,
+          actorId: scope.userId,
+          entityType: "operation",
+          entityId: id,
+          action: "contract.operation_blocked",
+          metadata: { reasons: gateResult.reasons },
+        });
+        return NextResponse.json(
+          { error: "contract_requirement_not_met", reasons: gateResult.reasons },
+          { status: 422 },
+        );
+      }
+      if (requirement?.contract_id) {
+        void logActivity(scope.db, {
+          tenantId: scope.tenantId,
+          actorId: scope.userId,
+          entityType: "operation",
+          entityId: id,
+          action: "contract.operation_released",
+        });
+      }
+    }
+
     update.status = body.status;
     if (body.status === "in_progress") update.started_at = new Date().toISOString();
     if (body.status === "completed") update.completed_at = new Date().toISOString();

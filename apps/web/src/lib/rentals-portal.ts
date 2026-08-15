@@ -25,6 +25,15 @@ export interface Rental {
   period_starts_at: string;
   period_ends_at: string;
   contract_assets: RentalAsset[];
+  template_id: string | null;
+  template_version_id: string | null;
+  snapshot_id: string | null;
+}
+
+export interface ContractSnapshot {
+  id: string;
+  rendered_content: string;
+  content_hash: string;
 }
 
 export interface ServiceRequest {
@@ -37,6 +46,7 @@ export interface ServiceRequest {
 
 const RENTAL_SELECT =
   "id, tenant_id, type, status, value_amount, value_currency, period_starts_at, period_ends_at, " +
+  "template_id, template_version_id, snapshot_id, " +
   "contract_assets(id, quantity, assets(id, name, category, status))";
 
 // No server-side API layer for this portal (same architectural choice as
@@ -83,6 +93,44 @@ export async function fetchServiceRequests(contractId: string): Promise<ServiceR
     .order("created_at", { ascending: false });
   if (error) throw toUserError(error, "Não foi possível carregar os pedidos.");
   return data ?? [];
+}
+
+export async function fetchContractSnapshot(snapshotId: string): Promise<ContractSnapshot> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("tenant_contract_snapshots")
+    .select("id, rendered_content, content_hash")
+    .eq("id", snapshotId)
+    .single();
+  if (error) throw toUserError(error, "Não foi possível carregar o contrato.");
+  return data;
+}
+
+export async function fetchDataProcessingLegalBasis(contractId: string): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("tenant_contract_requirements")
+    .select("data_processing_legal_basis")
+    .eq("contract_id", contractId)
+    .order("resolved_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.data_processing_legal_basis ?? null;
+}
+
+export async function acceptContract(
+  contractId: string,
+  input: { dataProcessingConsent?: boolean } = {},
+): Promise<void> {
+  const res = await fetch(`/api/customer-contracts/${contractId}/accept`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? "Não foi possível registrar o aceite.");
+  }
 }
 
 export async function createServiceRequest(input: {
