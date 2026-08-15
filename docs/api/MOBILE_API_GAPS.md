@@ -3,6 +3,12 @@
 Data: 2026-08-15 · Baseado em [MOBILE_API_AUDIT.md](MOBILE_API_AUDIT.md) e
 [MOBILE_SECURITY_REVIEW.md](MOBILE_SECURITY_REVIEW.md).
 
+**Status update (Wave 3)**: esta tabela é o snapshot original da auditoria — mantida como registro
+histórico, não editada linha a linha. Gaps fechados desde então: MOB-001/MOB-002 (Wave 1),
+MOB-004 (Wave 3 Phase B — `GET /api/customer-contracts/{id}/documents/{documentId}/url`, caminho
+real difere do proposto na coluna acima). Ver `mobile-openapi.yaml` para o estado atual e correto de
+cada endpoint (`x-shina-status`), não esta tabela.
+
 Prioridade: **P0** = necessário para autenticar/inicializar o app · **P1** = necessário para o loop
 funcional principal · **P2** = importante mas não bloqueante para MVP · **P3** = nice-to-have.
 

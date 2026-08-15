@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordContractAcceptance } from "@shina/tenant-contract-engine";
-import { clientIp } from "@/lib/rate-limit";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity-log";
 import { ensureContractInvoice } from "@/lib/contract-billing";
 
@@ -22,6 +22,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Sessão expirada. Faça login novamente." }, { status: 401 });
+  }
+
+  const rateLimit = checkRateLimit(
+    `contract-accept:${user.id}:${clientIp(req)}`,
+    10,
+    5 * 60 * 1000,
+  );
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Muitas tentativas. Tente novamente em instantes." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
   }
 
   const body = (await req.json().catch(() => ({}))) as { dataProcessingConsent?: boolean };

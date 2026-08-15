@@ -341,6 +341,72 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  # ── Wave 3 Phase A — Mobile Contracts (IMPLEMENTED) ─────────────────────
+  # Acceptance and document upload/list are NOT duplicated here — mobile
+  # calls the existing customer-session-authenticated routes directly:
+  # POST /api/customer-contracts/{id}/accept and
+  # GET/POST /api/customer-contracts/{id}/documents (see those operations
+  # below). Only list+detail are new, because no aggregation endpoint for
+  # them existed before this wave (the customer web portal reads Postgrest
+  # directly via lib/rentals-portal.ts, which mobile's own lib/rentals.ts
+  # had fallen out of sync with).
+  /api/mobile/contracts:
+    get:
+      operationId: listMobileContracts
+      summary: Lista contratos do cliente autenticado (Wave 3 Phase A)
+      description: >
+        customer apenas. Nunca resolve organização a partir de um valor
+        enviado pelo cliente — sempre via
+        rental_customer_organizations (já resolvido em
+        requireMobileContext()). Tenant staff continua usando
+        GET /api/contracts (reutilizado, não duplicado).
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/contracts/route.ts
+        handler: GET
+        auth: "requireMobileContext()"
+      tags: [contracts]
+      responses:
+        "200":
+          description: Lista de contratos visíveis ao cliente
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: userType diferente de customer
+
+  /api/mobile/contracts/{id}:
+    get:
+      operationId: getMobileContractDetail
+      summary: Detalhe de contrato — nunca o template editável (Wave 3 Phase A)
+      description: >
+        Retorna o snapshot imutável (tenant_contract_snapshots.rendered_content),
+        nunca o template/cláusulas editáveis. Inclui version/effectiveAt,
+        contract_assets, status de aceite (hasAcceptedContract), status de
+        billing (resolveBillingRequirement + isBillingSatisfied — registro/
+        controle apenas, sem cobrança automática) e um resumo de documentos
+        (hasApprovedDocuments — o detalhamento por requisito continua em
+        GET /api/customer-contracts/{id}/documents, reutilizado). allowedActions
+        é um preview server-computed (["view"] sempre; "accept" só quando
+        status=draft e ainda não aceito; "download" quando há snapshot) — a
+        aceitação real acontece em POST /api/customer-contracts/{id}/accept,
+        que já re-deriva e rejeita contractVersionId/snapshotId adulterados
+        (anti-tamper existente, não duplicado aqui). Mesma higiene IDOR das
+        outras rotas mobile: "não é seu" e "não existe" retornam a mesma
+        resposta.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/contracts/[id]/route.ts
+        handler: GET
+        auth: "requireMobileContext()"
+      tags: [contracts]
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+      responses:
+        "200":
+          description: Contrato + snapshot + acceptance + billing + documents summary + allowedActions
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   # ── Operations (IMPLEMENTED — staff-only, reused directly by tenant_user mobile) ──
   /api/operations:
     get:
@@ -487,15 +553,16 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  # ── Resources / Tracking (IMPLEMENTED + PARTIAL) ────────────────────────
+  # ── Resources / Tracking (IMPLEMENTED) ───────────────────────────────────
   /api/resources/locations:
     get:
       operationId: getResourceLocations
-      summary: Última posição conhecida por recurso
+      summary: Última posição conhecida de todos os recursos do tenant (staff)
       description: >
-        PARTIAL — retorna apenas a última posição de cada recurso, não um
-        histórico. Ver gap MOB-003 para a rota de histórico proposta.
-      x-shina-status: partial
+        Staff-only, bulk (todos os recursos do tenant de uma vez). Para
+        tracking mobile por identidade (tenant_user/customer/operator),
+        recurso a recurso, ver GET /api/mobile/tracking/{resourceId}/current.
+      x-shina-status: implemented
       x-shina-source:
         file: apps/web/src/app/api/resources/locations/route.ts
         handler: GET
@@ -516,24 +583,74 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /mobile/tracking/{resourceId}/history:
+  /api/mobile/tracking/{resourceId}/current:
     get:
-      operationId: getResourceTrackingHistory
-      summary: Histórico de posições de um recurso
-      description: GAP MOB-003. Endpoint proposto, não implementado.
-      x-shina-status: proposed
+      operationId: getMobileResourceCurrentPosition
+      summary: Última posição conhecida de um recurso, escopada por identidade (Wave 3 Phase C)
+      description: >
+        Resources e assets são tabelas separadas e sem relação neste schema —
+        a única visibilidade real de customer/operator para um recurso vem
+        das operações que já podem ver (operations.resource_id), via
+        resolveOperationsVisibility() (Wave 2 Phase B), reaproveitado, não
+        recriado. Nunca retorna credenciais/tokens do provedor de GPS — só o
+        modelo canônico (latitude/longitude/recordedAt/source). speed e
+        ignition só aparecem quando o provedor realmente os enviou no
+        webhook (raw_payload) — nunca inventados quando ausentes.
+      x-shina-status: implemented
+      x-shina-source:
+        file: "apps/web/src/app/api/mobile/tracking/[resourceId]/current/route.ts"
+        handler: GET
+        auth: "requireMobileContext()"
       tags: [tracking]
       parameters:
         - name: resourceId
           in: path
           required: true
           schema: { type: string, format: uuid }
-        - name: since
-          in: query
-          schema: { type: string, format: date-time }
       responses:
         "200":
-          description: Histórico de posições
+          description: Última posição (ou data:null se nunca houve uma)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: userType unprovisioned
+        "404":
+          description: recurso não visível a esta identidade
+
+  /api/mobile/tracking/{resourceId}/history:
+    get:
+      operationId: getMobileResourceTrackingHistory
+      summary: Histórico limitado de posições de um recurso (Wave 3 Phase C)
+      description: >
+        Fecha o gap MOB-003 — resource_locations já suportava histórico no
+        schema (índice (resource_id, recorded_at)), mas nenhuma rota o lia
+        dessa forma antes desta wave. limit é sempre clampado (default 100,
+        máximo 500) — nunca histórico ilimitado. Reautoriza resourceId a
+        cada chamada, nunca confia nele isoladamente.
+      x-shina-status: implemented
+      x-shina-source:
+        file: "apps/web/src/app/api/mobile/tracking/[resourceId]/history/route.ts"
+        handler: GET
+        auth: "requireMobileContext()"
+      tags: [tracking]
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - name: limit
+          in: query
+          description: Clampado em 500; default 100.
+          schema: { type: integer, maximum: 500, default: 100 }
+      responses:
+        "200":
+          description: Histórico de posições (mais recente primeiro)
           content:
             application/json:
               schema:
@@ -545,6 +662,10 @@ paths:
                       $ref: "#/components/schemas/TrackingPosition"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: userType unprovisioned
+        "404":
+          description: recurso não visível a esta identidade
 
   # ── Contracts (staff-facing, IMPLEMENTED) ───────────────────────────────
   /api/contracts:
@@ -583,6 +704,10 @@ paths:
         único campo opcional aceito do cliente é dataProcessingConsent, e
         só é honrado quando a base jurídica configurada pelo tenant for
         "consent" (nunca inferido, sempre configuração explícita).
+        recordContractAcceptance() re-deriva contractVersionId/snapshotId a
+        partir do próprio contrato e rejeita qualquer valor divergente
+        (anti-tamper, verificado ao vivo na Wave 3 Phase A). Rate-limited
+        (10 tentativas / 5 min por usuário+IP, Wave 3 Phase B).
       x-shina-status: implemented
       x-shina-source:
         file: apps/web/src/app/api/customer-contracts/[id]/accept/route.ts
@@ -659,7 +784,10 @@ paths:
         Upload sempre mediado por esta rota (multipart/form-data) — o
         bucket contract-documents é privado, sem storage.objects RLS; a
         autorização vive inteiramente aqui, nunca em URL assinada
-        client-side.
+        client-side. Rate-limited (10 uploads / 5 min por usuário+IP, Wave 3
+        Phase B). A extensão do storage_path é derivada do MIME já validado
+        (nunca do nome de arquivo enviado pelo cliente) — corrige um vetor
+        de path traversal encontrado nesta wave.
       x-shina-status: implemented
       x-shina-source:
         file: apps/web/src/app/api/customer-contracts/[id]/documents/route.ts
@@ -689,12 +817,23 @@ paths:
         "422":
           $ref: "#/components/responses/ValidationError"
 
-  /mobile/customer-contracts/{id}/documents/{documentId}/url:
+  /api/customer-contracts/{id}/documents/{documentId}/url:
     get:
       operationId: getCustomerContractDocumentUrl
-      summary: URL assinada para download de um documento enviado
-      description: GAP MOB-004. Endpoint proposto, não implementado.
-      x-shina-status: proposed
+      summary: URL assinada para download de um documento enviado (Wave 3 Phase B)
+      description: >
+        Fecha o gap MOB-004 — antes desta wave, createSignedUrl só existia na
+        fila de revisão do staff (api/contracts/{id}/documents), sem
+        equivalente para o cliente redownloadar o próprio arquivo. Ownership
+        é reforçado na própria query (contract_id + customer_id), não como
+        checagem separada — documento de outro contrato/cliente responde
+        404, nunca 403 (IDOR hygiene). URL expira em 5 minutos, nunca deve
+        ser cacheada pelo app; peça uma nova a cada exibição/download.
+        Rate-limited (30 req / 5 min por usuário+IP).
+      x-shina-status: implemented
+      x-shina-source:
+        file: "apps/web/src/app/api/customer-contracts/[id]/documents/[documentId]/url/route.ts"
+        handler: GET
       tags: [customer-contracts]
       parameters:
         - $ref: "#/components/parameters/PathId"
@@ -719,6 +858,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          description: Rate limit excedido
 
   # ── Operators (IMPLEMENTED) ─────────────────────────────────────────────
   /api/operators:
@@ -834,17 +975,17 @@ paths:
         "422":
           $ref: "#/components/responses/ValidationError"
 
-  # ── Notifications (PARTIAL) ─────────────────────────────────────────────
+  # ── Notifications (IMPLEMENTED) ──────────────────────────────────────────
   /api/notifications:
     get:
       operationId: listNotifications
-      summary: Lista notificações
+      summary: Lista notificações (staff, broadcast por tenant)
       description: >
-        PARTIAL — hoje é broadcast por tenant
-        (recipient_external_ref="tenant:<id>"), não há targeting por
-        usuário apesar da coluna person_id existir no schema. Ver gap
-        MOB-006.
-      x-shina-status: partial
+        tenant_user apenas — broadcast por tenant
+        (recipient_external_ref="tenant:<id>"). Para customer/operator, ver
+        GET /api/mobile/notifications (Wave 3 Phase D, targeting real por
+        recipient_external_ref="customer:<id>"/"operator:<id>").
+      x-shina-status: implemented
       x-shina-source:
         file: apps/web/src/app/api/notifications/route.ts
         handler: GET
@@ -865,15 +1006,87 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /mobile/devices/register:
-    post:
-      operationId: registerDeviceForPush
-      summary: Registra um device token para push notifications
+  /api/mobile/notifications:
+    get:
+      operationId: listMobileNotifications
+      summary: Lista notificações do cliente/operador autenticado (Wave 3 Phase D)
       description: >
-        GAP MOB-007. Endpoint proposto — nenhuma tabela de device token
-        existe hoje em todo o repositório (busca por device_token/
-        push_token/fcm/apns/expo_push retornou zero resultados).
-      x-shina-status: proposed
+        customer/operator apenas. A query É a checagem de posse — filtra por
+        recipient_external_ref exato (server-determined por
+        create-notification.ts, nunca aceito do app), então uma notificação
+        endereçada a outro cliente/operador simplesmente nunca aparece na
+        lista. tenant_user continua usando GET /api/notifications
+        (reutilizado).
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/notifications/route.ts
+        handler: GET
+        auth: "requireMobileContext()"
+      tags: [notifications]
+      responses:
+        "200":
+          description: Lista de notificações do usuário
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: userType diferente de customer/operator
+    patch:
+      operationId: markMobileNotificationsRead
+      summary: Marca notificações como lidas (Wave 3 Phase D)
+      description: >
+        Mesma checagem de posse do GET — o UPDATE só afeta linhas cujo
+        recipient_external_ref bate com a identidade autenticada, então não
+        é possível marcar como lida uma notificação de outro usuário mesmo
+        sabendo o id dela.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/notifications/route.ts
+        handler: PATCH
+        auth: "requireMobileContext()"
+      tags: [notifications]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids: { type: array, items: { type: string, format: uuid } }
+                all: { type: boolean }
+      responses:
+        "200":
+          description: Atualizado
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/mobile/devices:
+    post:
+      operationId: registerMobileDevice
+      summary: Registra/atualiza um device para push notifications (Wave 3 Phase D)
+      description: >
+        Fundação de registro apenas — nenhum provedor de push
+        (Expo/FCM/APNs) está integrado ainda; push_delivery_provider =
+        pending. user_id é sempre resolvido server-side a partir da sessão
+        (context.userId), nunca aceito do corpo — fecha o teste de
+        segurança "forged user_id on device registration". Qualquer
+        identidade mobile autenticada pode registrar (não só
+        customer/operator — staff usando o app mobile também precisa de
+        push). Upsert por deviceId: reautenticar num device já registrado
+        reatribui o dono (mesmo padrão de todo sistema de push — "o último
+        login é dono do token").
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/devices/route.ts
+        handler: POST
+        auth: "requireMobileContext()"
       tags: [notifications]
       requestBody:
         required: true
@@ -881,17 +1094,44 @@ paths:
           application/json:
             schema:
               type: object
-              required: [token, platform]
+              required: [deviceId, platform]
               properties:
-                token: { type: string }
+                deviceId: { type: string, format: uuid }
+                pushToken: { type: [string, "null"] }
                 platform: { type: string, enum: [ios, android] }
+                appVersion: { type: [string, "null"] }
       responses:
         "201":
-          description: Token registrado
+          description: Device registrado
         "401":
           $ref: "#/components/responses/Unauthorized"
         "422":
           $ref: "#/components/responses/ValidationError"
+
+  /api/mobile/devices/{deviceId}:
+    delete:
+      operationId: disableMobileDevice
+      summary: Desabilita um device (logout) (Wave 3 Phase D)
+      description: >
+        Nunca deleta a linha (mantém histórico) — apenas
+        enabled=false, push_token=null. Escopado por (device_id, user_id) na
+        própria query; device de outro usuário responde 404 (IDOR hygiene).
+      x-shina-status: implemented
+      x-shina-source:
+        file: "apps/web/src/app/api/mobile/devices/[deviceId]/route.ts"
+        handler: DELETE
+        auth: "requireMobileContext()"
+      tags: [notifications]
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Desabilitado
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 components:
   securitySchemes:
@@ -1155,7 +1395,7 @@ components:
 
     Notification:
       type: object
-      x-shina-status: partial
+      x-shina-status: implemented
       properties:
         id: { type: string, format: uuid }
         subject: { type: string }

@@ -100,6 +100,77 @@ conceitos/tabelas separados neste schema — não assuma que todo ativo tem posi
 (`category`, `status`, `branchId`) tocam só colunas genéricas — não espere um filtro específico por tipo
 de blueprint (ex. "placa do veículo") até que isso seja adicionado explicitamente ao contrato.
 
+## Wave 3 Phase A — Contratos
+
+**`GET /api/mobile/contracts`** (`userType: customer` apenas) — lista os contratos do cliente
+autenticado, escopados via `rental_customer_organizations` (nunca um `organization_id`/`customer_id`
+enviado pelo app). Tenant staff continua usando `GET /api/contracts`, já existente.
+
+**`GET /api/mobile/contracts/{id}`** — detalhe. **Nunca retorna o template editável**, só o snapshot
+imutável já renderizado (`snapshot.rendered_content`) — é isso que o app deve mostrar como "o
+contrato". Inclui `version`/`effectiveAt`, `assets` (itens do contrato), `acceptance.accepted`,
+`billing` (`type`, `satisfied` — registro/controle apenas, não existe cobrança automática nesta
+wave), `documents.allApproved` (resumo; para a lista completa por requisito, chame
+`GET /api/customer-contracts/{id}/documents`, endpoint reutilizado, não duplicado) e
+`allowedActions` (`["view"]` sempre; `"accept"` só quando o contrato ainda está em `draft` e não foi
+aceito; `"download"` quando existe snapshot). Mesma higiene IDOR das outras rotas: contrato de outro
+cliente responde `404`, nunca `403` (não confirma a existência do dado alheio).
+
+**Aceite — `POST /api/customer-contracts/{id}/accept`** (endpoint reutilizado, não um `/api/mobile/*`
+novo — mesma autenticação de sessão Supabase que todo o resto do app mobile já usa). O corpo aceito é
+só `{ dataProcessingConsent?: boolean }` — **o app nunca envia** `accepted_at`, `document_hash`,
+`contract_version`, `snapshot_id`, `tenant_id` ou `customer_id`; tudo isso é resolvido e validado
+server-side. Anti-tamper real: o backend re-deriva `contractVersionId`/`snapshotId` a partir do
+próprio contrato e rejeita qualquer valor que não bata (não é um TODO — já implementado e coberto por
+teste ao vivo). Fluxo recomendado no app: (1) `GET /api/mobile/contracts/{id}` para mostrar o
+`snapshot.rendered_content` e conferir `allowedActions.includes("accept")`, (2) checkbox nunca
+pré-marcado, (3) `POST /api/customer-contracts/{id}/accept`. Se a resposta for `422` com
+"não possui um requisito jurídico dinâmico associado", esse contrato específico não passa pelo motor
+novo — trate como um contrato legado, sem fluxo de aceite nesta wave.
+
+## Wave 3 Phase B — Documentos
+
+Três rotas, todas customer-session-authenticated (mesmo padrão de `/api/customer-contracts/{id}/accept`
+— nenhuma é `/api/mobile/*`, porque nenhuma precisa de agregação/DTO-shaping além do que a rota já
+faz):
+
+- **`GET /api/customer-contracts/{id}/documents`** — requisitos do template + documentos já enviados
+  pelo cliente (`status: pending|approved|rejected`).
+- **`POST /api/customer-contracts/{id}/documents`** — upload, sempre `multipart/form-data`
+  (`file` + `requirement_id`) direto para esta rota. **Nunca peça uma URL assinada para o app fazer
+  upload direto pro Storage** — o bucket `contract-documents` é privado sem RLS de `storage.objects`,
+  a autorização vive inteiramente na rota. Limite 10 MiB, apenas `image/png`, `image/jpeg`,
+  `application/pdf`. Rate-limited (10 uploads / 5 min).
+- **`GET /api/customer-contracts/{id}/documents/{documentId}/url`** (novo nesta wave, fecha o gap
+  MOB-004) — gera uma URL assinada de 5 minutos para o cliente rebaixar o próprio documento.
+  **Nunca cacheie essa URL** — ela expira rápido; peça uma nova a cada exibição/download. Documento
+  de outro contrato ou de outro cliente responde `404` (nunca `403` — não confirma a existência do
+  dado alheio). Rate-limited (30 req / 5 min).
+
+Nenhuma dessas rotas aceita um `storage_path`/caminho arbitrário do app — o backend sempre decide o
+caminho no Storage a partir de `tenant_id`/`contract_id`/`requirement.key`, nunca do nome do arquivo
+enviado (correção de um vetor de path traversal fechado nesta wave).
+
+## Wave 3 Phase C — Tracking
+
+**`GET /api/mobile/tracking/{resourceId}/current`** — última posição conhecida de um recurso
+(veículo/equipamento), escopada pela identidade: `tenant_user` vê qualquer recurso do próprio tenant;
+`customer`/`operator` só veem um recurso quando ele está vinculado a uma operação que já podem ver
+(o mesmo escopo de `GET /api/mobile/operations`, reaproveitado — não existe uma tabela separada
+"cliente → ativo rastreável"). Campos sempre presentes: `latitude`, `longitude`, `recordedAt`,
+`lastCommunicationAt`, `source`. `speed`/`ignition` só aparecem quando o provedor de GPS do tenant
+realmente os enviou naquele fix — **nunca assuma que esses dois campos sempre existem**. Nunca
+retorna nada do provedor (token, `provider_name`, id de conta) — só o modelo canônico Shinã.
+`data: null` quando o recurso nunca teve uma posição registrada.
+
+**`GET /api/mobile/tracking/{resourceId}/history`** — histórico de posições, `from`/`to`/`limit`
+(query params). `limit` é sempre limitado a 500 no servidor mesmo se você pedir mais — não existe
+"histórico completo" nesta wave. Reautoriza `resourceId` a cada chamada; não assuma que uma vez
+autorizado, sempre autorizado.
+
+Geofencing (entrada/saída de cercas virtuais) existe no backend (`tenant/tracking`, engine real) mas
+**não tem endpoint mobile nesta wave** — não construa telas de geofence no app ainda.
+
 **`GET /api/mobile/customers/me`** (`userType: customer` apenas) e **`GET /api/mobile/operators/me`**
 (`userType: operator` apenas) — perfil "de mim mesmo". Não existe um `GET /api/mobile/customers/{id}`
 genérico nem `GET /api/mobile/operators/{id}` — cada identidade só enxerga o próprio registro. Staff do
@@ -126,6 +197,28 @@ Nenhum padrão consistente confirmado — a maioria das listas retorna o array c
 Não assuma paginação automática; se uma tela precisar de paginação real, isso é um gap a ser fechado pela
 equipe Shinã antes do lançamento daquela tela específica, não algo pra inferir no client.
 
+## Wave 3 Phase D — Notificações e Push
+
+**`GET /api/mobile/notifications`** / **`PATCH /api/mobile/notifications`** (`userType: customer` ou
+`operator` apenas) — inbox real por usuário, não mais broadcast. Uma notificação endereçada a outro
+cliente/operador nunca aparece na lista e não pode ser marcada como lida, mesmo que o app conheça o
+`id` dela — a checagem de posse está embutida na própria query (`recipient_external_ref`), não é uma
+etapa separada que possa ser burlada. `tenant_user` continua usando `GET/PATCH /api/notifications`
+(inalterado, broadcast por tenant — targeting individual de staff continua fora de escopo).
+
+**`POST /api/mobile/devices`** — registra/atualiza o push token do device atual. `deviceId` deve ser
+um identificador estável gerado pelo app (uma vez por instalação, ex. via `expo-application` ou
+similar) — **nunca invente um novo a cada chamada**, isso criaria uma linha nova por request em vez
+de atualizar a existente. O app **nunca envia `user_id`** — é sempre resolvido a partir da sessão.
+Chame isso a cada login e periodicamente (ex. ao abrir o app) para manter `last_seen_at` fresco.
+
+**`DELETE /api/mobile/devices/{deviceId}`** — desabilita o device (não apaga o histórico). Chame no
+logout para parar de receber push nesse aparelho.
+
+**Nenhum provedor de push está integrado ainda** (Expo Push / FCM / APNs — `push_delivery_provider:
+pending`). Esta wave só entrega a fundação de registro; não espere notificações push chegando de
+fato até a Shinã confirmar a integração de um provedor.
+
 ## Permissões / Entitlements
 
 `permissions` e `entitlements` no bootstrap (quando existir) são **strings opacas** — não construa lógica
@@ -144,8 +237,10 @@ uma nova a cada exibição.
 ## Tracking
 
 O app nunca recebe credenciais de provedor de GPS. `resourceId` identifica o recurso (veículo/equipamento)
-sendo rastreado; a última posição vem de `/api/resources/locations`. Histórico completo ainda não existe
-(gap MOB-003) — não construa uma tela de "trajeto" até essa rota existir.
+sendo rastreado. Desde a Wave 3 Phase C, use `/api/mobile/tracking/{resourceId}/current` (última posição,
+escopada por identidade) e `/api/mobile/tracking/{resourceId}/history` (histórico limitado, `from`/`to`/
+`limit`) — ver seção "Wave 3 Phase C — Tracking" abaixo para detalhes completos.
+`/api/resources/locations` continua existindo mas é staff-only (bulk, todos os recursos do tenant).
 
 ## Contratos
 
