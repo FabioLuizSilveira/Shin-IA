@@ -2,12 +2,26 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logActivity } from "@/lib/activity-log";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 const BUCKET = "contract-documents";
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MiB, matches the bucket's file_size_limit
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "application/pdf"]);
+
+// Wave 3 Phase B — the storage path extension used to come from
+// file.name.split(".").pop(), which is attacker-controlled: a crafted
+// filename like "a.pdf/../../secret" produces an "extension" containing
+// slashes, letting the last segment escape the intended
+// tenant/contract-scoped storage prefix. Deriving the extension from the
+// already-validated MIME type instead removes the untrusted input from the
+// path entirely — ALLOWED_TYPES guarantees this map is exhaustive.
+const EXTENSION_BY_MIME: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "application/pdf": "pdf",
+};
 
 // Customer document upload — the bucket is private with no storage.objects
 // RLS (same posture as tenant-branding's public bucket: auth lives entirely
@@ -21,6 +35,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Sessão expirada. Faça login novamente." }, { status: 401 });
+  }
+
+  const rateLimit = checkRateLimit(`doc-upload:${user.id}:${clientIp(req)}`, 10, 5 * 60 * 1000);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Muitos envios. Tente novamente em instantes." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
   }
 
   const admin = createAdminClient();
@@ -78,7 +100,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     );
   }
 
-  const ext = file.name.split(".").pop() ?? "bin";
+  const ext = EXTENSION_BY_MIME[file.type];
   const storagePath = `${contract.tenant_id}/${contractId}/${requirement.key}-${Date.now()}.${ext}`;
   const bytes = new Uint8Array(await file.arrayBuffer());
   const { error: uploadError } = await admin.storage
