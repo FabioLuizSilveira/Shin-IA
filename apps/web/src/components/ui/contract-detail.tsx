@@ -1,7 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { X, Calendar, DollarSign, Building2, Truck, UserPlus, Plus, Trash2 } from "lucide-react";
+import {
+  X,
+  Calendar,
+  DollarSign,
+  Building2,
+  Truck,
+  UserPlus,
+  Plus,
+  Trash2,
+  FileCheck,
+  Check,
+  Ban,
+} from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { ContractDetail as ContractDetailData, ContractStatus } from "@/types/domain";
 
@@ -17,6 +29,20 @@ interface LinkedCustomer {
   created_at: string;
   rental_customers: { id: string; email: string | null; full_name: string | null } | null;
 }
+
+interface ContractDocument {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  original_filename: string;
+  signed_url: string | null;
+  contract_document_requirements: { key: string; label: string; is_mandatory: boolean } | null;
+}
+
+const DOC_STATUS_LABEL: Record<string, string> = {
+  pending: "Em análise",
+  approved: "Aprovado",
+  rejected: "Rejeitado",
+};
 
 interface ContractDetailProps {
   contractId: string | null;
@@ -116,6 +142,8 @@ export function ContractDetail({ contractId, onClose, onStatusChange }: Contract
 
   const [linkedAssets, setLinkedAssets] = useState<LinkedAsset[]>([]);
   const [linkedCustomers, setLinkedCustomers] = useState<LinkedCustomer[]>([]);
+  const [documents, setDocuments] = useState<ContractDocument[]>([]);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [assetIdInput, setAssetIdInput] = useState("");
   const [customerEmailInput, setCustomerEmailInput] = useState("");
   const [customerNameInput, setCustomerNameInput] = useState("");
@@ -139,6 +167,14 @@ export function ContractDetail({ contractId, onClose, onStatusChange }: Contract
       .catch(() => setLinkedCustomers([]));
   }, [contractId]);
 
+  const refreshDocuments = useCallback(() => {
+    if (!contractId) return;
+    fetch(`/api/contracts/${contractId}/documents`)
+      .then((r) => r.json())
+      .then((j: { data: ContractDocument[] }) => setDocuments(j.data ?? []))
+      .catch(() => setDocuments([]));
+  }, [contractId]);
+
   useEffect(() => {
     if (!contractId) {
       setContract(null);
@@ -154,7 +190,23 @@ export function ContractDetail({ contractId, onClose, onStatusChange }: Contract
       .finally(() => setLoading(false));
     refreshAssets();
     refreshCustomers();
-  }, [contractId, refreshAssets, refreshCustomers]);
+    refreshDocuments();
+  }, [contractId, refreshAssets, refreshCustomers, refreshDocuments]);
+
+  async function handleReviewDocument(documentId: string, status: "approved" | "rejected") {
+    if (!contractId) return;
+    setReviewingId(documentId);
+    try {
+      await fetch(`/api/contracts/${contractId}/documents/${documentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      refreshDocuments();
+    } finally {
+      setReviewingId(null);
+    }
+  }
 
   async function handleLinkAsset() {
     if (!contractId || !assetIdInput.trim()) return;
@@ -414,6 +466,67 @@ export function ContractDetail({ contractId, onClose, onStatusChange }: Contract
                   {inviteFeedback && <p className="text-xs text-slate-500">{inviteFeedback}</p>}
                 </div>
               </div>
+
+              {/* Contract documents (Fase F) */}
+              {documents.length > 0 && (
+                <div>
+                  <p className="text-xs text-slate-500 mb-2">Documentos do contrato</p>
+                  <div className="space-y-2">
+                    {documents.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl"
+                      >
+                        <FileCheck className="w-4 h-4 text-slate-400 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-900 truncate">
+                            {doc.contract_document_requirements?.label ?? doc.original_filename}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            {doc.signed_url ? (
+                              <a
+                                href={doc.signed_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-shina-blue"
+                              >
+                                Ver arquivo
+                              </a>
+                            ) : (
+                              <span className="text-xs text-slate-400">
+                                {doc.original_filename}
+                              </span>
+                            )}
+                            <span className="text-xs text-slate-500">
+                              · {DOC_STATUS_LABEL[doc.status]}
+                            </span>
+                          </div>
+                        </div>
+                        {doc.status === "pending" && (
+                          <div className="flex gap-1 shrink-0">
+                            <button
+                              onClick={() => void handleReviewDocument(doc.id, "approved")}
+                              disabled={reviewingId === doc.id}
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg cursor-pointer border-0 bg-transparent disabled:opacity-50"
+                              title="Aprovar"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => void handleReviewDocument(doc.id, "rejected")}
+                              disabled={reviewingId === doc.id}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg cursor-pointer border-0 bg-transparent disabled:opacity-50"
+                              title="Rejeitar"
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Created */}
               <div>

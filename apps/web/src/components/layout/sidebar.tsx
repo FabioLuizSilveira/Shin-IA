@@ -25,6 +25,7 @@ import {
   MessageSquareWarning,
   History,
   Palette,
+  UserCog,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -46,6 +47,7 @@ const TENANT_NAV_ITEMS = [
   { href: "/tenant/assets", label: "Frota & Ativos", icon: Truck },
   { href: "/tenant/crm", label: "Clientes & Parceiros", icon: Users },
   { href: "/tenant/contracts", label: "Contratos", icon: FileText },
+  { href: "/tenant/operators", label: "Operadores", icon: UserCog },
   { href: "/tenant/billing", label: "Financeiro", icon: DollarSign },
   { href: "/tenant/reports", label: "Relatórios", icon: BarChart2 },
   { href: "/tenant/commission", label: "Comissões", icon: Award },

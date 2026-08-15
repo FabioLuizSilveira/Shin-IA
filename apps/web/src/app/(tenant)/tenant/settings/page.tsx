@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
-import { User, Building2, Check, Lock, Scale, CreditCard } from "lucide-react";
+import { User, Building2, Check, Lock, Scale, CreditCard, FileStack } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -186,6 +186,12 @@ export default function TenantSettingsPage() {
           className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-0 border-b-2 border-transparent text-slate-500 hover:text-slate-700 no-underline"
         >
           <CreditCard className="w-3.5 h-3.5" /> Assinatura
+        </Link>
+        <Link
+          href="/tenant/settings/legal/contract-templates"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-0 border-b-2 border-transparent text-slate-500 hover:text-slate-700 no-underline"
+        >
+          <FileStack className="w-3.5 h-3.5" /> Templates de Contrato
         </Link>
       </div>
 

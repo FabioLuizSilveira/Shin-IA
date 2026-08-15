@@ -257,6 +257,9 @@ importers:
       '@shina/studio':
         specifier: workspace:*
         version: link:../../packages/studio
+      '@shina/tenant-contract-engine':
+        specifier: workspace:*
+        version: link:../../packages/tenant-contract-engine
       '@shina/theme':
         specifier: workspace:*
         version: link:../../packages/theme
@@ -943,6 +946,22 @@ importers:
         version: 1.6.1(vitest@1.6.1)
       typescript:
         specifier: ^5.4.5
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
+
+  packages/tenant-contract-engine:
+    dependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.38.0
+        version: 2.108.2
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      typescript:
+        specifier: ^5.0.0
         version: 5.9.3
       vitest:
         specifier: ^1.6.0
