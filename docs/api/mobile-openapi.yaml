@@ -943,6 +943,158 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  # ── Wave 4 Phase A — Mobile Billing (IMPLEMENTED) ───────────────────────
+  # Read-only this wave — no cartão salvo/PIX/payment intent/refund/manual
+  # charge. All three routes below require tenant.dashboard.financial for
+  # tenant_user (same key Wave 2 Phase A's dashboard financial slice
+  # already established — reused, not a new permission key invented per
+  # endpoint); customer identities are ownership-scoped instead (no
+  # permission catalog concept for their own data, same as
+  # contracts/documents/tracking) via
+  # billing_accounts.organization_id -> rental_customer_organizations.
+  /api/mobile/billing/summary:
+    get:
+      operationId: getMobileBillingSummary
+      summary: Resumo financeiro (receivables/overdue/paid/nextDue) por identidade
+      description: >
+        tenant_user: agregado por tenant_id. customer: agregado pelos
+        billing_accounts das organizações a que pertence (nunca por
+        customer_id enviado pelo app — sempre resolvido via sessão).
+        "paid" é o total pago no mês corrente (mesma janela de
+        tenant-metrics' paidThisMonth), não um total histórico
+        ilimitado.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/billing/summary/route.ts
+        handler: GET
+        auth: "requireMobileContext() + hasTenantPermission(tenant.dashboard.financial) para tenant_user"
+      tags: [billing]
+      responses:
+        "200":
+          description: Resumo financeiro
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: sem permissão financeira (tenant_user) ou userType não suportado
+
+  /api/mobile/invoices:
+    get:
+      operationId: listMobileInvoices
+      summary: Lista faturas por identidade
+      description: >
+        Mesmo SELECT shape de GET /api/invoices (staff) — não uma DTO
+        diferente inventada para mobile. Read-only.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/invoices/route.ts
+        handler: GET
+        auth: "requireMobileContext() + hasTenantPermission(tenant.dashboard.financial) para tenant_user"
+      tags: [billing]
+      responses:
+        "200":
+          description: Lista de faturas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Invoice"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: sem permissão financeira (tenant_user) ou userType não suportado
+
+  /api/mobile/invoices/{id}:
+    get:
+      operationId: getMobileInvoiceDetail
+      summary: Detalhe de fatura + itens (Wave 4 Phase A)
+      description: >
+        Sem campo de documento/PDF — não existe artefato de fatura real
+        (a única "impressão" existente é uma página web staff-only que
+        chama a própria rota de staff, não um PDF/signed URL) — gap
+        documentado, não inventado.
+      x-shina-status: implemented
+      x-shina-source:
+        file: "apps/web/src/app/api/mobile/invoices/[id]/route.ts"
+        handler: GET
+        auth: "requireMobileContext() + hasTenantPermission(tenant.dashboard.financial) para tenant_user"
+      tags: [billing]
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+      responses:
+        "200":
+          description: Fatura + itens
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/mobile/commissions/summary:
+    get:
+      operationId: getMobileCommissionsSummary
+      summary: Resumo de comissões por status (tenant_user apenas)
+      description: >
+        Agrega commission_transactions.total_amount já calculado pelo
+        CommissionCalculator real (packages/commission-engine) no momento
+        da criação da transação — este endpoint nunca recalcula
+        comissão, só soma/agrupa por status linhas já persistidas.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/commissions/summary/route.ts
+        handler: GET
+        auth: "requireMobileContext() + hasTenantPermission(tenant.dashboard.financial)"
+      tags: [billing]
+      responses:
+        "200":
+          description: Comissões agrupadas por status
+        "403":
+          description: sem permissão financeira ou userType diferente de tenant_user
+
+  # ── Wave 4 Phase B — Mobile Reporting (IMPLEMENTED) ─────────────────────
+  /api/mobile/reports/summary:
+    get:
+      operationId: getMobileReportsSummary
+      summary: KPIs agregados do tenant (tenant_user apenas)
+      description: >
+        Compõe o KpiEngine/createKpiDataProvider real (packages/reporting-engine),
+        o mesmo motor já usado por /api/tenant-reports (staff) — sem
+        reimplementar Aggregation Engine, sem KPI type novo além dos 6 que o
+        Core já suporta (operations/assets/revenue/commissions/utilization/
+        tracking). revenue e commissions são OMITIDOS da resposta (não
+        apenas escondidos) quando o usuário não tem
+        tenant.dashboard.financial — a checagem acontece antes do dado sair
+        do servidor. range aceita today|7d|30d|90d|custom; custom exige
+        from/to e é limitado a 90 dias — não existe "histórico completo"
+        nesta rota.
+      x-shina-status: implemented
+      x-shina-source:
+        file: apps/web/src/app/api/mobile/reports/summary/route.ts
+        handler: GET
+        auth: "requireMobileContext() + hasTenantPermission(tenant.dashboard.financial) para revenue/commissions"
+      tags: [reporting]
+      parameters:
+        - name: range
+          in: query
+          schema: { type: string, enum: [today, 7d, 30d, 90d, custom], default: 30d }
+        - name: from
+          in: query
+          description: obrigatório quando range=custom
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          description: obrigatório quando range=custom; janela máxima de 90 dias a partir de from
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Período resolvido + lista de KPIs (financeiros omitidos sem permissão)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: userType diferente de tenant_user
+        "422":
+          description: range=custom inválido (from/to ausente, invertido, ou excede 90 dias)
+
   /api/commercial/plans:
     get:
       operationId: listCommercialPlans
@@ -1016,7 +1168,11 @@ paths:
         create-notification.ts, nunca aceito do app), então uma notificação
         endereçada a outro cliente/operador simplesmente nunca aparece na
         lista. tenant_user continua usando GET /api/notifications
-        (reutilizado).
+        (reutilizado). Desde a Wave 4 Phase C, toda notificação criada por
+        create-notification.ts também dispara push real (ver
+        POST /api/mobile/devices) — esta rota continua sendo a fonte da
+        verdade para o conteúdo completo; o push em si só carrega texto
+        genérico (ver privacidade abaixo).
       x-shina-status: implemented
       x-shina-source:
         file: apps/web/src/app/api/mobile/notifications/route.ts
@@ -1070,18 +1226,24 @@ paths:
   /api/mobile/devices:
     post:
       operationId: registerMobileDevice
-      summary: Registra/atualiza um device para push notifications (Wave 3 Phase D)
+      summary: Registra/atualiza um device para push notifications (Wave 3 Phase D + Wave 4 Phase C)
       description: >
-        Fundação de registro apenas — nenhum provedor de push
-        (Expo/FCM/APNs) está integrado ainda; push_delivery_provider =
-        pending. user_id é sempre resolvido server-side a partir da sessão
-        (context.userId), nunca aceito do corpo — fecha o teste de
-        segurança "forged user_id on device registration". Qualquer
-        identidade mobile autenticada pode registrar (não só
+        pushToken deve ser um Expo push token real
+        (ExponentPushToken[...]) — a Wave 4 Phase C escolheu o Expo Push
+        Service como provider (apps/mobile é Expo-managed, sem FCM/APNs
+        direto configurado), atrás da interface MobilePushProvider
+        (apps/web/src/lib/push/types.ts) para que o resto do backend nunca
+        dependa de Expo diretamente. user_id é sempre resolvido server-side
+        a partir da sessão (context.userId), nunca aceito do corpo — fecha
+        o teste de segurança "forged user_id on device registration".
+        Qualquer identidade mobile autenticada pode registrar (não só
         customer/operator — staff usando o app mobile também precisa de
         push). Upsert por deviceId: reautenticar num device já registrado
         reatribui o dono (mesmo padrão de todo sistema de push — "o último
-        login é dono do token").
+        login é dono do token"). Um device é automaticamente desabilitado
+        (enabled=false, push_token=null) quando o Expo reporta
+        "DeviceNotRegistered" num envio — nunca fica tentando entregar pra
+        um token morto indefinidamente.
       x-shina-status: implemented
       x-shina-source:
         file: apps/web/src/app/api/mobile/devices/route.ts
