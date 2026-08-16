@@ -1,29 +1,39 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '@/src/theme';
 
-export function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { color: string; bg: string; label: string }> = {
-    available: { color: theme.colors.success, bg: '#E7F8EC', label: 'Disponível' },
-    rented: { color: theme.colors.brandPrimary, bg: theme.colors.brandTertiary, label: 'Alugado' },
-    maintenance: { color: theme.colors.warning, bg: '#FFF3E0', label: 'Manutenção' },
-    active: { color: theme.colors.success, bg: '#E7F8EC', label: 'Ativo' },
-    pending: { color: theme.colors.warning, bg: '#FFF3E0', label: 'Pendente' },
-    completed: { color: theme.colors.onSurfaceTertiary, bg: theme.colors.surfaceTertiary, label: 'Concluído' },
-    scheduled: { color: theme.colors.info, bg: '#E5F6FE', label: 'Agendado' },
-    in_progress: { color: theme.colors.warning, bg: '#FFF3E0', label: 'Em andamento' },
-    paid: { color: theme.colors.success, bg: '#E7F8EC', label: 'Pago' },
-  };
-  const cfg = map[status] || { color: theme.colors.onSurfaceTertiary, bg: theme.colors.surfaceTertiary, label: status };
+export const T = {
+  display: (size = theme.font.xl): TextStyle => ({ fontFamily: theme.display, fontSize: size, color: theme.colors.onSurface }),
+  text: (size = theme.font.base, color = theme.colors.onSurfaceSecondary): TextStyle => ({ fontFamily: theme.text, fontSize: size, color }),
+};
+
+const TONES: Record<string, string> = {
+  active: theme.colors.success, healthy: theme.colors.success, valid: theme.colors.success, success: theme.colors.success,
+  on_route: theme.colors.brandSecondary, available: theme.colors.success, paid: theme.colors.success,
+  alert: theme.colors.error, warning: theme.colors.warning, error: theme.colors.error, expiring: theme.colors.warning,
+  maintenance: theme.colors.warning, pending: theme.colors.warning,
+  idle: theme.colors.muted, off: theme.colors.muted, info: theme.colors.brandSecondary, brand: theme.colors.brandPrimary,
+  muted: theme.colors.muted,
+};
+const LABELS: Record<string, string> = {
+  active: 'Ativo', alert: 'Alerta', maintenance: 'Manutenção', idle: 'Ocioso', on_route: 'Em rota',
+  available: 'Disponível', off: 'Folga', pending: 'Pendente', valid: 'Válido', expiring: 'Expirando',
+  paid: 'Pago', healthy: 'Saudável',
+};
+
+export function Chip({ status, label }: { status: string; label?: string }) {
+  const color = TONES[status] || theme.colors.muted;
   return (
-    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
-      <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
+    <View style={[styles.chip, { backgroundColor: color + '22', borderColor: color + '55' }]}>
+      <View style={[styles.dot, { backgroundColor: color }]} />
+      <Text style={[styles.chipText, { color }]}>{label || LABELS[status] || status}</Text>
     </View>
   );
 }
 
-export function Card({ children, style }: any) {
+export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
@@ -31,77 +41,65 @@ export function ScreenHeader({ title, subtitle, right }: { title: string; subtit
   return (
     <View style={styles.header}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.headerTitle}>{title}</Text>
-        {!!subtitle && <Text style={styles.headerSub}>{subtitle}</Text>}
+        {!!subtitle && <Text style={[T.text(theme.font.sm, theme.colors.brandSecondary), { letterSpacing: 1, textTransform: 'uppercase' }]}>{subtitle}</Text>}
+        <Text style={[T.display(theme.font.xxxl), { marginTop: 2 }]}>{title}</Text>
       </View>
       {right}
     </View>
   );
 }
 
-export function EmptyState({ icon, title, subtitle, actionLabel, onAction, testID }: any) {
+export function Loader() {
+  return <View style={{ paddingVertical: theme.spacing.xxl, alignItems: 'center' }}><ActivityIndicator color={theme.colors.brandSecondary} /></View>;
+}
+
+export function EmptyState({ icon, title, subtitle }: { icon: any; title: string; subtitle?: string }) {
   return (
     <View style={styles.empty}>
-      <View style={styles.emptyIcon}>
-        <Ionicons name={icon || 'file-tray-outline'} size={32} color={theme.colors.onBrandTertiary} />
-      </View>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      {!!subtitle && <Text style={styles.emptySub}>{subtitle}</Text>}
-      {!!actionLabel && (
-        <Pressable testID={testID} style={styles.emptyBtn} onPress={onAction}>
-          <Text style={styles.emptyBtnText}>{actionLabel}</Text>
-        </Pressable>
-      )}
+      <View style={styles.emptyIcon}><Ionicons name={icon} size={30} color={theme.colors.brandSecondary} /></View>
+      <Text style={[T.display(theme.font.lg)]}>{title}</Text>
+      {!!subtitle && <Text style={[T.text(), { textAlign: 'center' }]}>{subtitle}</Text>}
     </View>
   );
 }
 
-export function Loader() {
+export function GradientButton({ label, onPress, testID, icon, colors, style, loading }: any) {
   return (
-    <View style={{ paddingVertical: theme.spacing.xl, alignItems: 'center' }}>
-      <ActivityIndicator color={theme.colors.brandPrimary} />
-    </View>
-  );
-}
-
-export function PrimaryButton({ label, onPress, testID, disabled, loading, style }: any) {
-  return (
-    <Pressable testID={testID} onPress={onPress} disabled={disabled || loading}
-      style={[styles.primaryBtn, (disabled || loading) && { opacity: 0.6 }, style]}>
-      {loading ? <ActivityIndicator color={theme.colors.onBrandPrimary} /> :
-        <Text style={styles.primaryBtnText}>{label}</Text>}
+    <Pressable testID={testID} onPress={onPress} disabled={loading} style={[{ borderRadius: theme.radius.pill, overflow: 'hidden' }, style]}>
+      <LinearGradient colors={colors || theme.gradients.neural} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradBtn}>
+        {loading ? <ActivityIndicator color="#fff" /> : (
+          <>
+            {icon && <Ionicons name={icon} size={18} color="#fff" style={{ marginRight: 8 }} />}
+            <Text style={styles.gradBtnText}>{label}</Text>
+          </>
+        )}
+      </LinearGradient>
     </Pressable>
   );
 }
 
+export function Sparkbar({ data, color, height = 44 }: { data: number[]; color?: string; height?: number }) {
+  const max = Math.max(...data, 1);
+  return (
+    <View style={[styles.spark, { height }]}>
+      {data.map((v, i) => (
+        <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
+          <View style={{ width: '62%', height: Math.max(4, (v / max) * height), backgroundColor: color || theme.colors.brandSecondary, borderRadius: 3, opacity: 0.55 + (v / max) * 0.45 }} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: theme.radius.pill, alignSelf: 'flex-start' },
-  badgeText: { fontSize: theme.font.sm, fontWeight: '500' },
-  card: {
-    backgroundColor: theme.colors.surfaceSecondary, borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border,
-  },
-  header: {
-    paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.md,
-    flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md,
-  },
-  headerTitle: { fontSize: 28, fontWeight: '500', color: theme.colors.onSurface, letterSpacing: -0.5 },
-  headerSub: { color: theme.colors.onSurfaceTertiary, marginTop: 2 },
-  empty: { alignItems: 'center', padding: theme.spacing.xl, gap: theme.spacing.sm },
-  emptyIcon: {
-    width: 64, height: 64, borderRadius: theme.radius.pill, backgroundColor: theme.colors.brandTertiary,
-    alignItems: 'center', justifyContent: 'center', marginBottom: theme.spacing.sm,
-  },
-  emptyTitle: { fontSize: theme.font.lg, fontWeight: '500', color: theme.colors.onSurface },
-  emptySub: { color: theme.colors.onSurfaceTertiary, textAlign: 'center' },
-  emptyBtn: {
-    backgroundColor: theme.colors.brandPrimary, paddingHorizontal: theme.spacing.xl,
-    paddingVertical: 12, borderRadius: theme.radius.pill, marginTop: theme.spacing.sm,
-  },
-  emptyBtnText: { color: theme.colors.onBrandPrimary, fontWeight: '500' },
-  primaryBtn: {
-    backgroundColor: theme.colors.brandPrimary, borderRadius: theme.radius.pill,
-    paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
-  },
-  primaryBtnText: { color: theme.colors.onBrandPrimary, fontWeight: '500', fontSize: theme.font.lg },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: theme.radius.pill, borderWidth: 1, alignSelf: 'flex-start' },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  chipText: { fontFamily: theme.text, fontSize: theme.font.sm, fontWeight: '600' },
+  card: { backgroundColor: theme.colors.surfaceSecondary, borderRadius: theme.radius.lg, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border },
+  header: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.md, paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.md },
+  empty: { alignItems: 'center', gap: theme.spacing.sm, padding: theme.spacing.xxl },
+  emptyIcon: { width: 64, height: 64, borderRadius: theme.radius.pill, backgroundColor: theme.colors.brandSecondary + '1A', alignItems: 'center', justifyContent: 'center', marginBottom: theme.spacing.sm },
+  gradBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 15 },
+  gradBtnText: { color: '#fff', fontFamily: theme.display, fontSize: theme.font.lg, fontWeight: '600' },
+  spark: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
 });

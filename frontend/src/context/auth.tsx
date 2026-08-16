@@ -1,87 +1,125 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as QueryParams from 'expo-auth-session/build/QueryParams';
+import { supabase, supabaseConfigured } from '@/src/lib/supabase';
 import { storage } from '@/src/utils/storage';
-import { api } from '@/src/api/client';
 
-export type Role = 'locador' | 'locatario';
+WebBrowser.maybeCompleteAuthSession();
 
-export type User = {
-  user_id: string;
+export type ShinaUser = {
+  id: string;
   name: string;
   email: string;
-  role: Role;
-  phone?: string | null;
+  avatar?: string | null;
+  provider: 'google' | 'apple' | 'demo';
 };
 
 type AuthState = {
-  user: User | null;
+  user: ShinaUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<User>;
-  register: (payload: { name: string; email: string; password: string; role: Role; phone?: string }) => Promise<User>;
-  logout: () => Promise<void>;
-  refresh: () => Promise<void>;
+  supabaseReady: boolean;
+  signInWith: (provider: 'google' | 'apple') => Promise<void>;
+  signInDemo: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
 
+const redirectTo = makeRedirectUri({ scheme: 'frontend', path: 'auth/callback' });
+
+function fromSupabase(session: any): ShinaUser | null {
+  const u = session?.user;
+  if (!u) return null;
+  return {
+    id: u.id,
+    name: u.user_metadata?.full_name || u.user_metadata?.name || (u.email || '').split('@')[0],
+    email: u.email || '',
+    avatar: u.user_metadata?.avatar_url || null,
+    provider: (u.app_metadata?.provider as any) || 'google',
+  };
+}
+
+const DEMO_USER: ShinaUser = {
+  id: 'demo-op-001',
+  name: 'Comandante Shinã',
+  email: 'ops@shinaia.com.br',
+  provider: 'demo',
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<ShinaUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const persist = async (token: string, u: User) => {
-    await storage.setItem('auth_token', token);
-    await storage.setItem('auth_user', JSON.stringify(u));
-    setUser(u);
-  };
-
-  const refresh = useCallback(async () => {
-    const token = await storage.getItem('auth_token');
-    if (!token) { setUser(null); return; }
-    try {
-      const res = await api<{ user: User }>('/auth/me');
-      setUser(res.user);
-      await storage.setItem('auth_user', JSON.stringify(res.user));
-    } catch {
-      await storage.removeItem('auth_token');
-      await storage.removeItem('auth_user');
-      setUser(null);
-    }
+  const completeUrl = useCallback(async (url: string) => {
+    if (!supabaseConfigured || !supabase) return;
+    const { params, errorCode } = QueryParams.getQueryParams(url);
+    if (errorCode || !params.access_token) return;
+    const { data, error } = await supabase.auth.setSession({
+      access_token: String(params.access_token),
+      refresh_token: String(params.refresh_token ?? ''),
+    });
+    if (!error) setUser(fromSupabase(data.session));
   }, []);
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
-      const raw = await storage.getItem('auth_user');
-      if (raw) {
-        try { setUser(JSON.parse(raw)); } catch {}
+      // Demo session persisted locally
+      const demo = await storage.getItem('demo_session');
+      if (demo === '1') {
+        if (mounted) { setUser(DEMO_USER); setLoading(false); }
+        return;
       }
-      await refresh();
-      setLoading(false);
+      if (supabaseConfigured && supabase) {
+        const { data } = await supabase.auth.getSession();
+        if (mounted) setUser(fromSupabase(data.session));
+        supabase.auth.onAuthStateChange((_e: any, s: any) => {
+          if (mounted) setUser(fromSupabase(s));
+        });
+      }
+      if (mounted) setLoading(false);
     })();
-  }, [refresh]);
 
-  const login = async (email: string, password: string) => {
-    const res = await api<{ token: string; user: User }>('/auth/login', {
-      method: 'POST', body: { email, password }, auth: false,
+    const sub = Linking.addEventListener('url', ({ url }) => { void completeUrl(url); });
+    return () => { mounted = false; sub.remove(); };
+  }, [completeUrl]);
+
+  const signInWith = async (provider: 'google' | 'apple') => {
+    if (!supabaseConfigured || !supabase) {
+      throw new Error('Supabase não configurado. Use o modo demonstração ou informe as chaves.');
+    }
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo, skipBrowserRedirect: true },
     });
-    await persist(res.token, res.user);
-    return res.user;
+    if (error) throw error;
+    if (!data.url) throw new Error('OAuth URL ausente');
+    if (Platform.OS === 'web') {
+      window.location.href = data.url;
+      return;
+    }
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type === 'success') await completeUrl(result.url);
   };
 
-  const register = async (payload: { name: string; email: string; password: string; role: Role; phone?: string }) => {
-    const res = await api<{ token: string; user: User }>('/auth/register', {
-      method: 'POST', body: payload, auth: false,
-    });
-    await persist(res.token, res.user);
-    return res.user;
+  const signInDemo = async () => {
+    await storage.setItem('demo_session', '1');
+    setUser(DEMO_USER);
   };
 
-  const logout = async () => {
-    await storage.removeItem('auth_token');
-    await storage.removeItem('auth_user');
+  const signOut = async () => {
+    await storage.removeItem('demo_session');
+    if (supabaseConfigured && supabase) {
+      try { await supabase.auth.signOut(); } catch {}
+    }
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, supabaseReady: supabaseConfigured, signInWith, signInDemo, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,43 +1,41 @@
-# PRD — Shinã I.A. (Gestão de Aluguel de Carros)
+# PRD — Shinã I.A. (Plataforma de Gestão de Operações & Frota)
 
-## Problem Statement
-Plataforma de gestão de aluguel de carros. App único que serve o **locador** (gerenciar locação: prazo do contrato, pagamentos, contrato entre as partes) e o **locatário** (visão completa dos carros locados, status, plano de manutenção, monitoramento, marketplace).
+## Direção atual (pivot)
+App mobile enterprise "Shinã I.A." que integra com o **backend próprio da Shinã** em `https://api.shinaia.com.br`.
+Auth via **Supabase client-side** (Google + Apple). Nesta fase, a camada mobile usa **adapters tipados + dados mockados**
+(sem backend/DB paralelo no Emergent). Os contratos reais de `/mobile/bootstrap` e módulos serão auditados/fornecidos depois.
 
-## User Choices
-- Ambos os perfis (locador + locatário)
-- Autenticação: email/senha + JWT (Google auth Emergent scaffolded)
-- Pagamentos: Stripe (checkout)
-- Extras: contratos digitais + PDF + assinatura digital, notificações de vencimento, manutenção programada, GPS/monitoramento, chat locador↔locatário, marketplace
+## Identidade visual
+- Dark-First Utility. Paleta do usuário: Navy Deep #0F172A, Electric Blue #2563EB, Neural Cyan #06B6D4, Growth Violet #7C3AED.
+- Tipografia: Space Grotesk (display) + Plus Jakarta Sans (texto), carregadas via expo-font.
 
-## Architecture
-- **Backend**: FastAPI + MongoDB (motor). JWT Bearer auth, bcrypt. Routes prefixed `/api`.
-- **Frontend**: Expo Router (file-based), role-based tab trees `(locador)` e `(locatario)`, shared detail routes `vehicle/[id]` e `contract/[id]`.
-- **Theme**: Moss Green (#4A5D23), iOS-native clean, sem azul/roxo.
+## Arquitetura
+- **Sem backend Emergent para dados.** `src/api/shinaia.ts` = adapters tipados que chamam api.shinaia.com.br com Bearer = Supabase access_token e caem em mocks (`src/mocks/data.ts`) quando offline.
+- **Auth**: `src/lib/supabase.ts` (SecureStore no nativo, storage util no web) + `src/context/auth.tsx` (OAuth Google/Apple + modo demonstração local).
+- **Navegação**: 5 bottom tabs — Operações, Ativos, Tracking, Financeiro, Menu. Menu abre módulos: Operadores, Clientes, Contratos, Documentos, Notificações. Rotas de detalhe: `asset/[id]`.
 
-## User Personas
-1. **Locador (Carlos)** — dono da frota; cadastra veículos, cria contratos, agenda manutenções, acompanha pagamentos/receita.
-2. **Locatário (Ana)** — aluga veículos; explora marketplace, vê carros alugados, status, manutenções, paga e assina contratos.
+## Personas
+- Gestor de Operações (Comandante Shinã) — visão de KPIs, frota, tracking, financeiro e módulos administrativos.
 
-## Core Requirements (static)
-- Auth dois perfis; RBAC (locador cria veículos/contratos/manutenções).
-- Gestão de frota, contratos com ciclo de vida (pending→active via assinatura de ambos), pagamentos, manutenção, chat, monitoramento GPS.
+## Implementado (2026-06-16)
+- ✅ Login dark (neural bg) com Google + Apple (Supabase) e modo demonstração
+- ✅ Operações: hero KPI (saúde da frota) + sparkbar, tiles de contexto, feed de atividade
+- ✅ Ativos: busca, chips de filtro (scroll horizontal), health bars, status chips, foto — detalhe do ativo com timeline de manutenção
+- ✅ Tracking: mapa dark full-bleed com pins por status + bottom sheet com lista de veículos
+- ✅ Financeiro: resultado líquido (violet), receita/despesas, gráfico de barras 6m, breakdown por categoria
+- ✅ Menu: perfil + 5 módulos + logout
+- ✅ Módulos: Operadores, Clientes, Contratos, Documentos, Notificações (todos com mocks)
+- ✅ Camada de dados com fallback live→mock e `source` (Ao vivo/Demonstração)
 
-## Implemented (2026-06-15)
-- ✅ Auth email/senha + JWT (register/login/me), demo login
-- ✅ Locador: dashboard com métricas (receita, frota, contratos, manutenções), frota CRUD (add via modal), contratos (criar + listar)
-- ✅ Locatário: marketplace com busca, meus alugados, contratos
-- ✅ Veículo: detalhe + specs + manutenção (agendar/concluir) + GPS (última posição, simulado)
-- ✅ Contrato: detalhe com abas Resumo/Pagamentos/Manutenção/Chat; assinatura digital (ambas as partes → ativa); PDF backend (reportlab); registro de pagamento (PIX/manual/Stripe checkout)
-- ✅ Chat com polling; endpoints de mensagens com controle de acesso
-- ✅ Seed data (4 veículos, 1 contrato, pagamentos, manutenção)
-- ✅ Backend testado: 31/31 pytest PASS
+## Pendências do usuário (bloqueiam produção)
+- **Supabase**: fornecer EXPO_PUBLIC_SUPABASE_URL + EXPO_PUBLIC_SUPABASE_ANON_KEY reais + configurar callbacks Google/Apple no Supabase.
+- **Contratos da API**: OpenAPI/campos reais de /mobile/bootstrap e módulos (após auditoria) para ajustar os adapters/tipos.
+- **Assets de marca**: logo/ícone oficiais (os caminhos enviados não foram anexados).
 
-## Backlog / Remaining
-- **P0**: Configurar STRIPE_SECRET_KEY para checkout real; download/visualização in-app do PDF (hoje mostra endpoint via Alert)
-- **P1**: Google Auth (Emergent) fluxo na UI; notificações de vencimento (contrato/pagamento/manutenção); GPS real (telemetria/expo-location para posição do dispositivo)
-- **P2**: mapa react-native-maps (build nativo), edição/exclusão de veículos na UI, encerramento de contrato, upload de fotos (Object Storage)
+## Backlog
+- P0: ligar Supabase real + mapear tipos live; substituir mocks por dados reais nos adapters.
+- P1: mapa nativo (react-native-maps) para tracking real; pull-to-refresh em todos os módulos; push notifications (Emergent) sob pedido.
+- P2: criação/edição em módulos (operadores, contratos), upload de documentos (Object Storage), busca global.
 
-## Next Tasks
-- Integrar chave Stripe e testar pagamento ponta-a-ponta
-- Assinatura por desenho (canvas) e download do PDF
-- Notificações de vencimento
+## Próximas tarefas
+- Receber chaves Supabase e OpenAPI → trocar mocks por live, validar OAuth ponta-a-ponta.

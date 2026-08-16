@@ -1,0 +1,38 @@
+{
+  "summary": "Shinã I.A. pivot (mock-only, frontend-only) validated end-to-end in mobile viewport (390x844). Login screen renders with Google/Apple/Demo buttons and Supabase-not-configured notice. Demo login navigates to Operações (hero 92%, 4 tiles, activity feed). All 5 bottom tabs switch correctly. Assets: search + 5 filter chips + 6 asset cards visible; drilling into asset-SHN-1042 shows Saúde do ativo, maintenance timeline, and back-btn returns. Tracking: 4 map pins + 4 track-row rows render (selection highlights row). Financial: net hero, revenue/expense cards, 6-month dual-bar chart, category breakdown all render. Menu: profile shows Comandante Shinã + Demonstração tag; all 5 module rows navigate and return via back-btn; notifications mark-all-btn toggles read; logout-btn returns to login screen. Shinã live API (api.shinaia.com.br) is unreachable due to CORS from the preview origin (expected per pivot), and mocks transparently fill in as designed. React Native web deprecation warning still present: props.pointerEvents.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Live Shinã API fallback", "issue": "All shinaia.* calls hit CORS errors ('No Access-Control-Allow-Origin' from api.shinaia.com.br) and silently fall back to mocks. Expected during pivot but the errors add console noise. Consider skipping the live fetch on web (Platform.OS === 'web') until CORS is configured on api.shinaia.com.br, or gate the live call behind a build-time flag.", "affected_testIDs": []}
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Pressable (multiple screens)", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' from react-native-web. Same warning was present in iteration_1; migrate any pointerEvents={...} prop usage to style={{ pointerEvents: ... }}. Reference: appears on login and after demo sign-in."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_2.json"
+  ],
+  "action_items": [
+    "(Low) Skip the live api.shinaia.com.br fetch on web (or gate via env flag) to remove CORS noise from console; mock fallback already works correctly.",
+    "(Low) Migrate 'pointerEvents' prop usages to 'style.pointerEvents' to silence react-native-web deprecation warning (still present after pivot)."
+  ],
+  "critical_code_review_comments": [
+    "src/api/shinaia.ts fallback pattern is clean: never throws on read paths, uses typed adapters, and simulates latency (350ms) so skeletons render. Good architecture for the mock->live swap.",
+    "auth/gate in app/_layout.tsx correctly redirects unauthenticated users away from (tabs)/module/asset routes and pushes signed-in users to /(tabs)/operations.",
+    "Supabase OAuth wiring is present but disabled by empty EXPO_PUBLIC_SUPABASE_URL / _ANON_KEY — signInWith('google'|'apple') throws a localized error 'Supabase não configurado…' as intended.",
+    "testID coverage is complete for every element in the review request (google/apple/demo login, filters, asset-<id>, pin-<id>, track-row-<id>, module-<id>, back-btn, mark-all-btn, logout-btn, asset-search).",
+    "All screens are RN-primitive-only (View/Text/Pressable/ScrollView/FlatList/Image/LinearGradient); no HTML leaked into JSX. All text is wrapped in <Text>."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only per request; FastAPI service is running but unused in this pivot)", "frontend": "100% of requested flows validated"},
+  "seed_data_creation": "None — app uses local mocks in src/mocks/data.ts.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "App is frontend-only in this pivot; ignore /app/backend (still present but not wired). Use Demo mode (demo-login-btn) to enter. All lists/pins/rows/modules use predictable testIDs: asset-<id>, pin-<id>, track-row-<id>, module-<operators|clients|contracts|documents|notifications>, filter-<all|active|alert|maintenance|idle>. Beware: [data-testid^='asset-'] also matches 'asset-search' — filter it out. api.shinaia.com.br CORS errors on every fetch are expected and handled by the mock fallback.",
+  "rca_of_issue": "N/A — no blocking issues. Two minor observations: (1) console CORS noise from api.shinaia.com.br is expected until CORS is configured on the upstream service; (2) pointerEvents deprecation is inherited from react-native-web internals of Pressable/TouchableOpacity but can be addressed by callers who set pointerEvents as a prop rather than a style."
+}

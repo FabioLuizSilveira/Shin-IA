@@ -5,6 +5,7 @@ import { LogBox, View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
 
 import { useIconFonts } from '@/src/hooks/use-icon-fonts';
 import { AuthProvider, useAuth } from '@/src/context/auth';
@@ -21,41 +22,46 @@ function Gate() {
   useEffect(() => {
     if (loading) return;
     const first = segments[0] as string | undefined;
-    const inAuth = first === undefined || first === 'index' || first === '(auth)';
-    if (!user && !inAuth) {
+    const inApp = first === '(tabs)' || first === 'module' || first === 'asset';
+    if (!user && inApp) {
       router.replace('/');
-    } else if (user) {
-      if (user.role === 'locador' && first !== '(locador)') router.replace('/(locador)/dashboard');
-      if (user.role === 'locatario' && first !== '(locatario)') router.replace('/(locatario)/home');
+    } else if (user && (first === undefined || first === 'index' || first === 'auth')) {
+      router.replace('/(tabs)/operations');
     }
   }, [user, loading, segments, router]);
 
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.surface }}>
-        <ActivityIndicator color={theme.colors.brandPrimary} />
+        <ActivityIndicator color={theme.colors.brandSecondary} />
       </View>
     );
   }
-  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.surface } }} />;
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.surface } }} />
+  );
 }
 
 export default function RootLayout() {
-  const [loaded, error] = useIconFonts();
+  const [iconsLoaded, iconsErr] = useIconFonts();
+  const [textLoaded, textErr] = useFonts({
+    SpaceGrotesk: require('../assets/fonts/SpaceGrotesk.ttf'),
+    PlusJakartaSans: require('../assets/fonts/PlusJakartaSans.ttf'),
+  });
+
+  const ready = (iconsLoaded || iconsErr) && (textLoaded || textErr);
 
   useEffect(() => {
-    if (loaded || error) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded, error]);
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
 
-  if (!loaded && !error) return null;
+  if (!ready) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AuthProvider>
-          <StatusBar style="dark" />
+          <StatusBar style="light" />
           <Gate />
         </AuthProvider>
       </SafeAreaProvider>

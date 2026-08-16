@@ -1,37 +1,37 @@
 {
-  "app_name": "Gestão de Aluguel de Carros",
-  "personality": "1 iOS-Native Clean",
-  "personality_one_liner": "A professional, highly legible, and native-feeling interface that bridges enterprise fleet management with a consumer-friendly rental experience.",
+  "app_name": "Shinã I.A.",
+  "personality": "7 Dark-First Utility structure with 6 Glass / Luxe premium surfaces",
+  "personality_one_liner": "A premium, data-dense operations command center driven by AI, blending tactical utility with a cinematic, glass-layered tech aesthetic.",
   "color": {
-    "surface": "#F9F9F7",
-    "onSurface": "#1C1C1E",
-    "surfaceSecondary": "#FFFFFF",
-    "onSurfaceSecondary": "#3A3A3C",
-    "surfaceTertiary": "#F2F2F0",
-    "onSurfaceTertiary": "#636366",
-    "surfaceInverse": "#2C2C2E",
-    "onSurfaceInverse": "#F9F9F7",
-    "brand": "#5B6B46",
-    "brandPrimary": "#4A5D23",
+    "surface": "#0F172A",
+    "onSurface": "#F8FAFC",
+    "surfaceSecondary": "#1E293B",
+    "onSurfaceSecondary": "#F1F5F9",
+    "surfaceTertiary": "#334155",
+    "onSurfaceTertiary": "#E2E8F0",
+    "surfaceInverse": "#F8FAFC",
+    "onSurfaceInverse": "#0F172A",
+    "brand": "#2563EB",
+    "brandPrimary": "#2563EB",
     "onBrandPrimary": "#FFFFFF",
-    "brandSecondary": "#7C8E64",
-    "onBrandSecondary": "#FFFFFF",
-    "brandTertiary": "#E7EBE1",
-    "onBrandTertiary": "#314013",
-    "success": "#34C759",
+    "brandSecondary": "#06B6D4",
+    "onBrandSecondary": "#0F172A",
+    "brandTertiary": "#7C3AED",
+    "onBrandTertiary": "#FFFFFF",
+    "success": "#10B981",
     "onSuccess": "#FFFFFF",
-    "warning": "#FF9500",
+    "warning": "#F59E0B",
     "onWarning": "#FFFFFF",
-    "error": "#FF3B30",
+    "error": "#EF4444",
     "onError": "#FFFFFF",
-    "info": "#5AC8FA",
-    "onInfo": "#FFFFFF",
-    "border": "#E5E5EA",
-    "borderStrong": "#C7C7CC",
-    "divider": "#E5E5EA"
+    "info": "#06B6D4",
+    "onInfo": "#0F172A",
+    "border": "#1E293B",
+    "borderStrong": "#334155",
+    "divider": "#1E293B"
   },
   "typography": {
-    "displayFontFamily": "Plus Jakarta Sans",
+    "displayFontFamily": "Space Grotesk",
     "textFontFamily": "Plus Jakarta Sans",
     "scale": {
       "sm": 12,
@@ -42,7 +42,7 @@
     }
   },
   "spacing": {
-    "rule": "Generous vertical breathing room. Clear grouping. Intentional padding. Thumb-zone focus.",
+    "rule": "Handle spacing correctly dont have extra spaces where its not required, handle padding and margin corectly and subtle for buttons and components",
     "xs": 4,
     "sm": 8,
     "md": 12,
@@ -57,20 +57,22 @@
     "lg": 20,
     "pill": 999
   },
-  "shadow_tier": "1",
+  "shadow_tier": "0",
   "navigation": "bottom_tabs",
-  "icon_set": "Ionicons",
+  "icon_set": "Phosphor",
   "glassmorphism": {
-    "enabled": true,
+    "enabled": "true",
     "do's": [
-      "Bottom tab bar when content scrolls behind it",
       "Sticky headers over scrolling content",
-      "Featured/hero cards frosted glass overlay on brand-tinted or photo backdrop"
+      "Bottom tab bar when content scrolls behind it",
+      "Modal scrim entry/exit",
+      "Premium/Featured status overlays on KPI tiles"
     ],
     "dont's": [
-      "Form fields",
-      "Body text regions",
-      "General list rows"
+      "Every button",
+      "List rows",
+      "Form inputs",
+      "Body content"
     ]
   },
   "platform_libraries": {
@@ -87,85 +89,83 @@
   },
   "screens": [
     {
-      "name": "Auth / Role Selection",
-      "purpose": "Secure entry point with explicit path selection for Locador (Owner) vs Locatário (Renter).",
+      "name": "Operations Dashboard",
+      "purpose": "Role-specific hierarchical overview of active fleet operations and critical KPIs.",
       "states": {
-        "loading": "Centered brand spinner",
-        "empty": "N/A",
-        "error": "Standard alert toast with Retry"
+        "loading": "Skeleton of hero KPI tile and 3 context tiles fading with neural cyan hue.",
+        "empty": "Abstract neural graphic indicating no active operations. CTA to start a new route or shift.",
+        "error": "Readable network error indicating API sync failure with a prominent retry button."
       },
-      "layout": "Full-bleed background image with a vertical gradient scrim (transparent to surfaceInverse) at the bottom. The content sits in the bottom 40%: App logo/title, subtitle, and two large pill buttons for role selection, stacked vertically."
+      "layout": "Follow hierarchical KPI structure: Place one large hero tile at the top (e.g., Active Fleet Health), followed by a 2-column grid of 3-4 context tiles (Active Vehicles, Alerts, Tasks). Use Space Grotesk for metrics. Use Electric Blue to Cyan gradients for active states. Maintain dense data layout but use subtle glass overlays for elevation."
     },
     {
-      "name": "Locador Dashboard (Owner)",
-      "purpose": "A modular control center for the fleet manager showing real-time metrics, alerts, and quick actions.",
+      "name": "Assets Registry",
+      "purpose": "A searchable, virtualized list of all fleet vehicles and operational equipment.",
       "states": {
-        "loading": "Skeleton of metric cards and list rows",
-        "empty": "Illustration of a parked car, 'Adicione seu primeiro veículo' (Add your first vehicle) + CTA",
-        "error": "Readable error message with a 'Tentar Novamente' button"
+        "loading": "List rows skeleton.",
+        "empty": "Illustration of a modern truck with 'No assets found' message. CTA to Add Asset.",
+        "error": "Error message with a retry connection button."
       },
-      "layout": "Safe area header. Top section features a horizontal scroll of metric cards (Total earnings, Active Rentals, Pending Maintenance) using brandTertiary tints. Below, a 'Veículos Ativos' (Active Vehicles) modular list. Status badges (success/warning) indicate vehicle health/contract status. Bottom sticky tab bar with glass effect."
+      "layout": "Virtualized list layout. Each row uses a leading visual (truck icon or photo thumbnail), title (Asset ID/Model), and trailing status chip. Status chips use semantic coloring (e.g., success green for 'Healthy', warning orange for 'Maintenance'). Keep touch targets 44pt+. Include a search bar and pinned filter row."
     },
     {
-      "name": "Locatário Home (Renter Marketplace)",
-      "purpose": "Browse available cars for rent with high-quality imagery and upfront pricing.",
+      "name": "Tracking Map",
+      "purpose": "Real-time location visualization of fleet assets.",
       "states": {
-        "loading": "Skeleton car cards",
-        "empty": "Empty road illustration, 'Nenhum carro disponível no momento' + Filter reset CTA",
-        "error": "Network error state + Retry"
+        "loading": "Dark mode map skeleton with a central spinner.",
+        "empty": "Map centered on default region with no markers. Prompt to assign trackers.",
+        "error": "Map overlay with 'Location Services Unavailable' and retry CTA."
       },
-      "layout": "Search/Filter bar at the top (sticky with glass effect). Below, a stacked list of large car cards (surfaceSecondary). Each card has a prominent image, title (Make/Model), features as small chips, and a right-aligned price. The layout uses generous lg padding and avoids dense data."
+      "layout": "Full-bleed map interface using a dark mode map style. Cluster assets by default to avoid visual clutter. Prioritize status over identity by coloring pins (green/red). The map acts as an interactive rail with a glassmorphism bottom sheet containing quick details of the selected asset."
     },
     {
-      "name": "Car Details & Booking",
-      "purpose": "Provides full vehicle information, maintenance status, and initiates the digital contract process.",
+      "name": "Financial Overview",
+      "purpose": "High-level summary of fleet costs, revenue, and efficiency metrics.",
       "states": {
-        "loading": "Image skeleton and text skeletons",
-        "empty": "N/A",
-        "error": "Failed to load details + Retry CTA"
+        "loading": "Skeleton charts and metric cards.",
+        "empty": "No financial data for period. Illustration of empty chart with 'Awaiting Data' message.",
+        "error": "Error fetching financial data with retry button."
       },
-      "layout": "Hero image at the top with a back button (glass circle). Scrolling content below: Title, status badge, specs grid (2-col), maintenance log preview, and contract terms. A fixed bottom container (surface or glass) houses the primary CTA ('Assinar Contrato' / 'Book Now') spanning 100% width, respecting safe area."
+      "layout": "Stacked metric modules and interactive charts. Large Space Grotesk numbers for revenue and expenses. Use Growth Violet as an accent for financial gains or key insights. Horizontal scrolling for period selection."
     },
     {
-      "name": "Contract & Maintenance Tracker (Shared)",
-      "purpose": "View active contract terms, payment history, and scheduled maintenance.",
+      "name": "Menu (More)",
+      "purpose": "Gateway to Operators, Clients, Contracts, Documents, and Notifications.",
       "states": {
-        "loading": "List skeletons",
-        "empty": "Illustration of documents, 'Nenhum contrato ativo'",
-        "error": "Failed to load contract + Retry"
+        "loading": "List loading skeleton.",
+        "empty": "N/A - Menu is static list.",
+        "error": "N/A"
       },
-      "layout": "Tabbed view or segmented control (Contracts | Payments | Maintenance). List items use leading icons in brandTertiary tinted squares. Payment statuses use clear success/error text colors. For tracking, a visual timeline or progress tracker indicates the contract lifecycle or maintenance schedule."
+      "layout": "Single-column settings-style list. Each row includes a tinted icon container (brandTertiary rounded square) with a Phosphor icon, row title, and trailing chevron. Sections divided by subtle dividers. Includes profile summary at the top with a glass background."
     }
   ],
   "images": {
-    "auth_bg": {
-      "url": "https://images.pexels.com/photos/29566884/pexels-photo-29566884.jpeg",
-      "alt": "Luxury car interior with red steering wheel"
+    "hero_auth_background": {
+      "url": "https://images.unsplash.com/photo-1677784976154-816c3ceca511?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNzl8MHwxfHNlYXJjaHwxfHxuZXVyYWwlMjBuZXR3b3JrJTIwYWJzdHJhY3QlMjBiYWNrZ3JvdW5kJTIwZGFya3xlbnwwfHx8fDE3ODY4MjUxNjB8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "abstract neural network background in dark mode"
     },
-    "empty_road": {
-      "url": "https://images.unsplash.com/photo-1512036849132-48508f294900",
-      "alt": "Empty road between trees with cloudy sky"
+    "asset_fleet_illustration": {
+      "url": "https://images.unsplash.com/photo-1780982907269-dae00c0d04f3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBmbGVldCUyMGNvbW1lcmNpYWwlMjB0cnVjayUyMGRhcmt8ZW58MHx8fHwxNzg2ODI1MTYwfDA&ixlib=rb-4.1.0&q=85",
+      "alt": "modern fleet commercial trucks in dark setting"
     },
-    "car_placeholder": {
-      "url": "https://images.pexels.com/photos/19868893/pexels-photo-19868893.jpeg",
-      "alt": "Side view of a black minimalist SUV"
+    "tracking_map_fallback": {
+      "url": "https://images.unsplash.com/photo-1759256243611-502772ac391b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwxfHxkYXJrJTIwbW9kZSUyMG1hcCUyMG5hdmlnYXRpb258ZW58MHx8fHwxNzg2ODI1MTYwfDA&ixlib=rb-4.1.0&q=85",
+      "alt": "dark mode map navigation placeholder"
     },
-    "dashboard_hero": {
-      "url": "https://images.unsplash.com/photo-1625690180114-5530b1304127?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBjYXIlMjBkYXNoYm9hcmQlMjBzY3JlZW58ZW58MHx8fHwxNzg2ODE2NDg1fDA&ixlib=rb-4.1.0&q=85",
-      "alt": "Modern car dashboard screen"
-    },
-    "contract_keys": {
-      "url": "https://images.unsplash.com/photo-1533558701576-23c65e0272fb",
-      "alt": "Person holding Mercedes-Benz fob"
+    "financial_charts_abstract": {
+      "url": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGZpbmFuY2lhbCUyMGRhdGElMjBjaGFydHMlMjBkYXJrfGVufDB8fHx8MTc4NjgyNTE2MHww&ixlib=rb-4.1.0&q=85",
+      "alt": "abstract financial data charts dark"
     }
   },
   "instructions_to_main_agent": [
-    "Design Identity: Adopt the '1 iOS-Native Clean' personality. Do NOT use ANY blue, indigo, or purple. Use the provided Moss Green (#4A5D23) for all primary branding/accents.",
-    "Navigation Structure: Implement two distinct tab-based navigation trees based on the user's role (Locador vs. Locatário) determined at Auth.",
-    "Role - Locador: Focus on a dashboard UI. Use a modular card layout for top-level metrics, keeping data highly legible and utilizing status colors (success, warning) for fleet health and contract alerts.",
-    "Role - Locatário: Focus on an e-commerce/marketplace feel. The home screen should prominently feature high-quality car images, clear pricing, and a smooth booking flow.",
-    "Glassmorphism: Use Expo's blur for the bottom tab bar and sticky headers. For hero images with text overlays (like the Auth screen), absolutely implement a vertical gradient scrim (transparent to surfaceInverse) to guarantee WCAG text contrast.",
-    "Spacing & Interaction: Ensure all primary actions (like 'Assinar Contrato') are housed in a sticky bottom container that clears the safe area. Hit targets must be at least 44x44pt.",
-    "Visual Hierarchy: Rely on font size and spacing for hierarchy instead of heavy font weights (max 500 weight). Use Plus Jakarta Sans throughout, ensuring a clean, modern aesthetic."
+    "CRITICAL: The brand palette is explicitly set by the user: Navy Deep (#0F172A), Electric Blue (#2563EB), Neural Cyan (#06B6D4), and Growth Violet (#7C3AED). Do NOT alter these base hues. Use them for gradients, data-viz, and semantic highlights.",
+    "Follow the 'Dark-First Utility' structure but integrate 'Glass / Luxe' surfaces for headers, tabs, and premium featured overlays to achieve the requested 'tech-forward AI identity'.",
+    "Use Space Grotesk for metrics and headings (Display) and Plus Jakarta Sans for body text to maintain an advanced geometric look that avoids Inter/Roboto slop.",
+    "For the Operations Dashboard layout, implement a hierarchical KPI structure (1 hero tile, 3-4 context tiles) to answer primary operational questions instantly. Pre-aggregate data visually.",
+    "For the Assets list, ensure you use virtualized lists and semantic status chips (e.g. green/red for health) instead of generic text.",
+    "For Live Tracking, design the map as a full-bleed interactive rail with a glassmorphism bottom sheet overlay for asset details, clustering assets by default.",
+    "Implement the Navigation as 4 primary bottom tabs (Operations, Assets, Tracking, Financial) with the 5th tab being a 'Menu' leading to Operators, Clients, Contracts, Documents, and Notifications.",
+    "Always apply a top-to-bottom gradient scrim (transparent to #0F172A) over imagery when overlaying text to guarantee readability.",
+    "Auth uses Supabase (Google + Apple). Style the login screen using the neural network background image provided, ensuring inputs have strong contrast against the dark background."
   ]
 }
