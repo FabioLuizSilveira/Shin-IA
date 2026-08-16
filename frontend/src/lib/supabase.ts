@@ -31,7 +31,9 @@ export const supabase = supabaseConfigured
         storage: secureStorage,
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: false,
+        // On web let supabase-js auto-exchange the ?code= on the callback page.
+        // On native we exchange manually after the WebBrowser returns.
+        detectSessionInUrl: Platform.OS === 'web',
         flowType: 'pkce',
       },
     })

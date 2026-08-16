@@ -56,12 +56,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const completeUrl = useCallback(async (url: string) => {
     if (!supabaseConfigured || !supabase) return;
     const { params, errorCode } = QueryParams.getQueryParams(url);
-    if (errorCode || !params.access_token) return;
-    const { data, error } = await supabase.auth.setSession({
-      access_token: String(params.access_token),
-      refresh_token: String(params.refresh_token ?? ''),
-    });
-    if (!error) setUser(fromSupabase(data.session));
+    if (errorCode) return;
+    // PKCE flow: exchange the ?code= for a session
+    if (params.code) {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(String(params.code));
+      if (!error) setUser(fromSupabase(data.session));
+      return;
+    }
+    // Implicit fallback: tokens in the URL fragment
+    if (params.access_token) {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: String(params.access_token),
+        refresh_token: String(params.refresh_token ?? ''),
+      });
+      if (!error) setUser(fromSupabase(data.session));
+    }
   }, []);
 
   useEffect(() => {
