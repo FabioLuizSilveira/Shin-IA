@@ -1,4 +1,9 @@
 ﻿import { createAdminClient } from "@/lib/supabase/admin";
+import { deliverPushForNotification } from "@/lib/push/delivery";
+import { ExpoPushProvider } from "@/lib/push/expo-provider";
+import type { DeepLinkTarget } from "@/lib/push/deep-link";
+
+const pushProvider = new ExpoPushProvider();
 
 interface CreateNotificationInput {
   tenantId: string;
@@ -13,6 +18,10 @@ interface CreateNotificationInput {
   // document was just approved") — this function never accepts a raw
   // string recipient from a request body.
   recipient?: { customerId: string } | { operatorId: string };
+  // Wave 4 Phase C — optional, typed deep-link target carried in the push
+  // payload's data field. Always one of the known DeepLinkTarget shapes,
+  // never a free-text URL from any caller.
+  deepLink?: DeepLinkTarget;
 }
 
 // Defaults to broadcasting to the whole tenant team when no `recipient` is
@@ -29,6 +38,7 @@ export async function createNotification({
   body,
   priority = "normal",
   recipient,
+  deepLink,
 }: CreateNotificationInput) {
   const recipientExternalRef = recipient
     ? "customerId" in recipient
@@ -37,15 +47,32 @@ export async function createNotification({
     : `tenant:${tenantId}`;
 
   const admin = createAdminClient();
-  const { error } = await admin.from("notifications").insert({
-    id: crypto.randomUUID(),
-    tenant_id: tenantId,
-    recipient_external_ref: recipientExternalRef,
-    channel: "in_app",
-    priority,
-    subject,
-    body,
-    status: "pending",
-  });
-  if (error) console.error("[create-notification]", error.message);
+  const { data: created, error } = await admin
+    .from("notifications")
+    .insert({
+      id: crypto.randomUUID(),
+      tenant_id: tenantId,
+      recipient_external_ref: recipientExternalRef,
+      channel: "in_app",
+      priority,
+      subject,
+      body,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+  if (error || !created) {
+    console.error("[create-notification]", error?.message);
+    return;
+  }
+
+  // Fire-and-forget, same posture as the in-app insert above — a push
+  // delivery failure (provider down, no devices registered) never fails
+  // the notification itself; it's just logged.
+  void deliverPushForNotification(
+    admin,
+    pushProvider,
+    { id: created.id, tenant_id: tenantId, recipient_external_ref: recipientExternalRef, priority },
+    { deepLink },
+  ).catch((err) => console.error("[create-notification] push delivery failed", err));
 }

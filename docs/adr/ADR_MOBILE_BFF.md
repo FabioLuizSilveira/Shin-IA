@@ -80,3 +80,27 @@ Conforme já estabelecido no pedido original:
   descartado, só não é o caminho crítico agora.
 - Se a decisão for revertida depois (mover pra `apps/api`), o contrato OpenAPI construído nesta
   auditoria permanece válido — é a implementação que muda de lugar, não a interface.
+
+## Condição para migração futura para `apps/api` (Wave 4 Phase D)
+
+Ainda **não migrar** — mas a migração só deve ser considerada aprovada quando **todos** os itens
+abaixo estiverem satisfeitos, não apenas "o Fastify skeleton existe":
+
+1. **Paridade de autorização** — `apps/api` reimplementa `hasTenantPermission()`,
+   `resolveMobileContext()`/`requireMobileContext()`, e todo o conjunto de `mobile-*-scope.ts`
+   (operations/assets/contracts/tracking/billing) com o mesmo comportamento, não uma versão
+   simplificada.
+2. **Paridade de tenant context** — `requireTenantScope()`/`scopedSelect`/`scopedUpdate` e o
+   decodificador de claims (`decodeSessionClaims`) portados sem divergência de semântica
+   (getSession() vs getUser(), branch scope, impersonation).
+3. **Contract tests** — o novo runtime validado contra o mesmo `mobile-openapi.yaml`, não apenas
+   "parece funcionar" manualmente.
+4. **Testes de integração** — cobertura equivalente aos testes ao vivo já rodados nesta sessão
+   (isolamento cross-tenant/cross-customer/cross-operator, IDOR, anti-tamper) rodando contra
+   `apps/api`, não só contra `apps/web`.
+5. **Validação de segurança sem regressão** — nenhuma das descobertas fechadas nesta sessão (ex.
+   path traversal em upload de documento, `operations:write` sem enforcement) pode reabrir na nova
+   implementação.
+
+Enquanto qualquer um desses itens não estiver satisfeito, `apps/api` permanece fora do caminho
+crítico — não é uma proibição permanente, é um gate de qualidade.

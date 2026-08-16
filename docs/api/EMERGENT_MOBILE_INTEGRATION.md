@@ -100,6 +100,72 @@ conceitos/tabelas separados neste schema — não assuma que todo ativo tem posi
 (`category`, `status`, `branchId`) tocam só colunas genéricas — não espere um filtro específico por tipo
 de blueprint (ex. "placa do veículo") até que isso seja adicionado explicitamente ao contrato.
 
+## Wave 4 Phase C — Push Notification Delivery
+
+Push é entregue de verdade a partir desta wave (fundação de registro veio da Wave 3). Provider:
+**Expo Push Service** (`apps/mobile` é Expo-managed — não há FCM/APNs direto configurado, então não
+há dois providers para escolher entre). Registre com `expo-notifications`
+(`Notifications.getExpoPushTokenAsync()`) e envie o token literal (`ExponentPushToken[...]`) para
+`POST /api/mobile/devices` — não invente seu próprio formato de token.
+
+**Privacidade (lock-screen)**: o texto do push é **sempre genérico**
+("Você tem uma nova atualização." / "Você tem uma atualização importante." para priority alta/crítica)
+— nunca o `subject`/`body` reais da notificação, que podem conter valores financeiros, nomes de
+cliente, termos de contrato. O payload carrega só um `data.notificationId` opaco; o app deve buscar o
+conteúdo real via `GET /api/mobile/notifications` **depois** que o usuário abrir o app e a sessão já
+estiver autenticada — nunca renderize o conteúdo sensível a partir do próprio payload do push.
+
+**Deep links**: quando presente, `data.deepLink` é sempre um dos tipos fechados —
+`operation`, `contract`, `document`, `tracking_alert`, `invoice`, `notification_center` — nunca uma
+URL livre. Trate qualquer payload de push com um `deepLink` que não bata em um desses tipos como
+inválido e ignore-o; não tente navegar para uma URL arbitrária vinda de `data`.
+
+**Ciclo de vida do token**: registre (`POST /api/mobile/devices`) a cada login e periodicamente
+(ex. ao abrir o app), e desregistre (`DELETE /api/mobile/devices/{deviceId}`) no logout. Se o Expo
+reportar que um token está morto ("DeviceNotRegistered"), o backend já desabilita o device
+automaticamente — o app não precisa (e não consegue) fazer nada a respeito, só voltar a registrar
+normalmente se o usuário logar de novo nesse aparelho.
+
+**Preferências**: não existe granularidade de categoria ainda (ex. "silenciar notificações
+financeiras") — é um gap documentado, não implementado nesta wave. Todo push usa a mesma prioridade
+essencial/não-essencial implícita no campo `priority` da notificação (`low`/`normal` vs `high`/`critical`).
+
+## Wave 4 Phase A — Billing
+
+Read-only nesta wave — **nenhuma ação de pagamento existe** (sem cartão salvo, PIX, payment intent,
+cobrança, refund). Três rotas, todas exigindo `tenant.dashboard.financial` para `tenant_user` (a
+mesma permission key que já esconde o card financeiro do bootstrap/dashboard — reutilizada, não uma
+nova por endpoint) e escopadas por posse (sem permission extra) para `customer`:
+
+- **`GET /api/mobile/billing/summary`** — `{ receivables, overdue, paid, nextDue }`.
+  `receivables`/`overdue` são saldo em aberto (`issued`+`overdue` e só `overdue`,
+  respectivamente); `paid` é o total pago **no mês corrente**, não histórico completo;
+  `nextDue` é a próxima fatura a vencer (ou `null`).
+- **`GET /api/mobile/invoices`** / **`GET /api/mobile/invoices/{id}`** — mesma forma de dado da
+  rota de staff (`/api/invoices`). Detalhe inclui `lineItems`. **Sem campo de documento/PDF** — não
+  existe artefato de fatura real para linkar (só uma página web de impressão, staff-only); não
+  espere um link de download aqui.
+- **`GET /api/mobile/commissions/summary`** (`tenant_user` apenas) — soma `commission_transactions`
+  já calculadas, agrupadas por `status`. Nunca recalcula comissão.
+
+`customer` nunca passa um id para descobrir as próprias faturas — a visibilidade vem de
+`billing_accounts.organization_id` através das organizações do cliente (mesma cadeia
+`rental_customer_organizations` de todas as outras telas do cliente).
+
+## Wave 4 Phase B — Reporting
+
+**`GET /api/mobile/reports/summary`** (`userType: tenant_user` apenas — KPIs são do tenant inteiro,
+sem caso de uso para customer/operator nesta wave). `?range=today|7d|30d|90d|custom` (default `30d`);
+`custom` exige `from`/`to` e tem **janela máxima de 90 dias** — não peça um intervalo maior, a rota
+rejeita com `422`. Retorna até 6 KPIs (`operations`, `assets`, `revenue`, `commissions`,
+`utilization`, `tracking`) — **estes são os únicos tipos que o Core (`KpiEngine`) sabe computar hoje**;
+não espere KPIs de "contratos", "clientes" ou "produtividade" como campos separados — não existem
+ainda. `revenue`/`commissions` **somem da lista** (não aparecem com valor zerado, não existem no
+array) quando o usuário não tem `tenant.dashboard.financial` — trate a ausência do tipo como "sem
+permissão", não como "sem dado". Cada KPI vem com `value`, `previousValue`, `changePercent` (delta
+vs. o período anterior de igual duração) — o app renderiza o gráfico/card, o backend nunca retorna
+imagem ou HTML de gráfico.
+
 ## Wave 3 Phase A — Contratos
 
 **`GET /api/mobile/contracts`** (`userType: customer` apenas) — lista os contratos do cliente
@@ -250,3 +316,62 @@ envia `accepted_at`, hash do documento, ou a versão do contrato — tudo isso �
 partir do que já foi apresentado. Se a rota rejeitar por "não possui requisito jurídico dinâmico
 associado" (422), esse contrato específico não passa pelo motor novo de contratos — trate como
 contrato legado, sem fluxo de aceite no app.
+
+## Wave 4 Phase D — Auth Lifecycle (estado real do app, auditado)
+
+Esta seção documenta o comportamento **real e já implementado** em `apps/mobile`, não um plano:
+
+- **Sessão**: `@supabase/supabase-js` com `autoRefreshToken: true`, `persistSession: true`,
+  `detectSessionInUrl: false` (correto para RN — detecção via URL é conceito web). O storage
+  adapter é `secure-session-store.ts`: um AES-256 por item gerado em runtime, guardado no
+  SecureStore (Keychain/Keystore); só o ciphertext vai pro AsyncStorage. **Nunca plaintext.**
+- **Refresh**: automático via `autoRefreshToken` — nenhuma lógica manual de refresh no app.
+  `onAuthStateChange` empurra a sessão renovada para o contexto React.
+- **Sessão expirada/revogada**: quando o Supabase invalida a sessão (refresh token revogado, etc.),
+  `onAuthStateChange` dispara com `session: null` e o navigator troca pra tela de Login
+  automaticamente — não há mensagem explícita de "sessão expirada" hoje, é um bounce silencioso.
+- **Logout**: **não existe no app hoje** — `signOut()` nunca é chamado em nenhum lugar do código
+  atual, não há botão de sair em nenhuma tela. Isso é um gap real, documentado no
+  `MOBILE_RELEASE_CHECKLIST.md`, não um "considere implementar" — é a checagem confirmada contra o
+  código atual.
+- **Deep link de callback OAuth**: validado contra um path exato (`auth/callback`) antes de
+  `setSession()` ser chamado — não aceita qualquer URL que bata só no scheme.
+- **MFA**: não implementado no app mobile.
+
+## Release Environments
+
+Três ambientes, cada um com seu próprio projeto/config — nunca misture URLs entre eles:
+
+|                               | development                                                               | staging                                            | production                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Supabase URL                  | projeto de dev (local ou hospedado separado)                              | **requisito ainda não atendido** — ver nota abaixo | `https://<projeto>.supabase.co` (mesmo projeto que `apps/web`/`apps/mkt` — IAM compartilhado) |
+| Supabase anon/publishable key | chave anon do projeto de dev                                              | idem                                               | chave anon do projeto de produção — **nunca a service role key** no client                    |
+| API URL (Mobile BFF)          | `http://<ip-da-máquina>:3000` (Next dev server) ou túnel, nunca commitado | URL de staging do `apps/web`                       | `https://app.shinaia.com.br`                                                                  |
+| App config                    | `EXPO_PUBLIC_*` via `.env.local` (gitignored)                             | build profile "preview" (EAS)                      | build profile "production" (EAS)                                                              |
+
+**Staging não existe hoje.** Não há um segundo deployment do `apps/web`/projeto Supabase configurado
+como staging — isso é um requisito documentado, não uma infraestrutura nova criada nesta wave (fora
+de escopo sem aprovação explícita). **Não homologue o app mobile diretamente contra produção** até
+que staging exista — é a instrução do próprio Wave 4.
+
+Nenhum secret privado (service role key, Stripe secret, credenciais de provider) nunca deve estar em
+`apps/mobile` — confirmado por auditoria: só `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_ANON_KEY`
+existem hoje no `.env.example` do app.
+
+## Error UX — como o app deve reagir a cada status
+
+| Status                         | Significado                                           | Comportamento esperado no app                                                                                      |
+| ------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| offline (sem resposta de rede) | sem conectividade                                     | Tela de "sem conexão" com retry manual, nunca crash silencioso                                                     |
+| timeout                        | requisição demorou demais                             | Mesmo tratamento de offline — retry, não erro genérico                                                             |
+| 401                            | sessão inválida/expirada                              | Deixar o `onAuthStateChange` levar pra tela de Login (já é o comportamento real)                                   |
+| 403                            | sem permissão/userType não suportado                  | Mensagem de "você não tem acesso a isso" — nunca mostrar a tela vazia como se fosse um bug                         |
+| 404                            | recurso não encontrado (ou não seu, por IDOR hygiene) | Tratar igual "não encontrado" — nunca assumir que significa "pertence a outra pessoa"                              |
+| 409                            | conflito (ex. double-booking)                         | Mostrar a mensagem real da API, não genérica                                                                       |
+| 422                            | validação/regra de negócio                            | Mostrar a mensagem real (`error` no corpo)                                                                         |
+| 429                            | rate limit                                            | Respeitar `Retry-After` quando presente; nunca retry automático agressivo                                          |
+| 500                            | erro interno                                          | Mensagem genérica ("algo deu errado, tente novamente") — **nunca exibir stack trace ou o corpo bruto da resposta** |
+
+Toda tela que consome uma dessas rotas precisa dos 5 estados: loading, empty (lista vazia real, não
+erro), error (com retry), offline, e o conteúdo normal — isso ainda não foi auditado tela a tela
+porque só 3 telas existem hoje (ver `MOBILE_RELEASE_CHECKLIST.md`).
