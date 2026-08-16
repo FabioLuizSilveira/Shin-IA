@@ -8,6 +8,9 @@ import { theme } from '@/src/theme';
 import { useAuth } from '@/src/context/auth';
 import { T } from '@/src/components/ui';
 
+// Apple login stays hidden until the Apple provider is configured in Supabase.
+const SHOW_APPLE = false;
+
 export default function Login() {
   const router = useRouter();
   const { user, loading, signInWith, signInDemo, supabaseReady } = useAuth();
@@ -80,7 +83,7 @@ export default function Login() {
             )}
           </Pressable>
 
-          <Pressable testID="apple-login-btn" style={[styles.oauthBtn, { backgroundColor: '#000' }]} onPress={() => oauth('apple')} disabled={!!busy}>
+          <Pressable testID="apple-login-btn" style={[styles.oauthBtn, { backgroundColor: '#000', display: SHOW_APPLE ? 'flex' : 'none' }]} onPress={() => oauth('apple')} disabled={!!busy || !SHOW_APPLE}>
             {busy === 'apple' ? <ActivityIndicator color="#fff" /> : (
               <>
                 <Ionicons name="logo-apple" size={20} color="#fff" />
