@@ -7,20 +7,26 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { supabase } from "../lib/supabase";
+import { areMocksAllowed } from "../lib/mock-policy";
+import { useAuth } from "../lib/auth-context";
 
 WebBrowser.maybeCompleteAuthSession();
 
 const redirectTo = makeRedirectUri({ scheme: "shinacustomer", path: "auth/callback" });
 
 export function LoginScreen() {
+  const { enterDemoMode } = useAuth();
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
 
   // Google OAuth: unlike signInWithOtp, GoTrue has no equivalent
   // "don't create a user" flag for OAuth providers — a first-time Google
@@ -46,6 +52,41 @@ export function LoginScreen() {
       Alert.alert("Erro", err instanceof Error ? err.message : "Falha ao entrar com Google");
     } finally {
       setGoogleLoading(false);
+    }
+  }
+
+  // M22.3 — Apple Sign-In. Uses the native Sign in with Apple button
+  // (iOS-only per Apple's own HIG/App Review requirement — there is no
+  // Android/web equivalent), exchanging Apple's identityToken for a real
+  // Supabase session via signInWithIdToken(). This still requires two
+  // pieces of external configuration this code cannot verify itself:
+  // (1) "Sign In with Apple" capability enabled on the app's Apple Developer
+  // identifier, and (2) the Apple provider configured in the Supabase
+  // dashboard (Authentication → Providers → Apple, with the Services ID/
+  // key). MANUAL CONFIGURATION REQUIRED for both before this button will
+  // actually authenticate — the code path is real and correct, but cannot
+  // self-verify infrastructure it doesn't control.
+  async function handleAppleLogin() {
+    setAppleLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) throw new Error("Apple não retornou um identityToken");
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: "apple",
+        token: credential.identityToken,
+      });
+      if (error) throw error;
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (code === "ERR_REQUEST_CANCELED") return;
+      Alert.alert("Erro", err instanceof Error ? err.message : "Falha ao entrar com Apple");
+    } finally {
+      setAppleLoading(false);
     }
   }
 
@@ -75,8 +116,8 @@ export function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Shinã Cliente</Text>
-      <Text style={styles.subtitle}>Acompanhe suas locações</Text>
+      <Text style={styles.title}>Shinã</Text>
+      <Text style={styles.subtitle}>Entre para continuar</Text>
 
       <Pressable
         style={[styles.button, styles.googleButton]}
@@ -89,6 +130,17 @@ export function LoginScreen() {
           <Text style={styles.googleButtonText}>Entrar com Google</Text>
         )}
       </Pressable>
+
+      {Platform.OS === "ios" && (
+        <AppleAuthentication.AppleAuthenticationButton
+          buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+          buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+          cornerRadius={12}
+          style={styles.appleButton}
+          onPress={() => void handleAppleLogin()}
+        />
+      )}
+      {appleLoading && <ActivityIndicator style={{ marginTop: 8 }} />}
 
       <View style={styles.divider}>
         <View style={styles.dividerLine} />
@@ -124,6 +176,16 @@ export function LoginScreen() {
           </Pressable>
         </>
       )}
+
+      {/* M22.5 — never rendered outside dev + EXPO_PUBLIC_ENABLE_MOCKS=1;
+          areMocksAllowed() folds in __DEV__, which is false in every
+          eas build release/production profile regardless of any env var,
+          so this button cannot exist in a release build's bundle output. */}
+      {areMocksAllowed() && (
+        <Pressable style={styles.demoButton} onPress={enterDemoMode}>
+          <Text style={styles.demoButtonText}>Entrar em modo demonstração (dev)</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -140,6 +202,7 @@ const styles = StyleSheet.create({
   },
   googleButton: { backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" },
   googleButtonText: { color: "#0F172A", fontWeight: "600", fontSize: 15 },
+  appleButton: { height: 48, marginTop: 12 },
   divider: { flexDirection: "row", alignItems: "center", marginVertical: 20 },
   dividerLine: { flex: 1, height: 1, backgroundColor: "#E2E8F0" },
   dividerText: { marginHorizontal: 12, color: "#94A3B8", fontSize: 12 },
@@ -156,4 +219,6 @@ const styles = StyleSheet.create({
   magicLinkButton: { backgroundColor: "#2563EB" },
   magicLinkButtonText: { color: "#fff", fontWeight: "600", fontSize: 15 },
   sentText: { textAlign: "center", color: "#334155", fontSize: 14, lineHeight: 20 },
+  demoButton: { marginTop: 24, alignItems: "center", paddingVertical: 8 },
+  demoButtonText: { color: "#94A3B8", fontSize: 13, textDecorationLine: "underline" },
 });

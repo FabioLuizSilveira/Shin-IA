@@ -1,6 +1,41 @@
 # Integração Mobile — Guia para o Emergent
 
-Data: 2026-08-15 · Este documento acompanha [mobile-openapi.yaml](mobile-openapi.yaml).
+Data: 2026-08-15 · atualizado 2026-08-17 (gate M22) · Este documento acompanha
+[mobile-openapi.yaml](mobile-openapi.yaml).
+
+## Status M23–27
+
+O app oficial (`apps/mobile`) agora consome o contrato real desta wave: `tenant_user` tem um shell
+completo (5 abas + Clientes/Operadores/Contratos/Notificações via menu), `customer` reaproveita as
+telas de locação já existentes, `operator` tem uma tela mínima. Client central em
+`apps/mobile/src/lib/shinaia-api.ts` — todo path corrigido contra este OpenAPI, nenhuma tela chama
+`fetch` diretamente. Gaps reais (tracking bulk, inbox de documentos cross-contrato, histórico de
+manutenção, telas de mutação de operação/documento) estão em
+[MOBILE_KNOWN_ISSUES.md](../mobile/MOBILE_KNOWN_ISSUES.md), não escondidos.
+
+## Unified App Runtime (M22)
+
+A partir do gate M22, existe **um único app Shinã oficial** ([ADR_UNIFIED_MOBILE_APP.md](../adr/ADR_UNIFIED_MOBILE_APP.md)),
+não um app por persona. O runtime segue sempre este fluxo:
+
+```
+Auth (Supabase — Google/Apple/Magic Link)
+↓
+GET /api/mobile/bootstrap
+↓
+Persona (userType: tenant_user | customer | operator | unprovisioned)
+↓
+Navigation (PersonaRouter — apps/mobile/src/navigation.tsx)
+↓
+Feature/Permission gating (server-side, sempre — bootstrap.permissions só
+esconde botão, nunca é a defesa real)
+```
+
+Implementação de referência em `apps/mobile`: `src/lib/auth-context.tsx` (sessão), `src/lib/bootstrap.ts`
+(chamada real ao bootstrap), `src/lib/persona-context.tsx` (cache/resolução de persona),
+`src/navigation.tsx` (branch por `userType`). Ver
+[MOBILE_PERSONA_ARCHITECTURE.md](../mobile/MOBILE_PERSONA_ARCHITECTURE.md) para o detalhamento
+completo por persona.
 
 **Status atual**: `GET /api/mobile/bootstrap` (Wave 1) está implementado e é o ponto de entrada oficial
 do Mobile BFF. Outros endpoints úteis para o app ainda não existem (marcados `x-shina-status: proposed`
