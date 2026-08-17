@@ -1,12 +1,14 @@
 import { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable } from "react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../theme";
 import { Card, ScreenHeader, Loader, T, GradientButton, EmptyState } from "../components/ui";
 import { usePersona } from "../lib/persona-context";
 import { useAuth } from "../lib/auth-context";
-import { shinaia, type DashboardSummary } from "../lib/shinaia-api";
+import { shinaia } from "../lib/shinaia-api";
+import type { TenantTabParamList } from "../navigation";
 
 // M22.8 — tenant_user home. Real data via GET /api/mobile/dashboard
 // (Wave 2 Phase A), navigation.tsx branches here whenever
@@ -52,26 +54,34 @@ function StatCard({
   label,
   value,
   tone,
+  onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: number;
   tone?: string;
+  onPress: () => void;
 }) {
   return (
-    <Card style={styles.statCard}>
-      <View
-        style={[styles.statIcon, { backgroundColor: (tone ?? theme.colors.brandSecondary) + "1A" }]}
-      >
-        <Ionicons name={icon} size={18} color={tone ?? theme.colors.brandSecondary} />
-      </View>
-      <Text style={[T.display(theme.font.xxl), { marginTop: theme.spacing.sm }]}>{value}</Text>
-      <Text style={T.text(theme.font.sm)}>{label}</Text>
-    </Card>
+    <Pressable style={styles.statCard} onPress={onPress}>
+      <Card>
+        <View
+          style={[
+            styles.statIcon,
+            { backgroundColor: (tone ?? theme.colors.brandSecondary) + "1A" },
+          ]}
+        >
+          <Ionicons name={icon} size={18} color={tone ?? theme.colors.brandSecondary} />
+        </View>
+        <Text style={[T.display(theme.font.xxl), { marginTop: theme.spacing.sm }]}>{value}</Text>
+        <Text style={T.text(theme.font.sm)}>{label}</Text>
+      </Card>
+    </Pressable>
   );
 }
 
 export function TenantHomeScreen() {
+  const navigation = useNavigation<BottomTabNavigationProp<TenantTabParamList>>();
   const { bootstrap } = usePersona();
   const { signOut, demoMode } = useAuth();
   const [data, setData] = useState<TenantDashboardData | null>(null);
@@ -128,38 +138,44 @@ export function TenantHomeScreen() {
               label="Operações ativas"
               value={data.summary.activeOperations}
               tone={theme.colors.success}
+              onPress={() => navigation.navigate("Operations")}
             />
             <StatCard
               icon="time-outline"
               label="Operações pendentes"
               value={data.summary.pendingOperations}
               tone={theme.colors.warning}
+              onPress={() => navigation.navigate("Operations")}
             />
             <StatCard
               icon="cube-outline"
               label="Ativos disponíveis"
               value={data.summary.availableAssets}
+              onPress={() => navigation.navigate("Assets")}
             />
             <StatCard
               icon="swap-horizontal-outline"
               label="Ativos em uso"
               value={data.summary.assetsInUse}
               tone={theme.colors.brandTertiary}
+              onPress={() => navigation.navigate("Assets")}
             />
           </View>
 
           {data.financial && (
-            <Card>
-              <Text style={T.text(theme.font.sm)}>Financeiro</Text>
-              <Text style={[T.display(theme.font.xxl), { marginTop: theme.spacing.xs }]}>
-                {formatCurrency(data.financial.pendingInvoicesTotal, data.financial.currency)}
-              </Text>
-              <Text style={T.text(theme.font.sm)}>
-                {data.financial.overdueInvoicesCount > 0
-                  ? `${data.financial.overdueInvoicesCount} fatura(s) em atraso`
-                  : "Nenhuma fatura em atraso"}
-              </Text>
-            </Card>
+            <Pressable onPress={() => navigation.navigate("Financial")}>
+              <Card>
+                <Text style={T.text(theme.font.sm)}>Financeiro</Text>
+                <Text style={[T.display(theme.font.xxl), { marginTop: theme.spacing.xs }]}>
+                  {formatCurrency(data.financial.pendingInvoicesTotal, data.financial.currency)}
+                </Text>
+                <Text style={T.text(theme.font.sm)}>
+                  {data.financial.overdueInvoicesCount > 0
+                    ? `${data.financial.overdueInvoicesCount} fatura(s) em atraso`
+                    : "Nenhuma fatura em atraso"}
+                </Text>
+              </Card>
+            </Pressable>
           )}
 
           {data.alerts.length > 0 && (

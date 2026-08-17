@@ -13,7 +13,6 @@ const ITEMS: {
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
   { key: "Clients", label: "Clientes", icon: "people-outline" },
-  { key: "Operators", label: "Operadores", icon: "person-outline" },
   { key: "Contracts", label: "Contratos", icon: "document-text-outline" },
   { key: "Tracking", label: "Rastreamento", icon: "map-outline" },
   { key: "Notifications", label: "Notificações", icon: "notifications-outline" },
