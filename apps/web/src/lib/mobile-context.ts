@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decodeSessionClaims, type SessionClaims } from "@/lib/jwt-claims";
@@ -169,15 +170,53 @@ export async function resolveMobileContext(input: {
   return { userType: "unprovisioned", userId, email };
 }
 
-// The route-facing entry point — fetches and verifies the session, then
-// delegates to resolveMobileContext(). Every mobile route calls this first,
-// per the mandatory pipeline (Wave 0.3): authenticate -> resolve identity ->
-// resolve user type -> resolve tenant/customer/operator context. Permission
-// checks and scope enforcement happen after this, in the route itself,
-// using hasTenantPermission()/scopedSelect() etc. for tenant_user contexts
-// (TenantUserMobileContext is structurally identical to TenantScope, so
-// those functions accept it directly with no adapter needed).
+// The route-facing entry point — fetches and verifies the caller's identity,
+// then delegates to resolveMobileContext(). Every mobile route calls this
+// first, per the mandatory pipeline (Wave 0.3): authenticate -> resolve
+// identity -> resolve user type -> resolve tenant/customer/operator context.
+// Permission checks and scope enforcement happen after this, in the route
+// itself, using hasTenantPermission()/scopedSelect() etc. for tenant_user
+// contexts (TenantUserMobileContext is structurally identical to
+// TenantScope, so those functions accept it directly with no adapter
+// needed).
+//
+// Two auth transports are supported:
+//   - Authorization: Bearer <token> — the ONLY transport a real React
+//     Native client can use (it has no cookie jar at all, unlike a
+//     browser). Found live in production: every /api/mobile/* call from
+//     the built Android app 401'd until this path was added, because
+//     createClient()'s cookie-only session read never sees a bearer
+//     header. The token is verified with a real call to Supabase Auth
+//     (auth.getUser(token)) — never trusted from decodeSessionClaims()
+//     alone, which only decodes, it doesn't verify a signature.
+//   - Cookie-based session (createClient() + getSession()) — the existing
+//     browser/web path, unchanged, still used by any web-based testing of
+//     these same routes.
 export async function requireMobileContext(): Promise<MobileContext | MobileContextError> {
+  const headerStore = await headers();
+  const authHeader = headerStore.get("authorization");
+  const bearerToken = authHeader?.toLowerCase().startsWith("bearer ")
+    ? authHeader.slice("bearer ".length).trim()
+    : null;
+
+  const db = createAdminClient();
+
+  if (bearerToken) {
+    const {
+      data: { user },
+      error,
+    } = await db.auth.getUser(bearerToken);
+    if (error || !user) return { error: "Unauthorized", status: 401 };
+
+    const claims = decodeSessionClaims(bearerToken);
+    return resolveMobileContext({
+      claims,
+      userId: user.id,
+      email: user.email ?? null,
+      db,
+    });
+  }
+
   const supabase = await createClient();
   const {
     data: { session },
@@ -189,7 +228,7 @@ export async function requireMobileContext(): Promise<MobileContext | MobileCont
     claims,
     userId: session.user.id,
     email: session.user.email ?? null,
-    db: createAdminClient(),
+    db,
   });
 }
 
