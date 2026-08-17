@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decodeSessionClaims } from "@/lib/jwt-claims";
@@ -19,21 +20,46 @@ export interface TenantScope {
 // rows for them. Using the admin client with an explicit tenant_id filter
 // works identically for a real tenant user and for an impersonating platform
 // admin, so individual routes don't need two code paths.
+// Mirrors requireMobileContext()'s two-transport auth (mobile-context.ts):
+// a real Bearer token, verified via a live Supabase Auth call, for
+// cookie-less clients (the mobile app calls /api/organizations,
+// /api/operators, /api/operations/[id] directly, per the Wave 2 Phase D
+// reuse decision); cookie-based getSession() unchanged for the web app.
 export async function requireTenantScope(): Promise<
   TenantScope | { error: string; status: number }
 > {
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) return { error: "Unauthorized", status: 401 };
+  const headerStore = await headers();
+  const authHeader = headerStore.get("authorization");
+  const bearerToken = authHeader?.toLowerCase().startsWith("bearer ")
+    ? authHeader.slice("bearer ".length).trim()
+    : null;
 
-  const claims = decodeSessionClaims(session.access_token);
+  let userId: string;
+  let claims: ReturnType<typeof decodeSessionClaims>;
+
+  if (bearerToken) {
+    const adminForAuth = createAdminClient();
+    const {
+      data: { user },
+      error,
+    } = await adminForAuth.auth.getUser(bearerToken);
+    if (error || !user) return { error: "Unauthorized", status: 401 };
+    userId = user.id;
+    claims = decodeSessionClaims(bearerToken);
+  } else {
+    const supabase = await createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return { error: "Unauthorized", status: 401 };
+    userId = session.user.id;
+    claims = decodeSessionClaims(session.access_token);
+  }
 
   if (claims.tenant_id) {
     return {
       tenantId: claims.tenant_id,
-      userId: session.user.id,
+      userId,
       tenantRole: claims.tenant_role ?? null,
       isImpersonating: false,
       accessMode: "full",
@@ -42,13 +68,13 @@ export async function requireTenantScope(): Promise<
   }
 
   if (claims.platform_role) {
-    const impersonation = await getActiveImpersonation(session.user.id);
+    const impersonation = await getActiveImpersonation(userId);
     if (!impersonation) {
       return { error: "No active tenant context — start impersonation first", status: 403 };
     }
     return {
       tenantId: impersonation.tenantId,
-      userId: session.user.id,
+      userId,
       tenantRole: null,
       isImpersonating: true,
       accessMode: impersonation.accessMode,

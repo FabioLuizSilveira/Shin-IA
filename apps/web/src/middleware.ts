@@ -79,6 +79,19 @@ function isAppPublicPath(pathname: string): boolean {
   return APP_PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 }
 
+// The mobile app (and any other non-browser API client) has no cookie jar —
+// it authenticates every /api/* call with an Authorization: Bearer <token>
+// header instead. This middleware's own session check (below) is cookie-only
+// (createServerClient's getUser()), so without this, every such call 401'd
+// here before ever reaching the route — the route's own bearer-aware auth
+// (requireMobileContext()/requireTenantScope()) never even ran. Verifying
+// the token itself is deliberately NOT done here: that's the route's job
+// (a real auth.getUser(token) call), this only decides whether to defer to
+// it instead of enforcing the cookie-only gate below.
+function hasBearerAuth(request: NextRequest): boolean {
+  return (request.headers.get("authorization") ?? "").toLowerCase().startsWith("bearer ");
+}
+
 // A rental customer's session carries neither platform_role nor tenant_id
 // (see supabase/migrations/20260055000000_rental_customers.sql — that model
 // is deliberately claims-free). Landing such a user on /tenant/dashboard
@@ -263,6 +276,11 @@ export async function middleware(request: NextRequest) {
   // ── 2. Unauthenticated → redirect to login / 401 ──────────────────────────
   if (!user && !isPublic) {
     if (isApiRoute) {
+      // Defer to the route's own bearer-token auth instead of rejecting a
+      // real mobile-client request that simply has no cookies to check here.
+      if (hasBearerAuth(request)) {
+        return supabaseResponse;
+      }
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const url = request.nextUrl.clone();
