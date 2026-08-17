@@ -1,5 +1,6 @@
 import { useCallback } from "react";
-import { View, Text } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import { theme } from "../theme";
 import { Card, ScreenHeader, Chip, T } from "../components/ui";
 import { AsyncScreen } from "../components/async-screen";
@@ -26,21 +27,32 @@ export function AssetsScreen() {
         {(assets: AssetItem[]) => (
           <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
             {assets.map((asset) => (
-              <Card key={asset.id}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={T.display(theme.font.lg)}>{asset.name}</Text>
-                  <Chip status={asset.status} />
+              <Card key={asset.id} style={styles.card}>
+                {asset.metadata?.photo_url ? (
+                  <Image
+                    source={{ uri: asset.metadata.photo_url }}
+                    style={styles.thumb}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View style={[styles.thumb, styles.thumbPlaceholder]} />
+                )}
+                <View style={{ flex: 1, gap: 4 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text style={T.display(theme.font.lg)}>{asset.name}</Text>
+                    <Chip status={asset.status} />
+                  </View>
+                  <Text style={T.text(theme.font.sm)}>
+                    {asset.type_name ?? asset.category}
+                    {asset.serial_number ? ` · ${asset.serial_number}` : ""}
+                  </Text>
                 </View>
-                <Text style={T.text(theme.font.sm)}>
-                  {asset.type_name ?? asset.category}
-                  {asset.serial_number ? ` · ${asset.serial_number}` : ""}
-                </Text>
               </Card>
             ))}
           </View>
@@ -49,3 +61,14 @@ export function AssetsScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  card: { flexDirection: "row", gap: theme.spacing.md, alignItems: "center" },
+  thumb: {
+    width: 72,
+    height: 72,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surfaceTertiary,
+  },
+  thumbPlaceholder: {},
+});

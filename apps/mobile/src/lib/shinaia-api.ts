@@ -107,6 +107,7 @@ export interface AssetItem {
   branch_id: string;
   asset_type_id: string;
   type_name?: string;
+  metadata?: { photo_url?: string; [key: string]: unknown };
 }
 export interface ContractItem {
   id: string;
