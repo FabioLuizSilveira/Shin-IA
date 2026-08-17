@@ -1,27 +1,49 @@
 # Mobile Release Checklist
 
-Data: 2026-08-15 · Produzido ao final da Wave 4 (Business Mobile + Release Readiness). Baseado em
-auditoria real do código de `apps/mobile` e `apps/web` — não é uma lista genérica de boas práticas,
-cada item reflete o estado real confirmado nesta sessão.
+Data: 2026-08-15 (Wave 4) · atualizado 2026-08-17 (gate M22). Baseado em auditoria real do código de
+`apps/mobile` e `apps/web` — não é uma lista genérica de boas práticas, cada item reflete o estado
+real confirmado nesta sessão.
 
 **Legenda**: ✅ pronto · ⚠️ parcial/gap documentado · ❌ bloqueador real
+
+**Atualização M22**: a partir do gate M22, o produto oficial é **um único app Shinã** com resolução
+de persona server-driven — ver [ADR_UNIFIED_MOBILE_APP.md](../adr/ADR_UNIFIED_MOBILE_APP.md) e
+[MOBILE_PERSONA_ARCHITECTURE.md](MOBILE_PERSONA_ARCHITECTURE.md). Os itens desta seção nova são
+obrigatórios além de tudo já registrado abaixo; nenhum item antigo foi removido.
+
+## Critérios obrigatórios — App Único (M22)
+
+| Item                                                             | Status                             | Nota                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Um único binário oficial Shinã (não um app por persona)          | ✅                                 | `apps/mobile` é o binário único; nenhum código do Emergent branch foi mantido como app separado.                                                                                                                                                                                                                        |
+| Resolução de persona via bootstrap (`GET /api/mobile/bootstrap`) | ✅                                 | `src/lib/bootstrap.ts` + `src/lib/persona-context.tsx` — chamada real, `userType` nunca inferido client-side.                                                                                                                                                                                                           |
+| `tenant_user` reconhecido e roteado                              | ✅ (screen mínima)                 | `TenantHomeScreen` real, dados reais via `/api/mobile/dashboard`. Shell completo (5 módulos do Emergent) é M23.                                                                                                                                                                                                         |
+| `customer` reconhecido e roteado                                 | ✅                                 | Reaproveita `RentalsListScreen`/`RentalDetailScreen` já existentes (decisão do ADR — não recriado).                                                                                                                                                                                                                     |
+| `operator` reconhecido e roteado                                 | ✅ (screen mínima)                 | `OperatorHomeScreen` real, mesmo endpoint de dashboard (branch `operator`).                                                                                                                                                                                                                                             |
+| `unprovisioned` reconhecido e roteado                            | ✅                                 | `UnprovisionedScreen` — estado + logout, nenhuma ação de provisionamento client-side.                                                                                                                                                                                                                                   |
+| Sem fallback de mock em produção                                 | ✅ enforcement real                | `mock-policy.ts`'s `areMocksAllowed()` exige `__DEV__ && EXPO_PUBLIC_ENABLE_MOCKS === "1"` — `__DEV__` é `false` em todo build de release do Expo/Metro, não uma env var que possa ser setada por engano em produção.                                                                                                   |
+| Sem dependência do backend Emergent (`backend/server.py`)        | ✅ nunca integrado                 | Confirmado morto e não mesclado (M21) — só o `frontend/` do branch foi portado.                                                                                                                                                                                                                                         |
+| Sem dependência de domínio Emergent (`*.emergentagent.com`)      | ✅ nunca integrado                 | —                                                                                                                                                                                                                                                                                                                       |
+| Sem auth de demo em produção                                     | ✅ enforcement real                | `enterDemoMode()` delega à mesma `areMocksAllowed()` — impossível em release build. Botão de demo no login também condicionado à mesma checagem.                                                                                                                                                                        |
+| Bundle identifier oficial Shinã                                  | ⚠️ proposto, não registrado        | `br.com.shinaia.app` (iOS/Android) definido em `app.json` — **proposta de config**, não registrado em App Store Connect/Google Play Console (fora do escopo desta sessão, requer acesso externo). Confirmar que não colide com nada já registrado antes do primeiro build real.                                         |
+| Deep-link scheme oficial Shinã                                   | ✅ preservado (decisão deliberada) | Mantido `shinacustomer` (não adotado o `shina` sugerido no M22) — já é uma dependência real em produção: `apps/web`'s `MOBILE_APP_SCHEME` usa esse exato scheme no fluxo de convite de cliente por e-mail. Trocar quebraria convites já enviados/agendados. Ver M22.15 ("se já existir, preservar, não criar colisão"). |
 
 ---
 
 ## Auth
 
-| Item                                                             | Status | Nota                                                                                                                                                                                                                                                 |
-| ---------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sessão persistida com segurança (não plaintext)                  | ✅     | `secure-session-store.ts` — padrão `LargeSecureStore` da própria Supabase: chave AES-256 por item no SecureStore (Keychain/Keystore), ciphertext no AsyncStorage. Corrigido nesta sessão (MÉD-11), antes era plaintext via polyfill de localStorage. |
-| Token refresh automático                                         | ✅     | `autoRefreshToken: true` no client Supabase + `onAuthStateChange` atualiza o contexto.                                                                                                                                                               |
-| Deep link de callback OAuth validado (não aceita URL arbitrária) | ✅     | `deep-link-session.ts` exige o path exato `auth/callback` (MÉD-12, corrigido).                                                                                                                                                                       |
-| Magic-link self-signup bloqueado                                 | ✅     | `shouldCreateUser: false` (Wave 0.1).                                                                                                                                                                                                                |
-| Google OAuth                                                     | ✅     | `expo-auth-session` + `expo-web-browser`.                                                                                                                                                                                                            |
-| **Apple Sign-In**                                                | ❌     | **Ausente.** App tem Google OAuth mas não Sign in with Apple — risco real de rejeição na App Store (guideline 4.8) se o app for publicado assim.                                                                                                     |
-| **Logout / sign-out**                                            | ❌     | **Não existe nenhum fluxo de logout no app** — `signOut()` nunca é chamado em lugar nenhum do código. Nenhuma tela tem botão de sair. Bloqueador de QA básico, não só de "boa prática".                                                              |
-| MFA no app mobile                                                | ⚠️     | Não implementado — não confirmado como requisito de produto, documentado como gap.                                                                                                                                                                   |
-| Colisão de conta (mesmo e-mail, providers diferentes)            | ⚠️     | Comportamento real depende da configuração do painel Supabase (Authentication → Providers → linking de identidade) — **não verificado nesta wave**, precisa ser confirmado no painel antes do release, não assumido.                                 |
-| Dev backdoor (`EXPO_PUBLIC_DEV_ACCESS_TOKEN`)                    | ✅     | Gated por `__DEV__` (removido em build de release) + env var só-local. Confirmar que EAS build profiles de produção nunca definem essa var.                                                                                                          |
+| Item                                                             | Status                                    | Nota                                                                                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Sessão persistida com segurança (não plaintext)                  | ✅                                        | `secure-session-store.ts` — padrão `LargeSecureStore` da própria Supabase: chave AES-256 por item no SecureStore (Keychain/Keystore), ciphertext no AsyncStorage. Corrigido nesta sessão (MÉD-11), antes era plaintext via polyfill de localStorage.                                                         |
+| Token refresh automático                                         | ✅                                        | `autoRefreshToken: true` no client Supabase + `onAuthStateChange` atualiza o contexto.                                                                                                                                                                                                                       |
+| Deep link de callback OAuth validado (não aceita URL arbitrária) | ✅                                        | `deep-link-session.ts` exige o path exato `auth/callback` (MÉD-12, corrigido).                                                                                                                                                                                                                               |
+| Magic-link self-signup bloqueado                                 | ✅                                        | `shouldCreateUser: false` (Wave 0.1).                                                                                                                                                                                                                                                                        |
+| Google OAuth                                                     | ✅                                        | `expo-auth-session` + `expo-web-browser`.                                                                                                                                                                                                                                                                    |
+| **Apple Sign-In**                                                | ⚠️ código pronto, config externa pendente | `expo-apple-authentication` + `signInWithIdToken()` implementado (M22.3), botão nativo só em iOS. **MANUAL CONFIGURATION REQUIRED**: capability "Sign In with Apple" no Apple Developer identifier + provider Apple configurado no painel Supabase — nenhum dos dois pode ser verificado/feito nesta sessão. |
+| **Logout / sign-out**                                            | ✅                                        | `useAuth().signOut()` (M22.13) — chama `supabase.auth.signOut()` (limpa a sessão segura) e reseta o estado local; `PersonaProvider` reseta o cache de bootstrap automaticamente quando a sessão vira null. Botão exposto em `TenantHomeScreen`/`OperatorHomeScreen`/`UnprovisionedScreen`.                   |
+| MFA no app mobile                                                | ⚠️                                        | Não implementado — não confirmado como requisito de produto, documentado como gap.                                                                                                                                                                                                                           |
+| Colisão de conta (mesmo e-mail, providers diferentes)            | ⚠️                                        | Comportamento real depende da configuração do painel Supabase (Authentication → Providers → linking de identidade) — **não verificado nesta wave**, precisa ser confirmado no painel antes do release, não assumido.                                                                                         |
+| Dev backdoor (`EXPO_PUBLIC_DEV_ACCESS_TOKEN`)                    | ✅                                        | Gated por `__DEV__` (removido em build de release) + env var só-local. Confirmar que EAS build profiles de produção nunca definem essa var.                                                                                                                                                                  |
 
 ## API / Mobile BFF
 
@@ -128,13 +150,23 @@ cada item reflete o estado real confirmado nesta sessão.
 
 ## Resumo — bloqueadores reais (❌) antes de qualquer submissão a loja
 
-1. Nenhum fluxo de logout no app.
-2. `ios.bundleIdentifier`/`android.package`/build numbers ausentes — build de release não é possível como está.
-3. `eas.json` não existe.
-4. Sem Apple Sign-In (risco de rejeição se publicado com Google OAuth apenas).
-5. `expo-notifications` não instalado — push do backend não chega a lugar nenhum no client ainda.
-6. Cobertura de tela mobile muito atrás do backend — 3 telas contra ~25 endpoints reais.
-7. Zero testes automatizados no app mobile.
+**Atualização M22**: itens 1 e 4 (logout, código de Apple Sign-In) foram resolvidos nesta milestone.
+Bundle id/package agora têm um valor _proposto_ em `app.json` (`br.com.shinaia.app`), mas continuam
+bloqueadores até serem confirmados/registrados externamente (fora do alcance desta sessão).
 
-Nenhum destes é resolvido nesta wave — são decisões de produto/trabalho de UI real, fora do escopo de
-um hardening de backend. Documentados aqui para que a aprovação humana decida a próxima iniciativa.
+1. ~~Nenhum fluxo de logout no app~~ — **resolvido (M22.13)**.
+2. `eas.json` não existe — build de release ainda não é possível como está, mesmo com bundle
+   id/package agora propostos em `app.json`.
+3. Apple Sign-In: código pronto, mas depende de capability no Apple Developer + provider configurado
+   no painel Supabase — **MANUAL CONFIGURATION REQUIRED**, não algo que o código sozinho resolve.
+4. `expo-notifications` não instalado — push do backend não chega a lugar nenhum no client ainda.
+5. Cobertura de tela mobile muito atrás do backend — telas mínimas por persona existem (M22), mas o
+   shell completo do Emergent (5 módulos tenant_user + módulos operator) ainda não foi portado —
+   M23.
+6. Zero testes automatizados no app mobile.
+7. Bundle identifier/package propostos (`br.com.shinaia.app`) mas não confirmados como livres de
+   colisão nem registrados em App Store Connect/Google Play Console.
+
+Itens 2, 3, 4, 5, 6, 7 não são resolvidos nesta wave — decisões de produto, acesso a consoles
+externos, ou trabalho de UI real fora do escopo do gate M22. Documentados para que a aprovação humana
+decida a próxima iniciativa (M23).
