@@ -1,0 +1,43 @@
+{
+  "cli": {
+    "version": ">= 13.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": false },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://wokoqmoulsvzikkdcmfc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indva29xbW91bHN2emlra2RjbWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMTg5MzQsImV4cCI6MjA5Nzg5NDkzNH0.ooIrP6ruo95JkSay9N_IAnr6XDQU7hgs_YPBmU_F9js",
+        "EXPO_PUBLIC_ENABLE_MOCKS": "1"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": false },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://wokoqmoulsvzikkdcmfc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indva29xbW91bHN2emlra2RjbWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMTg5MzQsImV4cCI6MjA5Nzg5NDkzNH0.ooIrP6ruo95JkSay9N_IAnr6XDQU7hgs_YPBmU_F9js",
+        "EXPO_PUBLIC_SHINAIA_API_URL": "https://app.shinaia.com.br",
+        "EXPO_PUBLIC_ENABLE_MOCKS": "0"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": { "buildType": "app-bundle" },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://wokoqmoulsvzikkdcmfc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indva29xbW91bHN2emlra2RjbWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMTg5MzQsImV4cCI6MjA5Nzg5NDkzNH0.ooIrP6ruo95JkSay9N_IAnr6XDQU7hgs_YPBmU_F9js",
+        "EXPO_PUBLIC_SHINAIA_API_URL": "https://app.shinaia.com.br",
+        "EXPO_PUBLIC_ENABLE_MOCKS": "0"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

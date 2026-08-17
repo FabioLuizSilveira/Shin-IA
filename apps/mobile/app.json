@@ -9,11 +9,13 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "br.com.shinaia.app",
+      "buildNumber": "1",
       "supportsTablet": true,
       "usesAppleSignIn": true
     },
     "android": {
       "package": "br.com.shinaia.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -31,6 +33,12 @@
       "expo-font",
       "expo-apple-authentication",
       "expo-notifications"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "31e2d122-3bfb-4699-87f1-7e8d5a38abb8"
+      }
+    },
+    "owner": "shina-i-a"
   }
 }
