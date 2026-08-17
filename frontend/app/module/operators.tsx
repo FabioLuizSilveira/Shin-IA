@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
 import { shinaia, Operator } from '@/src/api/shinaia';
-import { Card, Chip, Loader, T } from '@/src/components/ui';
+import { Card, Chip, Loader, T, BrandMark } from '@/src/components/ui';
 
 export default function Operators() {
   const router = useRouter();
@@ -22,6 +22,7 @@ export default function Operators() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.head}>
         <Pressable testID="back-btn" onPress={() => router.back()} style={styles.back}><Ionicons name="chevron-back" size={22} color={theme.colors.onSurface} /></Pressable>
+        <BrandMark size={22} />
         <Text style={[T.display(theme.font.xxl)]}>Operadores</Text>
       </View>
       {loading ? <Loader /> : (

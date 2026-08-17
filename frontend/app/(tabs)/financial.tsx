@@ -26,7 +26,7 @@ export default function Financial() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScreenHeader title="Financeiro" subtitle={data?.period || ''} />
+      <ScreenHeader title="Financeiro" subtitle={data?.period || ''} brand />
       {loading && !data ? <Loader /> : data && (
         <ScrollView
           contentContainerStyle={{ padding: theme.spacing.lg, paddingBottom: 120, gap: theme.spacing.lg }}

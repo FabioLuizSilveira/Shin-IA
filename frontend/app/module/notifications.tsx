@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
 import { shinaia, NotificationItem } from '@/src/api/shinaia';
-import { Card, Loader, T } from '@/src/components/ui';
+import { Card, Loader, T, BrandMark } from '@/src/components/ui';
 
 const toneColor = (t: string) => (t === 'warning' ? theme.colors.warning : t === 'success' ? theme.colors.success : theme.colors.brandSecondary);
 const toneIcon = (t: string) => (t === 'warning' ? 'warning' : t === 'success' ? 'checkmark-circle' : 'information-circle');
@@ -27,6 +27,7 @@ export default function Notifications() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.head}>
         <Pressable testID="back-btn" onPress={() => router.back()} style={styles.back}><Ionicons name="chevron-back" size={22} color={theme.colors.onSurface} /></Pressable>
+        <BrandMark size={22} />
         <Text style={[T.display(theme.font.xxl), { flex: 1 }]}>Notificações</Text>
         <Pressable testID="mark-all-btn" onPress={markAll}><Text style={[T.text(theme.font.sm, theme.colors.brandSecondary), { fontWeight: '600' }]}>Marcar lidas</Text></Pressable>
       </View>

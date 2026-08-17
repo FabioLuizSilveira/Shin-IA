@@ -6,7 +6,7 @@ import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
 import { shinaia, TrackedAsset } from '@/src/api/shinaia';
-import { Chip, Loader, T } from '@/src/components/ui';
+import { Chip, Loader, T, BrandMark } from '@/src/components/ui';
 
 const { width } = Dimensions.get('window');
 const MAP_H = 380;
@@ -36,9 +36,12 @@ export default function Tracking() {
       >
         <LinearGradient colors={['rgba(15,23,42,0.6)', 'rgba(15,23,42,0.2)', 'rgba(15,23,42,0.9)']} style={StyleSheet.absoluteFill} />
         <SafeAreaView edges={['top']} style={styles.mapHeader}>
-          <View>
-            <Text style={[T.text(theme.font.sm, theme.colors.brandSecondary), { letterSpacing: 1, textTransform: 'uppercase' }]}>Ao vivo</Text>
-            <Text style={[T.display(theme.font.xxl)]}>Tracking</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            <BrandMark size={26} />
+            <View>
+              <Text style={[T.text(theme.font.sm, theme.colors.brandSecondary), { letterSpacing: 1, textTransform: 'uppercase' }]}>Ao vivo</Text>
+              <Text style={[T.display(theme.font.xxl)]}>Tracking</Text>
+            </View>
           </View>
           <View style={styles.legend}>
             <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: theme.colors.success }]} /><Text style={styles.legendText}>Ativo</Text></View>

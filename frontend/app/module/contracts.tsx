@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
 import { shinaia, Contract } from '@/src/api/shinaia';
-import { Card, Chip, Loader, T } from '@/src/components/ui';
+import { Card, Chip, Loader, T, BrandMark } from '@/src/components/ui';
 
 const brl = (n: number) => 'R$ ' + n.toLocaleString('pt-BR');
 
@@ -24,6 +24,7 @@ export default function Contracts() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.head}>
         <Pressable testID="back-btn" onPress={() => router.back()} style={styles.back}><Ionicons name="chevron-back" size={22} color={theme.colors.onSurface} /></Pressable>
+        <BrandMark size={22} />
         <Text style={[T.display(theme.font.xxl)]}>Contratos</Text>
       </View>
       {loading ? <Loader /> : (

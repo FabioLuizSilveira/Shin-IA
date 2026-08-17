@@ -28,6 +28,7 @@ export default function Operations() {
       <ScreenHeader
         title="Operações"
         subtitle={source === 'live' ? 'Ao vivo' : 'Demonstração'}
+        brand
         right={
           <View style={styles.avatar}><Text style={styles.avatarText}>{user?.name?.charAt(0) || 'S'}</Text></View>
         }

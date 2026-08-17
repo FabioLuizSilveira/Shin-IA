@@ -1,8 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '@/src/theme';
+
+const SYMBOL = require('@/assets/images/shina-symbol-alpha.png');
+
+export function BrandMark({ size = 30 }: { size?: number }) {
+  return <Image source={SYMBOL} style={{ width: size, height: size * 1.16 }} contentFit="contain" />;
+}
 
 export const T = {
   display: (size = theme.font.xl): TextStyle => ({ fontFamily: theme.display, fontSize: size, color: theme.colors.onSurface }),
@@ -37,13 +44,28 @@ export function Card({ children, style }: { children: React.ReactNode; style?: V
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-export function ScreenHeader({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
+export function ScreenHeader({ title, subtitle, right, brand }: { title: string; subtitle?: string; right?: React.ReactNode; brand?: boolean }) {
   return (
     <View style={styles.header}>
+      {brand && (
+        <View style={styles.headerMark}>
+          <BrandMark size={26} />
+        </View>
+      )}
       <View style={{ flex: 1 }}>
         {!!subtitle && <Text style={[T.text(theme.font.sm, theme.colors.brandSecondary), { letterSpacing: 1, textTransform: 'uppercase' }]}>{subtitle}</Text>}
         <Text style={[T.display(theme.font.xxxl), { marginTop: 2 }]}>{title}</Text>
       </View>
+      {right}
+    </View>
+  );
+}
+
+export function BackHeader({ title, right }: { title: string; right?: React.ReactNode }) {
+  return (
+    <View style={styles.backHeader}>
+      <View style={styles.headerMark}><BrandMark size={24} /></View>
+      <Text style={[T.display(theme.font.xxl), { flex: 1 }]} numberOfLines={1}>{title}</Text>
       {right}
     </View>
   );
@@ -96,7 +118,9 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
   chipText: { fontFamily: theme.text, fontSize: theme.font.sm, fontWeight: '600' },
   card: { backgroundColor: theme.colors.surfaceSecondary, borderRadius: theme.radius.lg, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border },
-  header: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing.md, paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.md },
+  header: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.md },
+  headerMark: { width: 40, height: 40, borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceSecondary, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' },
+  backHeader: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md },
   empty: { alignItems: 'center', gap: theme.spacing.sm, padding: theme.spacing.xxl },
   emptyIcon: { width: 64, height: 64, borderRadius: theme.radius.pill, backgroundColor: theme.colors.brandSecondary + '1A', alignItems: 'center', justifyContent: 'center', marginBottom: theme.spacing.sm },
   gradBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 15 },

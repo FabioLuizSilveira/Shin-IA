@@ -24,7 +24,7 @@ export default function Menu() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScreenHeader title="Menu" subtitle="Módulos" />
+      <ScreenHeader title="Menu" subtitle="Módulos" brand />
       <ScrollView contentContainerStyle={{ padding: theme.spacing.lg, paddingBottom: 120, gap: theme.spacing.lg }}>
         {/* Profile */}
         <View style={styles.profile}>

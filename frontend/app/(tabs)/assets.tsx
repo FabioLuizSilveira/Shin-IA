@@ -32,7 +32,7 @@ export default function Assets() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScreenHeader title="Ativos" subtitle={`${items.length} na frota`} />
+      <ScreenHeader title="Ativos" subtitle={`${items.length} na frota`} brand />
       <View style={styles.search}>
         <Ionicons name="search" size={18} color={theme.colors.muted} />
         <TextInput
