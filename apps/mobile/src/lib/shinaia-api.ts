@@ -230,6 +230,23 @@ export const shinaia = {
       { status, review_notes: reviewNotes },
     ),
 
+  // Same staff-route-reuse pattern as organizations()/operators() (Wave 2
+  // Phase D) — no /api/mobile/* duplicate exists for the fleet-wide map,
+  // just the one requireTenantScope() route the web tracking page already
+  // uses.
+  fleetLocations: () =>
+    get<
+      {
+        resource_id: string;
+        resource_name: string | null;
+        resource_type: string | null;
+        resource_status: string | null;
+        latitude: number;
+        longitude: number;
+        recorded_at: string;
+      }[]
+    >("/api/resources/locations", []),
+
   trackingCurrent: (resourceId: string) =>
     get<{
       resourceId: string;
