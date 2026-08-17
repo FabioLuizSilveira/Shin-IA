@@ -38,13 +38,14 @@ export default function Contracts() {
                 <Text style={[T.display(theme.font.lg)]}>{item.id}</Text>
                 <Chip status={item.status} />
               </View>
-              <Text style={[T.text(theme.font.base, theme.colors.onSurfaceSecondary)]}>{item.client}</Text>
+              <Text style={[T.text(theme.font.base, theme.colors.onSurfaceSecondary), { fontWeight: '600' }]}>{item.client}</Text>
+              <Text style={[T.text(theme.font.sm, theme.colors.onSurfaceTertiary)]}>{item.vehicle ? `${item.vehicle} • ` : ''}{item.plan || 'Semanal'}</Text>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: theme.spacing.sm }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                   <Ionicons name="calendar-outline" size={14} color={theme.colors.muted} />
                   <Text style={[T.text(theme.font.sm, theme.colors.onSurfaceTertiary)]}>{item.start} → {item.end}</Text>
                 </View>
-                <Text style={[T.display(theme.font.lg), { color: theme.colors.brandSecondary }]}>{brl(item.value)}</Text>
+                <Text style={[T.display(theme.font.lg), { color: theme.colors.brandSecondary }]}>{brl(item.value)}/sem</Text>
               </View>
             </Card>
           )}

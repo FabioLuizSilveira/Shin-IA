@@ -8,8 +8,8 @@ import { theme } from '@/src/theme';
 import { shinaia, Asset } from '@/src/api/shinaia';
 import { Card, ScreenHeader, Chip, Loader, EmptyState, T } from '@/src/components/ui';
 
-const FILTERS = ['all', 'active', 'alert', 'maintenance', 'idle'] as const;
-const FILTER_LABEL: Record<string, string> = { all: 'Todos', active: 'Ativos', alert: 'Alertas', maintenance: 'Manutenção', idle: 'Ociosos' };
+const FILTERS = ['all', 'rented', 'available', 'maintenance'] as const;
+const FILTER_LABEL: Record<string, string> = { all: 'Todos', rented: 'Alugados', available: 'Disponíveis', maintenance: 'Manutenção' };
 
 export default function Assets() {
   const router = useRouter();
@@ -73,7 +73,10 @@ export default function Assets() {
                   <View style={styles.healthBar}>
                     <View style={[styles.healthFill, { width: `${item.health}%`, backgroundColor: item.health > 80 ? theme.colors.success : item.health > 65 ? theme.colors.warning : theme.colors.error }]} />
                   </View>
-                  <Text style={[T.text(theme.font.sm, theme.colors.muted)]}>Saúde {item.health}% • {item.odo_km.toLocaleString('pt-BR')} km</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={[T.text(theme.font.sm, theme.colors.muted)]}>Saúde {item.health}% • {item.odo_km.toLocaleString('pt-BR')} km</Text>
+                    <Text style={[T.text(theme.font.sm, theme.colors.brandSecondary), { fontWeight: '700' }]}>R$ {item.weekly_rate}/sem</Text>
+                  </View>
                 </View>
               </Card>
             </Pressable>

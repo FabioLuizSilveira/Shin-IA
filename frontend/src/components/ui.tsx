@@ -20,14 +20,16 @@ const TONES: Record<string, string> = {
   active: theme.colors.success, healthy: theme.colors.success, valid: theme.colors.success, success: theme.colors.success,
   on_route: theme.colors.brandSecondary, available: theme.colors.success, paid: theme.colors.success,
   alert: theme.colors.error, warning: theme.colors.warning, error: theme.colors.error, expiring: theme.colors.warning,
-  maintenance: theme.colors.warning, pending: theme.colors.warning,
+  maintenance: theme.colors.warning, pending: theme.colors.warning, inadimplente: theme.colors.error,
   idle: theme.colors.muted, off: theme.colors.muted, info: theme.colors.brandSecondary, brand: theme.colors.brandPrimary,
+  finalizado: theme.colors.muted, completed: theme.colors.muted, rented: theme.colors.brandSecondary,
   muted: theme.colors.muted,
 };
 const LABELS: Record<string, string> = {
-  active: 'Ativo', alert: 'Alerta', maintenance: 'Manutenção', idle: 'Ocioso', on_route: 'Em rota',
+  active: 'Ativo', alert: 'Alerta', maintenance: 'Manutenção', idle: 'Parado', on_route: 'Em rota',
   available: 'Disponível', off: 'Folga', pending: 'Pendente', valid: 'Válido', expiring: 'Expirando',
-  paid: 'Pago', healthy: 'Saudável',
+  paid: 'Pago', healthy: 'Saudável', rented: 'Alugado', finalizado: 'Finalizado', completed: 'Concluído',
+  inadimplente: 'Inadimplente',
 };
 
 export function Chip({ status, label }: { status: string; label?: string }) {

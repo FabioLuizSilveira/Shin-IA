@@ -28,7 +28,7 @@ export default function AssetDetail() {
     { icon: 'car-outline', label: 'Modelo', value: asset.model },
     { icon: 'pricetag-outline', label: 'Placa', value: asset.plate },
     { icon: 'speedometer-outline', label: 'Odômetro', value: `${asset.odo_km.toLocaleString('pt-BR')} km` },
-    { icon: 'cube-outline', label: 'Tipo', value: asset.type },
+    { icon: 'cash-outline', label: 'Locação', value: `R$ ${(asset as any).weekly_rate}/sem` },
   ];
 
   return (
