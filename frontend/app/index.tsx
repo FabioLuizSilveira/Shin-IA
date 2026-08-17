@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ImageBackground, Pressable, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -47,19 +48,19 @@ export default function Login() {
       </ImageBackground>
 
       <SafeAreaView style={{ flex: 1, justifyContent: 'space-between', padding: theme.spacing.xl }}>
-        <View style={{ marginTop: theme.spacing.xxl }}>
-          <View style={styles.logoRow}>
-            <LinearGradient colors={theme.gradients.neural} style={styles.logoMark} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-              <Ionicons name="pulse" size={26} color="#fff" />
-            </LinearGradient>
-            <Text style={[T.display(theme.font.xxl)]}>Shinã <Text style={{ color: theme.colors.brandSecondary }}>I.A.</Text></Text>
-          </View>
+        <View style={{ marginTop: theme.spacing.xl, alignItems: 'flex-start' }}>
+          <Image
+            source={require('@/assets/images/shina-lockup-alpha.png')}
+            style={{ width: 280, height: 144 }}
+            contentFit="contain"
+            testID="brand-logo"
+          />
         </View>
 
         <View>
           <Text style={[T.display(40), { lineHeight: 46 }]}>Comando{'\n'}inteligente{'\n'}da sua frota</Text>
           <Text style={[T.text(theme.font.lg, theme.colors.onSurfaceTertiary), { marginTop: theme.spacing.md, maxWidth: 320 }]}>
-            Operações, ativos, tracking e financeiro em um só painel, potencializados por IA.
+            Operações inteligentes em movimento — ativos, tracking e financeiro em um só painel.
           </Text>
         </View>
 
