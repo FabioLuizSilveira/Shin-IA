@@ -29,6 +29,10 @@ const APP_PUBLIC_PATHS = [
   "/api/auth",
   "/api/webhooks",
   "/rentals/login",
+  // The mobile app's "Demonstração" button calls this before any session
+  // exists — it signs in as one of two fixed demo accounts and returns
+  // real tokens, same pre-auth posture as /api/auth.
+  "/api/mobile/demo-login",
 ];
 
 // Roles that require MFA enrollment before accessing the platform.

@@ -168,6 +168,15 @@ export interface BillingSummary {
 }
 
 export const shinaia = {
+  // Pre-auth — the mobile login screen's "Demonstração" button. Signs in as
+  // one of two real, dedicated demo accounts against the real Veloz Rent a
+  // Car tenant (no mocks); the caller passes the resulting tokens straight
+  // into supabase.auth.setSession().
+  demoLogin: (persona: "tenant" | "customer") =>
+    request<{ access_token: string; refresh_token: string }>("POST", "/api/mobile/demo-login", {
+      persona,
+    }),
+
   dashboard: () => get<DashboardSummary>("/api/mobile/dashboard", MOCK.dashboard),
 
   operations: (params: Record<string, string> = {}) => {
