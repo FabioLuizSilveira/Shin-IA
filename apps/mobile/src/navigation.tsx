@@ -22,6 +22,7 @@ import { TrackingScreen } from "./screens/TrackingScreen";
 import { OperationDetailScreen } from "./screens/OperationDetailScreen";
 import { AssetDetailScreen } from "./screens/AssetDetailScreen";
 import { InvoicesScreen } from "./screens/InvoicesScreen";
+import { RenewalScreen } from "./screens/RenewalScreen";
 import { useAuth } from "./lib/auth-context";
 import { usePersona } from "./lib/persona-context";
 import { theme } from "./theme";
@@ -34,6 +35,7 @@ export type RootStackParamList = {
   Unprovisioned: undefined;
   RentalsList: undefined;
   RentalDetail: { rentalId: string };
+  Renewal: { rentalId: string };
   Clients: undefined;
   Operators: undefined;
   Contracts: undefined;
@@ -204,16 +206,9 @@ export function RootNavigator() {
         )}
         {bootstrap.user.userType === "customer" && (
           <>
-            <Stack.Screen
-              name="RentalsList"
-              component={RentalsListScreen}
-              options={{ headerShown: true, title: "Minhas Locações" }}
-            />
-            <Stack.Screen
-              name="RentalDetail"
-              component={RentalDetailScreen}
-              options={{ headerShown: true, title: "Detalhe da Locação" }}
-            />
+            <Stack.Screen name="RentalsList" component={RentalsListScreen} />
+            <Stack.Screen name="RentalDetail" component={RentalDetailScreen} />
+            <Stack.Screen name="Renewal" component={RenewalScreen} />
             <Stack.Screen
               name="ContractDetail"
               component={ContractDetailScreen}
