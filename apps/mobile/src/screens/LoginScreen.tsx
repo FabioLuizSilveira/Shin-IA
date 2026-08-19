@@ -15,6 +15,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { supabase } from "../lib/supabase";
 import { areMocksAllowed } from "../lib/mock-policy";
 import { useAuth } from "../lib/auth-context";
+import { shinaia, ApiError } from "../lib/shinaia-api";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -27,6 +28,33 @@ export function LoginScreen() {
   const [sent, setSent] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState<"tenant" | "customer" | null>(null);
+
+  // The approved (Emergent) design had a single "Entrar em modo
+  // demonstração" button on this screen, but backed by a fully mocked,
+  // offline session — reversing this app's mock-gating decision (M22:
+  // mocks/demo structurally impossible outside __DEV__) wasn't the goal.
+  // This is the real equivalent: two fixed, dedicated accounts already
+  // provisioned against the real Veloz Rent a Car tenant (a real staff
+  // login and a real customer login, both with real data behind them) —
+  // POST /api/mobile/demo-login signs in as one of them and returns real
+  // tokens, which hydrate a real Supabase session exactly like Google/
+  // Apple/magic-link do. No mock data, no bypassed backend.
+  async function handleDemoLogin(persona: "tenant" | "customer") {
+    setDemoLoading(persona);
+    try {
+      const { access_token, refresh_token } = await shinaia.demoLogin(persona);
+      const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+      if (error) throw error;
+    } catch (err) {
+      Alert.alert(
+        "Erro",
+        err instanceof ApiError ? err.message : "Falha ao entrar em modo demonstração",
+      );
+    } finally {
+      setDemoLoading(null);
+    }
+  }
 
   // Google OAuth: unlike signInWithOtp, GoTrue has no equivalent
   // "don't create a user" flag for OAuth providers — a first-time Google
@@ -177,13 +205,44 @@ export function LoginScreen() {
         </>
       )}
 
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>demonstração</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <Pressable
+          style={[styles.button, styles.realDemoButton, { flex: 1 }]}
+          onPress={() => void handleDemoLogin("tenant")}
+          disabled={demoLoading !== null}
+        >
+          {demoLoading === "tenant" ? (
+            <ActivityIndicator color="#2563EB" />
+          ) : (
+            <Text style={styles.realDemoButtonText}>Ver como Equipe</Text>
+          )}
+        </Pressable>
+        <Pressable
+          style={[styles.button, styles.realDemoButton, { flex: 1 }]}
+          onPress={() => void handleDemoLogin("customer")}
+          disabled={demoLoading !== null}
+        >
+          {demoLoading === "customer" ? (
+            <ActivityIndicator color="#2563EB" />
+          ) : (
+            <Text style={styles.realDemoButtonText}>Ver como Cliente</Text>
+          )}
+        </Pressable>
+      </View>
+
       {/* M22.5 — never rendered outside dev + EXPO_PUBLIC_ENABLE_MOCKS=1;
           areMocksAllowed() folds in __DEV__, which is false in every
           eas build release/production profile regardless of any env var,
           so this button cannot exist in a release build's bundle output. */}
       {areMocksAllowed() && (
         <Pressable style={styles.demoButton} onPress={enterDemoMode}>
-          <Text style={styles.demoButtonText}>Entrar em modo demonstração (dev)</Text>
+          <Text style={styles.demoButtonText}>Entrar em modo demonstração (dev, mock)</Text>
         </Pressable>
       )}
     </View>
@@ -218,6 +277,8 @@ const styles = StyleSheet.create({
   },
   magicLinkButton: { backgroundColor: "#2563EB" },
   magicLinkButtonText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  realDemoButton: { backgroundColor: "#EFF6FF", borderWidth: 1, borderColor: "#BFDBFE" },
+  realDemoButtonText: { color: "#2563EB", fontWeight: "600", fontSize: 14 },
   sentText: { textAlign: "center", color: "#334155", fontSize: 14, lineHeight: 20 },
   demoButton: { marginTop: 24, alignItems: "center", paddingVertical: 8 },
   demoButtonText: { color: "#94A3B8", fontSize: 13, textDecorationLine: "underline" },
