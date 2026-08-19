@@ -9,6 +9,7 @@ import { AsyncScreen } from "../components/async-screen";
 import { useAsyncData } from "../lib/use-async-data";
 import { shinaia, type AssetItem } from "../lib/shinaia-api";
 import type { RootStackParamList } from "../navigation";
+import { HOTLINK_HEADERS } from "../lib/image-headers";
 
 // M23 — real data via GET /api/mobile/assets (Wave 2 Phase C). Blueprint-
 // agnostic by construction (matches the backend route) — no
@@ -38,7 +39,7 @@ export function AssetsScreen() {
                 <Card style={styles.card}>
                   {asset.metadata?.photo_url ? (
                     <Image
-                      source={{ uri: asset.metadata.photo_url }}
+                      source={{ uri: asset.metadata.photo_url, headers: HOTLINK_HEADERS }}
                       style={styles.thumb}
                       contentFit="cover"
                     />

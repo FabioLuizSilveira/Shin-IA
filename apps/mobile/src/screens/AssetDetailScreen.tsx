@@ -7,6 +7,7 @@ import { BackHeader, Card, Chip, T, Loader } from "../components/ui";
 import { useAsyncData } from "../lib/use-async-data";
 import { shinaia, type AssetItem } from "../lib/shinaia-api";
 import type { RootStackParamList } from "../navigation";
+import { HOTLINK_HEADERS } from "../lib/image-headers";
 
 // Same customFields the tenant configured on the asset type (brand, model,
 // year, plate, weekly_rate, etc.) show up in `metadata` — rendered
@@ -59,7 +60,7 @@ export function AssetDetailScreen() {
       <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
         {asset.metadata?.photo_url && (
           <Image
-            source={{ uri: asset.metadata.photo_url }}
+            source={{ uri: asset.metadata.photo_url, headers: HOTLINK_HEADERS }}
             style={{ width: "100%", height: 200, borderRadius: theme.radius.lg }}
             contentFit="cover"
           />
