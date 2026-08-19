@@ -42,7 +42,7 @@ export function RentalDetailScreen({ route, navigation }: Props) {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState<"extension" | "issue" | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -61,16 +61,16 @@ export function RentalDetailScreen({ route, navigation }: Props) {
     }, [load]),
   );
 
-  async function handleSubmit(type: "extension" | "issue") {
+  async function handleReportIssue() {
     if (!rental || !message.trim()) return;
-    setSubmitting(type);
+    setSubmitting(true);
     try {
       const rentalCustomerId = await fetchMyRentalCustomerId();
       await createServiceRequest({
         tenantContractId: rental.id,
         rentalCustomerId,
         tenantId: rental.tenant_id,
-        type,
+        type: "issue",
         message: message.trim(),
       });
       setMessage("");
@@ -79,7 +79,7 @@ export function RentalDetailScreen({ route, navigation }: Props) {
     } catch (err) {
       Alert.alert("Erro", err instanceof Error ? err.message : "Falha ao enviar pedido");
     } finally {
-      setSubmitting(null);
+      setSubmitting(false);
     }
   }
 
@@ -146,21 +146,12 @@ export function RentalDetailScreen({ route, navigation }: Props) {
             value={message}
             onChangeText={setMessage}
           />
-          <View style={{ flexDirection: "row", gap: theme.spacing.sm }}>
-            <GradientButton
-              label={submitting === "issue" ? "Enviando..." : "Reportar problema"}
-              onPress={() => void handleSubmit("issue")}
-              loading={submitting === "issue"}
-              colors={[theme.colors.error, theme.colors.error] as const}
-              style={{ flex: 1 }}
-            />
-            <GradientButton
-              label={submitting === "extension" ? "Enviando..." : "Pedir prorrogação"}
-              onPress={() => void handleSubmit("extension")}
-              loading={submitting === "extension"}
-              style={{ flex: 1 }}
-            />
-          </View>
+          <GradientButton
+            label={submitting ? "Enviando..." : "Reportar problema"}
+            onPress={() => void handleReportIssue()}
+            loading={submitting}
+            colors={[theme.colors.error, theme.colors.error] as const}
+          />
         </Card>
 
         {requests.length > 0 && (
