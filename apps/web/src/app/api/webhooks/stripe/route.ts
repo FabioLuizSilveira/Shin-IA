@@ -87,6 +87,7 @@ export async function POST(request: Request) {
           const { data: newContract } = await admin
             .from("contracts")
             .insert({
+              id: crypto.randomUUID(),
               tenant_id: reservation.tenant_id,
               organization_id: reservation.organization_id,
               type: "rental",

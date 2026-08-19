@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
     const { data: created, error: baErr } = await context.db
       .from("billing_accounts")
       .insert({
+        id: crypto.randomUUID(),
         tenant_id: contract.tenant_id,
         organization_id: contract.organization_id,
         cycle: "one_time",
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
   const { data: invoice, error: invErr } = await context.db
     .from("invoices")
     .insert({
+      id: crypto.randomUUID(),
       tenant_id: contract.tenant_id,
       billing_account_id: billingAccount.id,
       status: "issued",
@@ -90,6 +92,7 @@ export async function POST(req: NextRequest) {
   if (invErr) return internalError(invErr);
 
   await context.db.from("invoice_line_items").insert({
+    id: crypto.randomUUID(),
     invoice_id: invoice.id,
     tenant_id: contract.tenant_id,
     description: "Renovação semanal",
