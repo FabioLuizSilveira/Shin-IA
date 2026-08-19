@@ -65,6 +65,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const { data: invoice, error: invErr } = await context.db
       .from("invoices")
       .insert({
+        id: crypto.randomUUID(),
         tenant_id: reservation.tenant_id,
         billing_account_id: billingAccount.id,
         status: "issued",
@@ -78,6 +79,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     invoiceId = invoice.id;
 
     await context.db.from("invoice_line_items").insert({
+      id: crypto.randomUUID(),
       invoice_id: invoiceId,
       tenant_id: reservation.tenant_id,
       description: `Saldo (80%) — ${assetName}`,
