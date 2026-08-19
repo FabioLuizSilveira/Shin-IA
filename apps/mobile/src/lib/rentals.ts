@@ -94,3 +94,76 @@ export async function createServiceRequest(input: {
   });
   if (error) throw toUserError(error, "Não foi possível enviar seu pedido.");
 }
+
+export interface UpgradeOption {
+  id: string;
+  name: string;
+  serial_number: string | null;
+  metadata: { photo_url?: string; brand?: string; model?: string; weekly_rate?: number };
+}
+
+// assets_select_rental_customer_catalog (20260090000000) scopes this to
+// status='available' assets within a tenant the customer already rents
+// from — never the whole fleet, and never anything currently rented out.
+// Filtering by weekly_rate >= the current rental's own rate is what makes
+// this "equal or higher value" rather than a generic browse-everything list.
+export async function fetchUpgradeOptions(
+  tenantId: string,
+  minWeeklyRate: number,
+): Promise<UpgradeOption[]> {
+  const { data, error } = await supabase
+    .from("assets")
+    .select("id, name, serial_number, metadata")
+    .eq("tenant_id", tenantId)
+    .eq("status", "available")
+    .eq("category", "vehicle")
+    .gte("metadata->>weekly_rate", String(minWeeklyRate))
+    .order("metadata->>weekly_rate", { ascending: true });
+  if (error) throw toUserError(error, "Não foi possível carregar os veículos disponíveis.");
+  return (data ?? []) as unknown as UpgradeOption[];
+}
+
+export interface CustomerInvoice {
+  id: string;
+  status: string;
+  total_amount: number;
+  total_currency: string;
+  due_date: string;
+  paid_at: string | null;
+}
+
+// invoices_select_rental_customer (20260090000000) — the customer's own
+// invoices only, via their billing_accounts' organization link.
+export async function fetchMyInvoices(): Promise<CustomerInvoice[]> {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("id, status, total_amount, total_currency, due_date, paid_at")
+    .order("due_date", { ascending: false })
+    .limit(10);
+  if (error) throw toUserError(error, "Não foi possível carregar suas faturas.");
+  return (data ?? []) as unknown as CustomerInvoice[];
+}
+
+// Renewal has no live payment gateway behind it yet (Fase G decision:
+// billing is registro/controle only) — a renewal request is submitted the
+// same way a prorrogação already is, staff turns it into a real contract +
+// invoice. The chosen asset/price is folded into the message so staff has
+// everything needed without a schema change to rental_service_requests.
+export async function createRenewalRequest(input: {
+  tenantContractId: string;
+  rentalCustomerId: string;
+  tenantId: string;
+  chosenAssetName: string;
+  weeklyRate: number;
+}) {
+  const message =
+    `Renovação solicitada pelo app — veículo: ${input.chosenAssetName}, ` +
+    `valor: R$ ${input.weeklyRate.toFixed(2)}/semana.`;
+  await createServiceRequest({
+    tenantContractId: input.tenantContractId,
+    rentalCustomerId: input.rentalCustomerId,
+    tenantId: input.tenantId,
+    type: "extension",
+    message,
+  });
+}

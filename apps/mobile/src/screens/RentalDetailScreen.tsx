@@ -1,16 +1,9 @@
 import { useCallback, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  TextInput,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, ScrollView, TextInput, Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { theme } from "../theme";
+import { BackHeader, Card, Chip, T, Loader, GradientButton } from "../components/ui";
 import {
   fetchMyRentals,
   fetchMyRentalCustomerId,
@@ -22,14 +15,6 @@ import {
 import type { RootStackParamList } from "../navigation";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RentalDetail">;
-
-const STATUS_LABEL: Record<string, string> = {
-  active: "Ativo",
-  draft: "Rascunho",
-  expired: "Expirado",
-  terminated: "Encerrado",
-  suspended: "Suspenso",
-};
 
 const REQUEST_STATUS_LABEL: Record<string, string> = {
   pending: "Pendente",
@@ -50,7 +35,8 @@ function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(amount);
 }
 
-export function RentalDetailScreen({ route }: Props) {
+// Restyled to match the shared design system (see RentalsListScreen).
+export function RentalDetailScreen({ route, navigation }: Props) {
   const { rentalId } = route.params;
   const [rental, setRental] = useState<Rental | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
@@ -99,134 +85,106 @@ export function RentalDetailScreen({ route }: Props) {
 
   if (loading || !rental) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator />
+      <View style={{ flex: 1, backgroundColor: theme.colors.surface }}>
+        <Loader />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.section}>
-        <Text style={styles.label}>Status</Text>
-        <Text style={styles.value}>{STATUS_LABEL[rental.status] ?? rental.status}</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Período</Text>
-        <Text style={styles.value}>
-          {formatDate(rental.period_starts_at)} — {formatDate(rental.period_ends_at)}
-        </Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Valor</Text>
-        <Text style={styles.value}>
-          {formatCurrency(Number(rental.value_amount), rental.value_currency)}
-        </Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Ativos</Text>
-        {rental.contract_assets.map((ca) => (
-          <Text key={ca.id} style={styles.value}>
-            {ca.assets?.name ?? "—"} (qtd: {ca.quantity})
+    <ScrollView style={{ flex: 1, backgroundColor: theme.colors.surface }}>
+      <BackHeader title="Detalhe da Locação" />
+      <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
+        <Card>
+          <View
+            style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+          >
+            <Text style={T.display(theme.font.xl)}>
+              {formatCurrency(Number(rental.value_amount), rental.value_currency)}
+            </Text>
+            <Chip status={rental.status} />
+          </View>
+          <Text style={[T.text(theme.font.sm), { marginTop: theme.spacing.xs }]}>
+            {formatDate(rental.period_starts_at)} — {formatDate(rental.period_ends_at)}
           </Text>
-        ))}
-      </View>
+        </Card>
 
-      <View style={styles.divider} />
-
-      <Text style={styles.sectionTitle}>Solicitar</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Descreva o problema ou o pedido de prorrogação..."
-        placeholderTextColor="#94A3B8"
-        multiline
-        numberOfLines={4}
-        value={message}
-        onChangeText={setMessage}
-      />
-      <View style={styles.buttonRow}>
-        <Pressable
-          style={[styles.actionButton, styles.issueButton]}
-          disabled={!!submitting || !message.trim()}
-          onPress={() => void handleSubmit("issue")}
-        >
-          {submitting === "issue" ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.actionButtonText}>Reportar problema</Text>
-          )}
-        </Pressable>
-        <Pressable
-          style={[styles.actionButton, styles.extensionButton]}
-          disabled={!!submitting || !message.trim()}
-          onPress={() => void handleSubmit("extension")}
-        >
-          {submitting === "extension" ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.actionButtonText}>Pedir prorrogação</Text>
-          )}
-        </Pressable>
-      </View>
-
-      {requests.length > 0 && (
-        <>
-          <View style={styles.divider} />
-          <Text style={styles.sectionTitle}>Histórico de pedidos</Text>
-          {requests.map((r) => (
-            <View key={r.id} style={styles.requestCard}>
-              <View style={styles.requestHeader}>
-                <Text style={styles.requestType}>
-                  {r.type === "extension" ? "Prorrogação" : "Problema"}
-                </Text>
-                <Text style={styles.requestStatus}>{REQUEST_STATUS_LABEL[r.status]}</Text>
-              </View>
-              <Text style={styles.requestMessage}>{r.message}</Text>
-              <Text style={styles.requestDate}>{formatDate(r.created_at)}</Text>
-            </View>
+        <Card>
+          <Text style={T.text(theme.font.sm, theme.colors.brandSecondary)}>ATIVOS</Text>
+          {rental.contract_assets.map((ca) => (
+            <Text key={ca.id} style={[T.text(), { marginTop: theme.spacing.xs }]}>
+              {ca.assets?.name ?? "—"} (qtd: {ca.quantity})
+            </Text>
           ))}
-        </>
-      )}
+        </Card>
+
+        {rental.status === "active" && (
+          <GradientButton
+            label="Renovar contrato"
+            onPress={() => navigation.navigate("Renewal", { rentalId: rental.id })}
+          />
+        )}
+
+        <Card style={{ gap: theme.spacing.sm }}>
+          <Text style={T.text(theme.font.sm, theme.colors.brandSecondary)}>SOLICITAR</Text>
+          <TextInput
+            style={{
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              borderRadius: theme.radius.md,
+              padding: theme.spacing.md,
+              fontFamily: theme.text,
+              fontSize: theme.font.base,
+              color: theme.colors.onSurface,
+              textAlignVertical: "top",
+              minHeight: 90,
+            }}
+            placeholder="Descreva o problema ou o pedido de prorrogação..."
+            placeholderTextColor={theme.colors.muted}
+            multiline
+            numberOfLines={4}
+            value={message}
+            onChangeText={setMessage}
+          />
+          <View style={{ flexDirection: "row", gap: theme.spacing.sm }}>
+            <GradientButton
+              label={submitting === "issue" ? "Enviando..." : "Reportar problema"}
+              onPress={() => void handleSubmit("issue")}
+              loading={submitting === "issue"}
+              colors={[theme.colors.error, theme.colors.error] as const}
+              style={{ flex: 1 }}
+            />
+            <GradientButton
+              label={submitting === "extension" ? "Enviando..." : "Pedir prorrogação"}
+              onPress={() => void handleSubmit("extension")}
+              loading={submitting === "extension"}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </Card>
+
+        {requests.length > 0 && (
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text style={T.display(theme.font.lg)}>Histórico de pedidos</Text>
+            {requests.map((r) => (
+              <Card key={r.id}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={T.text(theme.font.base, theme.colors.onSurfaceSecondary)}>
+                    {r.type === "extension" ? "Prorrogação" : "Problema"}
+                  </Text>
+                  <Text style={T.text(theme.font.sm, theme.colors.brandSecondary)}>
+                    {REQUEST_STATUS_LABEL[r.status]}
+                  </Text>
+                </View>
+                <Text style={[T.text(), { marginTop: theme.spacing.xs }]}>{r.message}</Text>
+                <Text style={[T.text(theme.font.sm), { marginTop: theme.spacing.xs }]}>
+                  {formatDate(r.created_at)}
+                </Text>
+              </Card>
+            ))}
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  content: { padding: 16 },
-  section: { marginBottom: 16 },
-  label: { fontSize: 12, color: "#64748B", marginBottom: 2 },
-  value: { fontSize: 15, color: "#0F172A", fontWeight: "500" },
-  divider: { height: 1, backgroundColor: "#E2E8F0", marginVertical: 16 },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: "#0F172A", marginBottom: 10 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 14,
-    color: "#0F172A",
-    textAlignVertical: "top",
-    minHeight: 90,
-  },
-  buttonRow: { flexDirection: "row", gap: 10, marginTop: 12 },
-  actionButton: { flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
-  issueButton: { backgroundColor: "#DC2626" },
-  extensionButton: { backgroundColor: "#2563EB" },
-  actionButtonText: { color: "#fff", fontWeight: "600", fontSize: 13 },
-  requestCard: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-  },
-  requestHeader: { flexDirection: "row", justifyContent: "space-between" },
-  requestType: { fontSize: 13, fontWeight: "600", color: "#0F172A" },
-  requestStatus: { fontSize: 12, fontWeight: "600", color: "#2563EB" },
-  requestMessage: { fontSize: 13, color: "#334155", marginTop: 4 },
-  requestDate: { fontSize: 11, color: "#94A3B8", marginTop: 4 },
-});
