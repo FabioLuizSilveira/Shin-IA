@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // (tenant staff only), so customer/operator identities need a separate
 // route, not a reimplementation for aesthetics.
 const SELECT =
-  "id, name, serial_number, category, status, branch_id, asset_type_id, asset_types(name)";
+  "id, name, serial_number, category, status, branch_id, asset_type_id, metadata, asset_types(name)";
 
 export async function GET(req: NextRequest) {
   const context = await requireMobileContext();

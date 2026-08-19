@@ -107,6 +107,7 @@ export interface AssetItem {
   branch_id: string;
   asset_type_id: string;
   type_name?: string;
+  metadata?: { photo_url?: string; [key: string]: unknown };
 }
 export interface ContractItem {
   id: string;
@@ -228,6 +229,23 @@ export const shinaia = {
       `/api/contracts/${contractId}/documents/${documentId}`,
       { status, review_notes: reviewNotes },
     ),
+
+  // Same staff-route-reuse pattern as organizations()/operators() (Wave 2
+  // Phase D) — no /api/mobile/* duplicate exists for the fleet-wide map,
+  // just the one requireTenantScope() route the web tracking page already
+  // uses.
+  fleetLocations: () =>
+    get<
+      {
+        resource_id: string;
+        resource_name: string | null;
+        resource_type: string | null;
+        resource_status: string | null;
+        latitude: number;
+        longitude: number;
+        recorded_at: string;
+      }[]
+    >("/api/resources/locations", []),
 
   trackingCurrent: (resourceId: string) =>
     get<{

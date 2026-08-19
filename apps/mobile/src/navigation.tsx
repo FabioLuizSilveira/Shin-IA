@@ -18,6 +18,10 @@ import { OperatorsScreen } from "./screens/OperatorsScreen";
 import { ContractsScreen } from "./screens/ContractsScreen";
 import { ContractDetailScreen } from "./screens/ContractDetailScreen";
 import { NotificationsScreen } from "./screens/NotificationsScreen";
+import { TrackingScreen } from "./screens/TrackingScreen";
+import { OperationDetailScreen } from "./screens/OperationDetailScreen";
+import { AssetDetailScreen } from "./screens/AssetDetailScreen";
+import { InvoicesScreen } from "./screens/InvoicesScreen";
 import { useAuth } from "./lib/auth-context";
 import { usePersona } from "./lib/persona-context";
 import { theme } from "./theme";
@@ -35,9 +39,13 @@ export type RootStackParamList = {
   Contracts: undefined;
   ContractDetail: { contractId: string };
   Notifications: undefined;
+  Tracking: undefined;
+  OperationDetail: { operationId: string };
+  AssetDetail: { assetId: string };
+  Invoices: { statusFilter?: "issued" | "overdue" | "paid" } | undefined;
 };
 
-type TenantTabParamList = {
+export type TenantTabParamList = {
   Dashboard: undefined;
   Operations: undefined;
   Assets: undefined;
@@ -165,6 +173,26 @@ export function RootNavigator() {
               name="Notifications"
               component={NotificationsScreen}
               options={{ headerShown: true, title: "Notificações" }}
+            />
+            <Stack.Screen
+              name="Tracking"
+              component={TrackingScreen}
+              options={{ headerShown: true, title: "Rastreamento" }}
+            />
+            <Stack.Screen
+              name="OperationDetail"
+              component={OperationDetailScreen}
+              options={{ headerShown: true, title: "Operação" }}
+            />
+            <Stack.Screen
+              name="AssetDetail"
+              component={AssetDetailScreen}
+              options={{ headerShown: true, title: "Ativo" }}
+            />
+            <Stack.Screen
+              name="Invoices"
+              component={InvoicesScreen}
+              options={{ headerShown: true, title: "Faturas" }}
             />
           </>
         )}

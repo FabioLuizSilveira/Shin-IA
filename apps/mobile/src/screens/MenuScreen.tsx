@@ -13,15 +13,16 @@ const ITEMS: {
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
   { key: "Clients", label: "Clientes", icon: "people-outline" },
-  { key: "Operators", label: "Operadores", icon: "person-outline" },
   { key: "Contracts", label: "Contratos", icon: "document-text-outline" },
+  { key: "Tracking", label: "Rastreamento", icon: "map-outline" },
   { key: "Notifications", label: "Notificações", icon: "notifications-outline" },
 ];
 
 // M23 — module hub for screens that aren't tabs (mirrors the Emergent
-// frontend's menu.tsx module list). Tracking/Documents-as-a-standalone-inbox
-// are deliberately absent here — see MOBILE_KNOWN_ISSUES.md for why
-// (registered gaps, not silently dropped).
+// frontend's menu.tsx module list). Documents-as-a-standalone-inbox is
+// deliberately absent here — see MOBILE_KNOWN_ISSUES.md for why (a
+// registered gap, not silently dropped). Tracking was added later, reusing
+// the same requireTenantScope() route the web tracking page uses.
 export function MenuScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { signOut } = useAuth();
