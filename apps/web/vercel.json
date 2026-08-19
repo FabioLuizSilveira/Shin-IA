@@ -2,5 +2,11 @@
   "buildCommand": "cd ../.. && pnpm build --filter=@shina/web",
   "outputDirectory": ".next",
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/forfeit-reservations",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }
