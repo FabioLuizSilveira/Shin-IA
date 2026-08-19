@@ -80,19 +80,21 @@ export function RentalsListScreen({ navigation }: Props) {
       ) : (
         <View style={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}>
           {invoices.length > 0 && (
-            <Card>
-              <Text style={T.text(theme.font.sm, theme.colors.brandSecondary)}>PAGAMENTOS</Text>
-              <Text style={[T.display(theme.font.xxl), { marginTop: theme.spacing.xs }]}>
-                {formatCurrency(pendingTotal, currency)}
-              </Text>
-              <Text style={T.text(theme.font.sm)}>
-                {overdue.length > 0
-                  ? `${overdue.length} fatura(s) em atraso`
-                  : pending.length > 0
-                    ? `${pending.length} fatura(s) a pagar`
-                    : "Nenhuma fatura pendente"}
-              </Text>
-            </Card>
+            <Pressable onPress={() => navigation.navigate("CustomerInvoices")}>
+              <Card>
+                <Text style={T.text(theme.font.sm, theme.colors.brandSecondary)}>PAGAMENTOS</Text>
+                <Text style={[T.display(theme.font.xxl), { marginTop: theme.spacing.xs }]}>
+                  {formatCurrency(pendingTotal, currency)}
+                </Text>
+                <Text style={T.text(theme.font.sm)}>
+                  {overdue.length > 0
+                    ? `${overdue.length} fatura(s) em atraso`
+                    : pending.length > 0
+                      ? `${pending.length} fatura(s) a pagar`
+                      : "Nenhuma fatura pendente"}
+                </Text>
+              </Card>
+            </Pressable>
           )}
 
           {rentals.length === 0 ? (

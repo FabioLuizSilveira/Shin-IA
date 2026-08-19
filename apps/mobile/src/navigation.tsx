@@ -23,6 +23,7 @@ import { OperationDetailScreen } from "./screens/OperationDetailScreen";
 import { AssetDetailScreen } from "./screens/AssetDetailScreen";
 import { InvoicesScreen } from "./screens/InvoicesScreen";
 import { RenewalScreen } from "./screens/RenewalScreen";
+import { CustomerInvoicesScreen } from "./screens/CustomerInvoicesScreen";
 import { useAuth } from "./lib/auth-context";
 import { usePersona } from "./lib/persona-context";
 import { theme } from "./theme";
@@ -45,6 +46,7 @@ export type RootStackParamList = {
   OperationDetail: { operationId: string };
   AssetDetail: { assetId: string };
   Invoices: { statusFilter?: "issued" | "overdue" | "paid" } | undefined;
+  CustomerInvoices: undefined;
 };
 
 export type TenantTabParamList = {
@@ -209,6 +211,7 @@ export function RootNavigator() {
             <Stack.Screen name="RentalsList" component={RentalsListScreen} />
             <Stack.Screen name="RentalDetail" component={RentalDetailScreen} />
             <Stack.Screen name="Renewal" component={RenewalScreen} />
+            <Stack.Screen name="CustomerInvoices" component={CustomerInvoicesScreen} />
             <Stack.Screen
               name="ContractDetail"
               component={ContractDetailScreen}
