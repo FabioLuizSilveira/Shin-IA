@@ -11,7 +11,24 @@ const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "shinaia.com.br";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? `https://app.${ROOT_DOMAIN}`;
 
 // Paths served exclusively by the institutional landing (root/www domain)
-const SITE_PATHS = ["/", "/pricing", "/contact", "/about", "/demo", "/privacidade"];
+const SITE_PATHS = [
+  "/",
+  "/pricing",
+  "/contact",
+  "/about",
+  "/demo",
+  "/privacidade",
+  // Next.js metadata routes (app/robots.ts, app/sitemap.ts) plus the
+  // static public/llms.txt — the middleware matcher only excludes image
+  // extensions (see config.matcher below), so these .txt/.xml requests
+  // were falling through to the same "not a site path → redirect to the
+  // app subdomain → not authenticated → redirect to /login" chain as any
+  // other unknown path. Search Console/llms.txt validators were literally
+  // receiving the login page's HTML instead of these files.
+  "/robots.txt",
+  "/sitemap.xml",
+  "/llms.txt",
+];
 
 // Paths that are public within the app subdomain (no auth required).
 // /api/webhooks is called server-to-server by Stripe — no user session
@@ -19,6 +36,9 @@ const SITE_PATHS = ["/", "/pricing", "/contact", "/about", "/demo", "/privacidad
 const APP_PUBLIC_PATHS = [
   "/login",
   "/auth",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/llms.txt",
   // /onboarding (the page) stays public so an unauthenticated visitor can
   // land on it and see the login step (Unified Commercial Flow: login
   // happens first, inside the wizard). /api/onboarding/* is deliberately
