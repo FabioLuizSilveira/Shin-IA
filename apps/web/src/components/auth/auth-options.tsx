@@ -7,7 +7,13 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { appUrl } from "@/lib/domain";
 import { Loader2, Mail } from "lucide-react";
+
+const DEMO_DESTINATION: Record<"tenant" | "customer", string> = {
+  tenant: appUrl("/tenant/dashboard"),
+  customer: appUrl("/rentals"),
+};
 
 function GoogleIcon() {
   return (
@@ -74,6 +80,38 @@ export function AuthOptions() {
       // navegação para o provedor acontece via redirect — loading fica ativo
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao iniciar login.");
+      setLoading(null);
+    }
+  }
+
+  // Same real-account demo login as the mobile app (see apps/mobile/src/
+  // screens/LoginScreen.tsx's handleDemoLogin) — POST /api/mobile/demo-login
+  // is public and same-origin regardless of which host (root/www marketing
+  // or app.$ROOT_DOMAIN) this component renders on, so no cross-origin
+  // fetch issue. setSession() writes the shared `.${ROOT_DOMAIN}` cookie
+  // (see lib/supabase/client.ts), then a full navigation to the app
+  // subdomain picks it up — a relative router.push wouldn't survive a
+  // cross-subdomain jump when rendered from the marketing host.
+  async function handleDemoLogin(persona: "tenant" | "customer") {
+    setLoading(`demo-${persona}`);
+    setError(null);
+    try {
+      const res = await fetch("/api/mobile/demo-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ persona }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "Falha ao entrar em modo demonstração.");
+      const supabase = createClient();
+      const { error } = await supabase.auth.setSession({
+        access_token: json.data.access_token,
+        refresh_token: json.data.refresh_token,
+      });
+      if (error) throw error;
+      window.location.href = DEMO_DESTINATION[persona];
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao entrar em modo demonstração.");
       setLoading(null);
     }
   }
@@ -178,6 +216,33 @@ export function AuthOptions() {
           Mais opções
         </button>
       )}
+
+      <div className="flex items-center gap-3 py-1">
+        <div className="flex-1 h-px bg-white/10" />
+        <span className="text-xs text-slate-400">demonstração</span>
+        <div className="flex-1 h-px bg-white/10" />
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => void handleDemoLogin("tenant")}
+          disabled={loading !== null}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 text-sm font-semibold rounded-xl border border-blue-400/20 cursor-pointer transition disabled:opacity-60"
+        >
+          {loading === "demo-tenant" && <Loader2 className="w-4 h-4 animate-spin" />}
+          Ver como Equipe
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleDemoLogin("customer")}
+          disabled={loading !== null}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 text-sm font-semibold rounded-xl border border-blue-400/20 cursor-pointer transition disabled:opacity-60"
+        >
+          {loading === "demo-customer" && <Loader2 className="w-4 h-4 animate-spin" />}
+          Ver como Cliente
+        </button>
+      </div>
 
       {error && (
         <div className="px-4 py-2.5 bg-red-400/10 border border-red-400/20 rounded-xl text-sm text-red-300">
