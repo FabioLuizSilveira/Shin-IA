@@ -62,6 +62,7 @@ export interface Asset {
   type_name?: string;
   branch_id?: string;
   asset_type_id?: string;
+  metadata?: { photo_url?: string } | null;
 }
 
 export type ContractType = "service" | "rental" | "lease" | "subscription" | "one_time";

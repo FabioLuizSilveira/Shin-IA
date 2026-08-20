@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   fetchMyRentals,
   fetchMyRentalCustomerId,
@@ -131,6 +132,17 @@ export default function RentalDetailPage() {
       </header>
 
       <div className="px-4 py-4 max-w-xl mx-auto space-y-5">
+        {rental.contract_assets[0]?.assets?.metadata?.photo_url && (
+          <Image
+            src={rental.contract_assets[0].assets.metadata.photo_url}
+            alt={rental.contract_assets[0].assets.name}
+            width={600}
+            height={220}
+            className="w-full h-44 rounded-xl object-cover bg-slate-100 dark:bg-slate-800"
+            unoptimized
+          />
+        )}
+
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400">Período</p>

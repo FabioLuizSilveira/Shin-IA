@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ExportButton } from "@/components/ui/export-button";
-import { Plus, X } from "lucide-react";
+import { Plus, X, ImageIcon } from "lucide-react";
 import type { Asset, AssetCategory, AssetStatus } from "@/types/domain";
 
 interface AssetType {
@@ -61,6 +62,8 @@ export default function TenantAssetsPage() {
   const [formCategory, setFormCategory] = useState<AssetCategory>("vehicle");
   const [formTypeId, setFormTypeId] = useState("");
   const [formSerial, setFormSerial] = useState("");
+  const [formPhoto, setFormPhoto] = useState<File | null>(null);
+  const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,18 +105,43 @@ export default function TenantAssetsPage() {
           serial_number: formSerial || undefined,
         }),
       });
-      const json = (await res.json()) as { error?: string };
+      const json = (await res.json()) as { error?: string; data?: Asset };
       if (!res.ok) throw new Error(json.error ?? "Falha ao criar ativo");
+
+      if (formPhoto && json.data) {
+        const photoForm = new FormData();
+        photoForm.append("file", formPhoto);
+        const photoRes = await fetch(`/api/assets/${json.data.id}/photo`, {
+          method: "POST",
+          body: photoForm,
+        });
+        if (!photoRes.ok) {
+          const photoJson = (await photoRes.json().catch(() => ({}))) as { error?: string };
+          throw new Error(photoJson.error ?? "Ativo criado, mas falha ao enviar a foto");
+        }
+      }
+
       setShowForm(false);
       setFormName("");
       setFormTypeId("");
       setFormSerial("");
+      setFormPhoto(null);
+      setFormPhotoPreview(null);
       await load();
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Erro inesperado");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setFormPhoto(file);
+    setFormPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file ? URL.createObjectURL(file) : null;
+    });
   }
 
   async function handleStatusChange(status: AssetStatus) {
@@ -133,6 +161,25 @@ export default function TenantAssetsPage() {
   }
 
   const columns = [
+    {
+      key: "photo",
+      label: "",
+      render: (row: AssetRow) =>
+        row.metadata?.photo_url ? (
+          <Image
+            src={row.metadata.photo_url}
+            alt={row.name}
+            width={40}
+            height={40}
+            className="w-10 h-10 rounded-lg object-cover bg-slate-100 dark:bg-slate-800"
+            unoptimized
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+            <ImageIcon className="w-4 h-4 text-slate-300 dark:text-slate-600" />
+          </div>
+        ),
+    },
     { key: "name", label: "Nome" },
     {
       key: "category",
@@ -209,6 +256,20 @@ export default function TenantAssetsPage() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+              {selected.metadata?.photo_url ? (
+                <Image
+                  src={selected.metadata.photo_url}
+                  alt={selected.name}
+                  width={400}
+                  height={200}
+                  className="w-full h-48 rounded-xl object-cover bg-slate-100 dark:bg-slate-800"
+                  unoptimized
+                />
+              ) : (
+                <div className="w-full h-48 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                  <ImageIcon className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                </div>
+              )}
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs text-slate-500 mb-1">Nome</p>
@@ -278,7 +339,12 @@ export default function TenantAssetsPage() {
               </h2>
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  if (formPhotoPreview) URL.revokeObjectURL(formPhotoPreview);
+                  setFormPhoto(null);
+                  setFormPhotoPreview(null);
+                }}
                 className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -288,6 +354,31 @@ export default function TenantAssetsPage() {
               onSubmit={(e) => void handleCreate(e)}
               className="flex-1 overflow-y-auto px-6 py-6 space-y-4"
             >
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">
+                  Foto (opcional)
+                </label>
+                {formPhotoPreview ? (
+                  <Image
+                    src={formPhotoPreview}
+                    alt="Pré-visualização"
+                    width={400}
+                    height={160}
+                    className="w-full h-40 rounded-xl object-cover bg-slate-100 dark:bg-slate-800 mb-2"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="w-full h-40 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2">
+                    <ImageIcon className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handlePhotoChange}
+                  className="w-full text-xs text-slate-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-shina-blue file:text-white file:text-xs file:font-semibold file:cursor-pointer"
+                />
+              </div>
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Nome</label>
                 <input

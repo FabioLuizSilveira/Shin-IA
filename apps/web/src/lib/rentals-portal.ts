@@ -12,7 +12,13 @@ import { createClient } from "@/lib/supabase/client";
 export interface RentalAsset {
   id: string;
   quantity: number;
-  assets: { id: string; name: string; category: string; status: string } | null;
+  assets: {
+    id: string;
+    name: string;
+    category: string;
+    status: string;
+    metadata: { photo_url?: string } | null;
+  } | null;
 }
 
 export interface Rental {
@@ -47,7 +53,7 @@ export interface ServiceRequest {
 const RENTAL_SELECT =
   "id, tenant_id, type, status, value_amount, value_currency, period_starts_at, period_ends_at, " +
   "template_id, template_version_id, snapshot_id, " +
-  "contract_assets(id, quantity, assets(id, name, category, status))";
+  "contract_assets(id, quantity, assets(id, name, category, status, metadata))";
 
 // No server-side API layer for this portal (same architectural choice as
 // apps/mobile) — talks directly to PostgREST via RLS, so raw Postgres

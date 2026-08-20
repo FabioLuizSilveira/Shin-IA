@@ -6,7 +6,7 @@ import { logActivity } from "@/lib/activity-log";
 export const dynamic = "force-dynamic";
 
 const SELECT =
-  "id, name, serial_number, category, status, branch_id, asset_type_id, asset_types(name)";
+  "id, name, serial_number, category, status, branch_id, asset_type_id, metadata, asset_types(name)";
 
 function flattenType<T extends { asset_types: { name: string } | null }>(
   row: T,
