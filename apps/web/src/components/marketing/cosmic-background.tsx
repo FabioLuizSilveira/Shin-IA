@@ -4,8 +4,10 @@
 // referência (nebulosa + campo de estrelas + semente neural com dendritos
 // ramificados). Sem texto, sem assets externos; posições determinísticas
 // para não quebrar a hidratação. Quando a seção entra na tela, a semente
-// nasce pequena e cresce: núcleo primeiro, depois os ramos se desenham e
-// os nós acendem.
+// nasce pequena e cresce: núcleo primeiro, depois os ramos aparecem (fade,
+// não mais stroke-draw — ver public.css) e os nós acendem. Sem rotação
+// contínua: um SVG filter (feGaussianBlur) girando para sempre forçava
+// repintura constante da thread principal (achado real de Lighthouse).
 
 import { useRef } from "react";
 import { useInView } from "framer-motion";

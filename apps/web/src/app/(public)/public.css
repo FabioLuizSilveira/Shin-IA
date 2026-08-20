@@ -114,10 +114,14 @@
   opacity: 0;
 }
 
+/* cosmic-spin (continuous 55s rotation) was removed — this group contains
+   feGaussianBlur-filtered paths (SVG filters aren't GPU-composited the way
+   CSS filters are), so rotating it forced a full filter re-rasterization on
+   every frame, forever, for as long as the tab stayed open. That was the
+   dominant cost behind this page's Lighthouse TBT/main-thread-work numbers,
+   not just a one-time animation cost. The one-shot grow-in stays. */
 .cosmic-grow .cosmic-seed {
-  animation:
-    cosmic-seed-grow 2.2s cubic-bezier(0.22, 0.9, 0.3, 1) forwards,
-    cosmic-spin 55s linear 3s infinite;
+  animation: cosmic-seed-grow 2.2s cubic-bezier(0.22, 0.9, 0.3, 1) forwards;
 }
 
 .cosmic-core {
@@ -130,13 +134,20 @@
   animation: cosmic-core-in 1s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s forwards;
 }
 
+/* Was a stroke-dashoffset "draw the line" animation over 62 paths (two
+   layers — glow + sharp — of the 31 BRANCHES entries). stroke-dashoffset
+   isn't a compositor-only property, so animating it forces a paint pass on
+   every one of those 62 elements on every frame — the single biggest
+   contributor to this page's "non-composited animations" Lighthouse flag.
+   A plain opacity fade-in keeps the same per-branch stagger (still driven
+   by the inline animationDelay in cosmic-background.tsx) at a fraction of
+   the cost, since opacity animates on the compositor thread. */
 .cosmic-branch {
-  stroke-dasharray: 480;
-  stroke-dashoffset: 480;
+  opacity: 0;
 }
 
 .cosmic-grow .cosmic-branch {
-  animation: cosmic-draw 1.5s ease-out forwards;
+  animation: cosmic-branch-in 0.6s ease-out forwards;
   /* delay por ramo definido inline (troncos antes das bifurcações) */
 }
 
@@ -165,9 +176,9 @@
   }
 }
 
-@keyframes cosmic-draw {
+@keyframes cosmic-branch-in {
   to {
-    stroke-dashoffset: 0;
+    opacity: 1;
   }
 }
 
@@ -210,16 +221,6 @@
   }
 }
 
-/* Rotação horária contínua após o crescimento (0→360° = sentido horário). */
-@keyframes cosmic-spin {
-  from {
-    transform: scale(1) rotate(0deg);
-  }
-  to {
-    transform: scale(1) rotate(360deg);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .cosmic-nebula,
   .cosmic-twinkle {
@@ -233,7 +234,7 @@
     animation: none !important;
   }
   .cosmic-branch {
-    stroke-dashoffset: 0 !important;
+    opacity: 1 !important;
     animation: none !important;
   }
   .cosmic-node {
