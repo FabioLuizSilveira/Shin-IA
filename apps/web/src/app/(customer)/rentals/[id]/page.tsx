@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   fetchMyRentals,
   fetchMyRentalCustomerId,
@@ -49,7 +50,7 @@ export default function RentalDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState<"extension" | "issue" | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [sentNotice, setSentNotice] = useState(false);
 
   const load = useCallback(() => {
@@ -68,9 +69,9 @@ export default function RentalDetailPage() {
     load();
   }, [load]);
 
-  async function handleSubmit(type: "extension" | "issue") {
+  async function handleReportIssue() {
     if (!rental || !message.trim()) return;
-    setSubmitting(type);
+    setSubmitting(true);
     setError(null);
     try {
       const rentalCustomerId = await fetchMyRentalCustomerId();
@@ -78,7 +79,7 @@ export default function RentalDetailPage() {
         tenantContractId: rental.id,
         rentalCustomerId,
         tenantId: rental.tenant_id,
-        type,
+        type: "issue",
         message: message.trim(),
       });
       setMessage("");
@@ -88,7 +89,7 @@ export default function RentalDetailPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao enviar pedido");
     } finally {
-      setSubmitting(null);
+      setSubmitting(false);
     }
   }
 
@@ -153,35 +154,33 @@ export default function RentalDetailPage() {
           </div>
         </div>
 
+        {rental.status === "active" && (
+          <Link
+            href={`/rentals/${rental.id}/renew`}
+            className="block text-center px-4 py-2.5 bg-shina-blue hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition"
+          >
+            Renovar contrato
+          </Link>
+        )}
+
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
           <p className="text-sm font-bold text-slate-900 dark:text-white">Solicitar</p>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Descreva o problema ou o pedido de prorrogação..."
+            placeholder="Descreva o problema..."
             rows={4}
             className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
           />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={submitting !== null || !message.trim()}
-              onClick={() => void handleSubmit("issue")}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
-            >
-              {submitting === "issue" && <Loader2 className="w-4 h-4 animate-spin" />}
-              Reportar problema
-            </button>
-            <button
-              type="button"
-              disabled={submitting !== null || !message.trim()}
-              onClick={() => void handleSubmit("extension")}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-shina-blue hover:bg-blue-600 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
-            >
-              {submitting === "extension" && <Loader2 className="w-4 h-4 animate-spin" />}
-              Pedir prorrogação
-            </button>
-          </div>
+          <button
+            type="button"
+            disabled={submitting || !message.trim()}
+            onClick={() => void handleReportIssue()}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
+          >
+            {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            Reportar problema
+          </button>
           {sentNotice && (
             <p className="text-xs text-green-600 dark:text-green-400">
               Seu pedido foi enviado ao locador.
