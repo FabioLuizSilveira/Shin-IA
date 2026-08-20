@@ -11,7 +11,7 @@ const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "shinaia.com.br";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? `https://app.${ROOT_DOMAIN}`;
 
 // Paths served exclusively by the institutional landing (root/www domain)
-const SITE_PATHS = ["/", "/pricing", "/contact", "/about", "/demo"];
+const SITE_PATHS = ["/", "/pricing", "/contact", "/about", "/demo", "/privacidade"];
 
 // Paths that are public within the app subdomain (no auth required).
 // /api/webhooks is called server-to-server by Stripe — no user session
@@ -25,6 +25,11 @@ const APP_PUBLIC_PATHS = [
   // NOT public anymore — /complete and /status both require a real session
   // now that contract_acceptances.user_id is never null.
   "/onboarding",
+  // Linked from /onboarding's footer and required by Apple's TestFlight
+  // Beta App Review (Privacy Policy URL) — must be reachable with no
+  // session on both the marketing domain (SITE_PATHS) and the app
+  // subdomain, since /onboarding itself lives on the app subdomain.
+  "/privacidade",
   "/api/commercial",
   "/api/auth",
   "/api/webhooks",
