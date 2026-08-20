@@ -10,6 +10,9 @@ import { createSessionFromUrl } from "./src/lib/deep-link-session";
 import { RootNavigator } from "./src/navigation";
 import { theme } from "./src/theme";
 import { registerForPushNotifications, unregisterCurrentDevice } from "./src/lib/push-registration";
+import { perfMark } from "./src/lib/perf-trace";
+
+perfMark("app_js_start");
 
 function DeepLinkHandler() {
   const url = Linking.useLinkingURL();
@@ -55,6 +58,10 @@ export default function App() {
     SpaceGrotesk: require("./assets/fonts/SpaceGrotesk.ttf"),
     PlusJakartaSans: require("./assets/fonts/PlusJakartaSans.ttf"),
   });
+
+  useEffect(() => {
+    if (fontsLoaded) perfMark("fonts_loaded");
+  }, [fontsLoaded]);
 
   if (!fontsLoaded) {
     return (

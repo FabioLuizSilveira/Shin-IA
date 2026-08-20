@@ -8,6 +8,7 @@ import { Card, ScreenHeader, Loader, T, GradientButton, EmptyState } from "../co
 import { usePersona } from "../lib/persona-context";
 import { useAuth } from "../lib/auth-context";
 import { shinaia } from "../lib/shinaia-api";
+import { perfMark } from "../lib/perf-trace";
 import type { TenantTabParamList } from "../navigation";
 
 // M22.8 — tenant_user home. Real data via GET /api/mobile/dashboard
@@ -95,6 +96,7 @@ export function TenantHomeScreen() {
       const result = await shinaia.dashboard();
       setData(result.data as unknown as TenantDashboardData);
       setSource(result.source);
+      perfMark("first_useful_render", { source: result.source });
     } catch {
       setData(null);
     } finally {

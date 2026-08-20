@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useAuth } from "./auth-context";
 import { fetchBootstrap, type BootstrapResponse } from "./bootstrap";
+import { perfMark } from "./perf-trace";
 
 // M22.7 — PersonaRouter: the one place that resolves session -> bootstrap ->
 // userType, so screens never do `if (userType === ...)` themselves. Renamed
@@ -77,18 +78,21 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false;
     setStatus("loading");
+    perfMark("persona_resolution_start");
     fetchBootstrap()
       .then((data) => {
         if (cancelled) return;
         setBootstrap(data);
         setStatus("ready");
         setError(null);
+        perfMark("persona_resolution_done", { userType: data.user.userType });
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         setBootstrap(null);
         setStatus("error");
         setError(err instanceof Error ? err.message : "Failed to load bootstrap");
+        perfMark("persona_resolution_error");
       });
     return () => {
       cancelled = true;

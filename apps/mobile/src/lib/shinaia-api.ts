@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { areMocksAllowed } from "./mock-policy";
 import { MOCK } from "./mocks";
+import { perfMark, PERF_TRACE_ENABLED } from "./perf-trace";
 
 // M22/M23 — typed data-access layer. Single point of HTTP for the whole
 // app; no screen ever calls fetch() directly. Paths corrected against the
@@ -40,6 +41,9 @@ async function request<T>(
   const headers = await authHeader();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const isDashboard = path.startsWith("/api/mobile/dashboard");
+  const clientStart = Date.now();
+  if (isDashboard) perfMark("dashboard_request_start");
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
@@ -47,6 +51,7 @@ async function request<T>(
       headers: {
         Accept: "application/json",
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(PERF_TRACE_ENABLED ? { "x-perf-trace": "1" } : {}),
         ...headers,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -59,6 +64,21 @@ async function request<T>(
     throw err;
   } finally {
     clearTimeout(timeoutId);
+  }
+  if (isDashboard) {
+    const clone = res.clone();
+    clone
+      .json()
+      .then((j: { data?: { _perf?: Record<string, number> } }) => {
+        perfMark("dashboard_response", {
+          clientMs: Date.now() - clientStart,
+          status: res.status,
+          serverMs: j.data?._perf?.totalMs ?? -1,
+        });
+      })
+      .catch(() =>
+        perfMark("dashboard_response", { clientMs: Date.now() - clientStart, status: res.status }),
+      );
   }
   if (!res.ok) {
     let message = `HTTP ${res.status}`;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { requireMobileContext } from "@/lib/mobile-context";
 import { createStudioRuntime } from "@/lib/studio-runtime-factory";
 import { getEffectiveTenantPermissions } from "@/lib/tenant-context";
@@ -23,11 +24,34 @@ const SCHEMA_VERSION = 1;
 // specific tenant's — they aren't associated with one.
 const DEFAULT_BRANDING = { name: "Shinã" };
 
+// PERFORMANCE PASS 2 — opt-in server-side timing, only computed/returned when
+// the client sends x-perf-trace: 1 (the instrumented mobile build sets this
+// only when EXPO_PUBLIC_PERF_TRACE=1). Zero cost and zero response-shape
+// change for normal traffic. Never includes tokens, PII, or query results —
+// only step durations in ms.
 export async function GET() {
+  const headerStore = await headers();
+  const traceEnabled = headerStore.get("x-perf-trace") === "1";
+  const t0 = performance.now();
+
   const context = await requireMobileContext();
+  const t1 = performance.now();
+  const contextResolutionMs = t1 - t0;
+
   if ("error" in context) {
     return NextResponse.json({ error: context.error }, { status: context.status });
   }
+
+  const perf = (dataFetchStart: number) =>
+    traceEnabled
+      ? {
+          _perf: {
+            contextResolutionMs: Math.round(contextResolutionMs),
+            dataFetchMs: Math.round(performance.now() - dataFetchStart),
+            totalMs: Math.round(performance.now() - t0),
+          },
+        }
+      : {};
 
   if (context.userType === "tenant_user") {
     const [tenantResult, brandingVersion, permissions, entitlements] = await Promise.all([
@@ -53,6 +77,7 @@ export async function GET() {
         permissions,
         entitlements: entitlements.features,
         features: Object.fromEntries(entitlements.features.map((f) => [f, true])),
+        ...perf(t1),
       },
     });
   }
@@ -86,6 +111,7 @@ export async function GET() {
         permissions: [],
         entitlements: entitlements.features,
         features: Object.fromEntries(entitlements.features.map((f) => [f, true])),
+        ...perf(t1),
       },
     });
   }

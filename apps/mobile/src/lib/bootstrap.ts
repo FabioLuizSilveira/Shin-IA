@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { perfMark, PERF_TRACE_ENABLED } from "./perf-trace";
 
 // M22.6 — the official source for user/userType/tenant/branding/roles/
 // permissions/entitlements/features/navigation. Never build persona from
@@ -46,11 +47,18 @@ export async function fetchBootstrap(): Promise<BootstrapResponse> {
   if (!token) {
     throw new BootstrapError("No active session", 401);
   }
+  perfMark("access_token_available");
 
   let res: Response;
+  const clientStart = Date.now();
+  perfMark("bootstrap_request_start");
   try {
     res = await fetch(`${API_BASE}/api/mobile/bootstrap`, {
-      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(PERF_TRACE_ENABLED ? { "x-perf-trace": "1" } : {}),
+      },
     });
   } catch {
     throw new BootstrapError("Network error");
@@ -60,6 +68,13 @@ export async function fetchBootstrap(): Promise<BootstrapResponse> {
     throw new BootstrapError(`HTTP ${res.status}`, res.status);
   }
 
-  const json = (await res.json()) as { data: BootstrapResponse };
+  const json = (await res.json()) as {
+    data: BootstrapResponse & { _perf?: Record<string, number> };
+  };
+  perfMark("bootstrap_response", {
+    clientMs: Date.now() - clientStart,
+    serverMs: json.data._perf?.totalMs ?? -1,
+    contextMs: json.data._perf?.contextResolutionMs ?? -1,
+  });
   return json.data;
 }

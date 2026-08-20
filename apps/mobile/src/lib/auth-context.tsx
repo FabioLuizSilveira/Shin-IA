@@ -10,6 +10,7 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { areMocksAllowed } from "./mock-policy";
+import { perfMark } from "./perf-trace";
 
 interface AuthContextValue {
   session: Session | null;
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [demoMode, setDemoMode] = useState(false);
 
   useEffect(() => {
+    perfMark("session_restore_start");
     supabase.auth.getSession().then(async ({ data }) => {
       // Dev-only shortcut: Expo Go can't complete the magic-link/Google
       // deep link back into the app (custom scheme, see
@@ -48,10 +50,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         setSession(devData.session);
         setLoading(false);
+        perfMark("session_restore_done", { hasSession: true });
         return;
       }
       setSession(data.session);
       setLoading(false);
+      perfMark("session_restore_done", { hasSession: !!data.session });
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
