@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, RefreshControl } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -57,9 +57,12 @@ export function RentalsListScreen({ navigation }: Props) {
     }, [load]),
   );
 
-  const pending = invoices.filter((i) => i.status === "issued" || i.status === "overdue");
-  const overdue = invoices.filter((i) => i.status === "overdue");
-  const pendingTotal = pending.reduce((sum, i) => sum + Number(i.total_amount), 0);
+  const { pending, overdue, pendingTotal } = useMemo(() => {
+    const pending = invoices.filter((i) => i.status === "issued" || i.status === "overdue");
+    const overdue = invoices.filter((i) => i.status === "overdue");
+    const pendingTotal = pending.reduce((sum, i) => sum + Number(i.total_amount), 0);
+    return { pending, overdue, pendingTotal };
+  }, [invoices]);
   const currency = invoices[0]?.total_currency ?? "BRL";
 
   return (

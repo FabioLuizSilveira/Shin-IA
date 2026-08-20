@@ -22,17 +22,34 @@ export async function GET() {
   }
 
   if (context.userType === "tenant_user") {
-    const [operationsResult, assetsResult, financial, alerts, recentActivity] = await Promise.all([
-      context.db
-        .from("operations")
-        .select("status", { count: "exact", head: false })
+    // Was fetching every operations/assets row (status column only) just to
+    // filter 2 status buckets each in JS — fine at demo scale, but a real
+    // tenant's operations/assets tables only grow, and every row was being
+    // transferred + JSON-serialized to derive 4 integers. head:true count
+    // queries let Postgres do the counting and return zero rows.
+    const countQuery = (table: "operations" | "assets", status: string, deletedAtFilter = true) => {
+      let q = context.db
+        .from(table)
+        .select("id", { count: "exact", head: true })
         .eq("tenant_id", context.tenantId)
-        .is("deleted_at", null),
-      context.db
-        .from("assets")
-        .select("status", { count: "exact", head: false })
-        .eq("tenant_id", context.tenantId)
-        .is("deleted_at", null),
+        .eq("status", status);
+      if (deletedAtFilter) q = q.is("deleted_at", null);
+      return q;
+    };
+
+    const [
+      activeOpsResult,
+      pendingOpsResult,
+      availableAssetsResult,
+      assetsInUseResult,
+      financial,
+      alerts,
+      recentActivity,
+    ] = await Promise.all([
+      countQuery("operations", "in_progress"),
+      countQuery("operations", "pending"),
+      countQuery("assets", "available"),
+      countQuery("assets", "in_use"),
       resolveFinancialSummary(context),
       resolveAlerts(context),
       context.db
@@ -43,16 +60,13 @@ export async function GET() {
         .limit(10),
     ]);
 
-    const operations = operationsResult.data ?? [];
-    const assets = assetsResult.data ?? [];
-
     return NextResponse.json({
       data: {
         summary: {
-          activeOperations: operations.filter((o) => o.status === "in_progress").length,
-          pendingOperations: operations.filter((o) => o.status === "pending").length,
-          availableAssets: assets.filter((a) => a.status === "available").length,
-          assetsInUse: assets.filter((a) => a.status === "in_use").length,
+          activeOperations: activeOpsResult.count ?? 0,
+          pendingOperations: pendingOpsResult.count ?? 0,
+          availableAssets: availableAssetsResult.count ?? 0,
+          assetsInUse: assetsInUseResult.count ?? 0,
         },
         alerts,
         recentActivity: (recentActivity.data ?? []).map((a) => ({
