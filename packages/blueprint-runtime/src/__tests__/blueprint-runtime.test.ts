@@ -127,7 +127,7 @@ describe("BlueprintRegistry", () => {
   it("gets a registered blueprint", () => {
     const registry = new BlueprintRegistry([mobilityManifest]);
     const bp = registry.get("mobility");
-    expect(bp.displayName).toBe("Mobility");
+    expect(bp.displayName).toBe("Mobilidade");
   });
 
   it("throws on get for unknown blueprint", () => {
@@ -522,7 +522,7 @@ describe("BlueprintRuntime", () => {
   it("gets a blueprint by id", () => {
     const runtime = makeRuntime();
     const bp = runtime.getBlueprint("mobility");
-    expect(bp.displayName).toBe("Mobility");
+    expect(bp.displayName).toBe("Mobilidade");
   });
 
   it("validates install config", () => {
