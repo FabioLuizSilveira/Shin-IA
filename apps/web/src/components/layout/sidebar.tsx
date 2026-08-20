@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -65,6 +66,15 @@ const TENANT_NAV_ITEMS = [
   { href: "/tenant/settings", label: "Configurações", icon: Settings },
 ];
 
+// Blueprints that are pure vehicle-rental (see packages/blueprint-runtime/
+// src/built-ins.ts) have no operator or shared-resource concept — same
+// product decision already applied to the mobile app's tenant menu. A
+// tenant whose only installed blueprints are these ones doesn't need
+// Recursos/Operadores cluttering the nav; a tenant that also has e.g. a
+// forklift or crane blueprint installed still sees both.
+const VEHICLE_RENTAL_BLUEPRINT_IDS = new Set(["mobility", "rental-cars", "rental-motorcycles"]);
+const HIDDEN_FOR_VEHICLE_RENTAL = new Set(["/tenant/resources", "/tenant/operators"]);
+
 interface SidebarProps {
   onClose?: () => void;
 }
@@ -72,9 +82,31 @@ interface SidebarProps {
 export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [hideVehicleRentalOnlyItems, setHideVehicleRentalOnlyItems] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+    supabase
+      .from("blueprint_instances")
+      .select("blueprint_id")
+      .eq("status", "active")
+      .then(({ data }) => {
+        if (cancelled || !data || data.length === 0) return;
+        const onlyVehicleRental = data.every((row) =>
+          VEHICLE_RENTAL_BLUEPRINT_IDS.has(row.blueprint_id),
+        );
+        setHideVehicleRentalOnlyItems(onlyVehicleRental);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isPlatform = pathname.startsWith("/platform");
-  const navItems = isPlatform ? PLATFORM_NAV_ITEMS : TENANT_NAV_ITEMS;
+  const navItems = (isPlatform ? PLATFORM_NAV_ITEMS : TENANT_NAV_ITEMS).filter(
+    (item) => !hideVehicleRentalOnlyItems || !HIDDEN_FOR_VEHICLE_RENTAL.has(item.href),
+  );
 
   async function handleLogout() {
     const supabase = createClient();
