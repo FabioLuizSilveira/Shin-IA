@@ -150,3 +150,126 @@ export async function createServiceRequest(input: {
   });
   if (error) throw toUserError(error, "Não foi possível enviar o pedido.");
 }
+
+export interface UpgradeOption {
+  id: string;
+  name: string;
+  serial_number: string | null;
+  metadata: { photo_url?: string; brand?: string; model?: string; weekly_rate?: number };
+}
+
+// Same numeric-comparison fix as apps/mobile/src/lib/rentals.ts's
+// fetchUpgradeOptions — PostgREST's gte()/order() on metadata->>weekly_rate
+// compares lexicographically as text, letting cheaper cars slip through a
+// server-side filter, so the >= check and sort happen client-side instead.
+export async function fetchUpgradeOptions(
+  tenantId: string,
+  minWeeklyRate: number,
+): Promise<UpgradeOption[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("assets")
+    .select("id, name, serial_number, metadata")
+    .eq("tenant_id", tenantId)
+    .eq("status", "available")
+    .eq("category", "vehicle");
+  if (error) throw toUserError(error, "Não foi possível carregar os veículos disponíveis.");
+  return ((data ?? []) as unknown as UpgradeOption[])
+    .filter((a) => Number(a.metadata?.weekly_rate ?? 0) >= minWeeklyRate)
+    .sort((a, b) => Number(a.metadata?.weekly_rate ?? 0) - Number(b.metadata?.weekly_rate ?? 0));
+}
+
+export interface CustomerInvoice {
+  id: string;
+  status: string;
+  total_amount: number;
+  total_currency: string;
+  due_date: string;
+  paid_at: string | null;
+}
+
+export async function fetchMyInvoices(): Promise<CustomerInvoice[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("id, status, total_amount, total_currency, due_date, paid_at")
+    .order("due_date", { ascending: false })
+    .limit(10);
+  if (error) throw toUserError(error, "Não foi possível carregar suas faturas.");
+  return (data ?? []) as unknown as CustomerInvoice[];
+}
+
+export interface Reservation {
+  id: string;
+  tenant_id: string;
+  asset_id: string;
+  period_starts_at: string;
+  period_ends_at: string;
+  total_amount: number;
+  total_currency: string;
+  deposit_amount: number;
+  balance_amount: number;
+  status: "pending_deposit" | "reserved" | "completed" | "forfeited" | "cancelled";
+  assets: { name: string } | null;
+}
+
+export async function fetchMyReservations(): Promise<Reservation[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("rental_reservations")
+    .select(
+      "id, tenant_id, asset_id, period_starts_at, period_ends_at, total_amount, total_currency, " +
+        "deposit_amount, balance_amount, status, assets(name)",
+    )
+    .order("created_at", { ascending: false });
+  if (error) throw toUserError(error, "Não foi possível carregar suas reservas.");
+  return (data ?? []) as unknown as Reservation[];
+}
+
+// The checkout/availability endpoints below are the same public,
+// requireMobileContext()-guarded routes the mobile app calls
+// (api/mobile/customer/*) — requireMobileContext() already falls back to
+// cookie-based getSession() when there's no Authorization: Bearer header
+// (see lib/mobile-context.ts), which is exactly what this browser client
+// sends, so no separate web-specific API layer is needed.
+async function postJson<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error ?? "Falha ao processar a solicitação.");
+  return json.data as T;
+}
+
+export async function renewalCheckout(contractId: string): Promise<{ url: string }> {
+  return postJson("/api/mobile/customer/renewal-checkout", { contractId });
+}
+
+export async function fetchAssetAvailability(
+  assetId: string,
+): Promise<{ start: string; end: string }[]> {
+  const res = await fetch(`/api/mobile/customer/asset-availability?assetId=${assetId}`);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) return [];
+  return (json.data ?? []) as { start: string; end: string }[];
+}
+
+export async function createReservation(input: {
+  assetId: string;
+  startsAt: string;
+  endsAt: string;
+}): Promise<{
+  url: string;
+  reservationId: string;
+  deposit: number;
+  balance: number;
+  total: number;
+}> {
+  return postJson("/api/mobile/customer/reservations", input);
+}
+
+export async function reservationBalanceCheckout(reservationId: string): Promise<{ url: string }> {
+  return postJson(`/api/mobile/customer/reservations/${reservationId}/balance-checkout`);
+}
