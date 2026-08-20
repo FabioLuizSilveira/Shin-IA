@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useAuth } from "./auth-context";
 import { fetchBootstrap, type BootstrapResponse } from "./bootstrap";
 
@@ -87,15 +95,19 @@ export function PersonaProvider({ children }: { children: ReactNode }) {
     };
   }, [session, demoMode, authLoading, refetchToken]);
 
-  function refetch() {
+  const refetch = useCallback(() => {
     setRefetchToken((t) => t + 1);
-  }
+  }, []);
 
-  return (
-    <PersonaContext.Provider value={{ status, bootstrap, error, refetch }}>
-      {children}
-    </PersonaContext.Provider>
+  // Perf audit finding: unmemoized value object meant any consumer reading
+  // only `bootstrap` (large, rarely-changing) also re-rendered on every
+  // `status` transition (loading -> ready etc.), and vice versa.
+  const value = useMemo(
+    () => ({ status, bootstrap, error, refetch }),
+    [status, bootstrap, error, refetch],
   );
+
+  return <PersonaContext.Provider value={value}>{children}</PersonaContext.Provider>;
 }
 
 export function usePersona() {

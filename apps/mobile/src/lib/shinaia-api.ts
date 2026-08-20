@@ -25,6 +25,12 @@ class ApiError extends Error {
   }
 }
 
+// Perf audit finding: request() had no timeout — a hung request (dead
+// network, backend stall) blocked the caller indefinitely with no cutoff,
+// which section 14 of the audit spec explicitly calls out ("loading não
+// pode bloquear indefinidamente").
+const REQUEST_TIMEOUT_MS = 15_000;
+
 async function request<T>(
   method: "GET" | "PATCH" | "POST",
   path: string,
@@ -32,15 +38,28 @@ async function request<T>(
 ): Promise<T> {
   if (!API_BASE) throw new ApiError("EXPO_PUBLIC_SHINAIA_API_URL is not configured");
   const headers = await authHeader();
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: {
-      Accept: "application/json",
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...headers,
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: {
+        Accept: "application/json",
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...headers,
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new ApiError("A solicitação demorou demais para responder.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {

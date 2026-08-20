@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { areMocksAllowed } from "./mock-policy";
@@ -59,30 +67,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // session. It is a no-op unless __DEV__ AND EXPO_PUBLIC_ENABLE_MOCKS are
   // both true — see mock-policy.ts, which this function delegates to so
   // there is exactly one place that decides "is mock/demo allowed here".
-  function enterDemoMode() {
+  const enterDemoMode = useCallback(() => {
     if (!areMocksAllowed()) return;
     setDemoMode(true);
     setLoading(false);
-  }
+  }, []);
 
   // M22.13 — logout clears the Supabase session (which itself wipes the
   // encrypted secure-store blob, see secure-session-store.ts) and any local
   // demo-mode flag. Bootstrap/persona cache lives in PersonaProvider, which
   // resets itself in response to `session` becoming null (see
   // persona-context.tsx) — no separate cache-clear call needed here.
-  async function signOut() {
+  const signOut = useCallback(async () => {
     setDemoMode(false);
     if (session) {
       await supabase.auth.signOut();
     }
     setSession(null);
-  }
+  }, [session]);
 
-  return (
-    <AuthContext.Provider value={{ session, loading, demoMode, signOut, enterDemoMode }}>
-      {children}
-    </AuthContext.Provider>
+  // Perf audit finding: this object literal was rebuilt every render with
+  // no memoization, so every useAuth() consumer re-rendered on any change
+  // to any field, even ones it doesn't read.
+  const value = useMemo(
+    () => ({ session, loading, demoMode, signOut, enterDemoMode }),
+    [session, loading, demoMode, signOut, enterDemoMode],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

@@ -72,6 +72,15 @@ export function RenewalScreen({ route, navigation }: Props) {
 
   const currentAssetId = rental?.contract_assets[0]?.assets?.id ?? null;
 
+  // Perf audit finding: was recomputed inline after the loading early-return
+  // below on every render. Hoisted above it (hooks can't follow a
+  // conditional return) so it's a real useMemo instead.
+  const { pending, pendingTotal } = useMemo(() => {
+    const pending = invoices.filter((i) => i.status === "issued" || i.status === "overdue");
+    const pendingTotal = pending.reduce((sum, i) => sum + Number(i.total_amount), 0);
+    return { pending, pendingTotal };
+  }, [invoices]);
+
   const load = useCallback(() => {
     setLoading(true);
     fetchMyRentals()
@@ -244,8 +253,6 @@ export function RenewalScreen({ route, navigation }: Props) {
     );
   }
 
-  const pending = invoices.filter((i) => i.status === "issued" || i.status === "overdue");
-  const pendingTotal = pending.reduce((sum, i) => sum + Number(i.total_amount), 0);
   const currency = invoices[0]?.total_currency ?? rental.value_currency;
 
   return (
