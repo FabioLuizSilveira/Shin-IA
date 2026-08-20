@@ -22,6 +22,7 @@ import {
   TrendingUp,
   Shield,
   X,
+  Trash2,
 } from "lucide-react";
 import type { TenantStatus, TenantPlan, OperationStatus, ContractStatus } from "@/types/domain";
 
@@ -433,11 +434,13 @@ function SettingsTab({
   tenant,
   onStatusChange,
   onPlanChange,
+  onDeleteClick,
   saving,
 }: {
   tenant: TenantDetail;
   onStatusChange: (status: TenantStatus) => void;
   onPlanChange: (plan: TenantPlan) => void;
+  onDeleteClick: () => void;
   saving: boolean;
 }) {
   const isSuspended = tenant.status === "suspended";
@@ -503,6 +506,27 @@ function SettingsTab({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Danger zone */}
+      <div className="bg-white dark:bg-slate-900 rounded-xl border-2 border-red-200 dark:border-red-900/40 p-6">
+        <h3 className="text-sm font-semibold text-red-700 dark:text-red-400 mb-1">
+          Zona de Perigo
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
+          Excluir o tenant remove imediatamente o acesso de todos os usuários e o tira de toda
+          listagem da plataforma. Operação irreversível.
+        </p>
+        <button
+          id="tenant-delete"
+          type="button"
+          onClick={onDeleteClick}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60 cursor-pointer border-0"
+        >
+          <Trash2 className="w-4 h-4" />
+          Excluir tenant
+        </button>
       </div>
     </div>
   );
@@ -602,6 +626,85 @@ function ImpersonateModal({
   );
 }
 
+function DeleteTenantModal({
+  tenantName,
+  tenantSlug,
+  onClose,
+  onConfirm,
+  submitting,
+  error,
+}: {
+  tenantName: string;
+  tenantSlug: string;
+  onClose: () => void;
+  onConfirm: () => void;
+  submitting: boolean;
+  error: string | null;
+}) {
+  const [typed, setTyped] = useState("");
+  const confirmed = typed === tenantSlug;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-red-200 dark:border-red-900/40 shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-sm font-semibold text-red-700 dark:text-red-400 flex items-center gap-2">
+            <AlertOctagon className="w-4 h-4" />
+            Excluir tenant — {tenantName}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 bg-transparent border-0 cursor-pointer text-slate-400 hover:text-slate-600"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Isso remove imediatamente o acesso de todos os usuários deste tenant e o tira de toda
+            listagem da plataforma. <strong>Essa ação não pode ser desfeita pela interface.</strong>
+          </p>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+              Digite <span className="font-mono font-semibold">{tenantSlug}</span> para confirmar
+            </label>
+            <input
+              type="text"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={tenantSlug}
+              className="w-full px-3 py-2 text-sm font-mono border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+            />
+          </div>
+          {error && (
+            <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 p-2 rounded-lg">
+              {error}
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 dark:border-slate-800">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 bg-transparent border-0 cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={submitting || !confirmed}
+            onClick={onConfirm}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60 cursor-pointer border-0"
+          >
+            {submitting ? "Excluindo..." : "Excluir definitivamente"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -630,6 +733,9 @@ export default function TenantDetailPage({ params }: PageProps) {
   const [showImpersonate, setShowImpersonate] = useState(false);
   const [impersonating, setImpersonating] = useState(false);
   const [impersonateError, setImpersonateError] = useState<string | null>(null);
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleImpersonate(reason: string, accessMode: "full" | "read_only") {
     setImpersonating(true);
@@ -714,6 +820,29 @@ export default function TenantDetailPage({ params }: PageProps) {
       setError(err instanceof Error ? err.message : "Erro inesperado");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!tenant) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/tenants/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: tenant.slug }),
+      });
+      if (!res.ok) {
+        const json = (await res.json()) as { error?: string };
+        throw new Error(json.error ?? "Falha ao excluir tenant");
+      }
+      router.push("/platform/tenants");
+      router.refresh();
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : "Erro inesperado");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -847,7 +976,22 @@ export default function TenantDetailPage({ params }: PageProps) {
               tenant={tenant}
               onStatusChange={(s) => void handleStatusChange(s)}
               onPlanChange={(p) => void handlePlanChange(p)}
+              onDeleteClick={() => setShowDelete(true)}
               saving={saving}
+            />
+          )}
+
+          {showDelete && (
+            <DeleteTenantModal
+              tenantName={tenant.name}
+              tenantSlug={tenant.slug}
+              onClose={() => {
+                setShowDelete(false);
+                setDeleteError(null);
+              }}
+              onConfirm={() => void handleDelete()}
+              submitting={deleting}
+              error={deleteError}
             />
           )}
         </>
