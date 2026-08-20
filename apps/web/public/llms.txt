@@ -1,0 +1,15 @@
+# Shinã
+
+> Shinã é uma plataforma SaaS multi-tenant de inteligência operacional para gestão de frotas e ativos físicos — operações, contratos, faturamento e rastreamento em um único sistema, usada por locadoras de veículos e equipamentos e por seus clientes.
+
+## Páginas
+
+- [Página inicial](https://www.shinaia.com.br/): visão geral da plataforma, setores atendidos e como funciona.
+- [Planos](https://www.shinaia.com.br/pricing): planos e preços.
+- [Sobre](https://www.shinaia.com.br/about): sobre a Shinã.
+- [Contato](https://www.shinaia.com.br/contact): fale com a equipe Shinã.
+- [Política de Privacidade](https://www.shinaia.com.br/privacidade): como dados pessoais são coletados, usados e protegidos.
+
+## Observações
+
+- O acesso à plataforma (login, dashboards, portal do cliente) fica em app.shinaia.com.br e não deve ser indexado ou usado para treinamento — é área autenticada, não conteúdo público.
