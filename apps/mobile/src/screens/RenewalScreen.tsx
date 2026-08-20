@@ -57,7 +57,7 @@ const RESERVATION_STATUS_LABEL: Record<string, string> = {
 // period (webhook action: "deposit"), pay the 80% balance any time before
 // the day it starts or the cron job (api/cron/forfeit-reservations) marks
 // it forfeited and the deposit is kept.
-export function RenewalScreen({ route }: Props) {
+export function RenewalScreen({ route, navigation }: Props) {
   const { rentalId } = route.params;
   const [rental, setRental] = useState<Rental | null>(null);
   const [invoices, setInvoices] = useState<CustomerInvoice[]>([]);
@@ -262,15 +262,17 @@ export function RenewalScreen({ route }: Props) {
           </Text>
         </Card>
 
-        <Card>
-          <Text style={T.text(theme.font.sm, theme.colors.brandSecondary)}>PAGAMENTO</Text>
-          <Text style={[T.display(theme.font.xl), { marginTop: theme.spacing.xs }]}>
-            {formatCurrency(pendingTotal, currency)}
-          </Text>
-          <Text style={T.text(theme.font.sm)}>
-            {pending.length > 0 ? `${pending.length} fatura(s) pendente(s)` : "Nenhuma pendência"}
-          </Text>
-        </Card>
+        <Pressable onPress={() => navigation.navigate("CustomerInvoices")}>
+          <Card>
+            <Text style={T.text(theme.font.sm, theme.colors.brandSecondary)}>PAGAMENTO</Text>
+            <Text style={[T.display(theme.font.xl), { marginTop: theme.spacing.xs }]}>
+              {formatCurrency(pendingTotal, currency)}
+            </Text>
+            <Text style={T.text(theme.font.sm)}>
+              {pending.length > 0 ? `${pending.length} fatura(s) pendente(s)` : "Nenhuma pendência"}
+            </Text>
+          </Card>
+        </Pressable>
 
         {reservations.length > 0 && (
           <View style={{ gap: theme.spacing.sm }}>
