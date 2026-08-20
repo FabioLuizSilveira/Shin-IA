@@ -99,12 +99,40 @@ export function WispBackground() {
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let frameId: number | null = null;
+    // Uncapped rAF issued a full-viewport 6-iteration fragment shader draw
+    // call on every frame, forever, for as long as the tab stayed open —
+    // the dominant cost behind this page's Lighthouse main-thread-work/TBT
+    // numbers (confirmed via a fresh mobile audit after the cosmic-
+    // background fix landed — this was the much bigger remaining cause). A
+    // slow wave/glow effect doesn't need 60fps to read as smooth, so cap it
+    // at 30fps, and stop issuing draw calls entirely while the tab is
+    // hidden or this section has scrolled out of view.
+    const FRAME_INTERVAL_MS = 1000 / 30;
+    let lastDrawMs = 0;
+    let running = !document.hidden;
+
+    function handleVisibility() {
+      running = !document.hidden;
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    let inView = true;
+    let observer: IntersectionObserver | null = null;
+    if (canvas.parentElement) {
+      observer = new IntersectionObserver(([entry]) => {
+        inView = entry.isIntersecting;
+      });
+      observer.observe(canvas.parentElement);
+    }
 
     if (reducedMotion) {
       draw(6);
     } else {
       const render = (time: number) => {
-        draw(time * 0.001);
+        if (running && inView && time - lastDrawMs >= FRAME_INTERVAL_MS) {
+          lastDrawMs = time;
+          draw(time * 0.001);
+        }
         frameId = requestAnimationFrame(render);
       };
       frameId = requestAnimationFrame(render);
@@ -112,6 +140,8 @@ export function WispBackground() {
 
     return () => {
       window.removeEventListener("resize", resize);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      observer?.disconnect();
       if (frameId !== null) cancelAnimationFrame(frameId);
     };
   }, []);
