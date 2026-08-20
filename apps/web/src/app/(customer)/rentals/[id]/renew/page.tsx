@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   fetchMyRentals,
   fetchMyInvoices,
@@ -18,6 +18,7 @@ import {
   type UpgradeOption,
   type Reservation,
 } from "@/lib/rentals-portal";
+import { CustomerHeader } from "@/components/customer/customer-header";
 
 const RESERVATION_STATUS_LABEL: Record<string, string> = {
   pending_deposit: "Aguardando sinal",
@@ -214,8 +215,8 @@ export default function RenewalPage() {
 
   if (loading || !rental) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
       </div>
     );
   }
@@ -226,69 +227,58 @@ export default function RenewalPage() {
   const today = toDateString(new Date());
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <header className="sticky top-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-4 flex items-center gap-3">
-        <button
-          onClick={() => router.push(`/rentals/${rental.id}`)}
-          className="p-1 -ml-1 cursor-pointer border-0 bg-transparent text-slate-500 dark:text-slate-400"
-          aria-label="Voltar"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <h1 className="text-base font-bold text-slate-900 dark:text-white">Renovar contrato</h1>
-      </header>
+    <div className="min-h-screen bg-slate-950">
+      <CustomerHeader
+        title="Renovar contrato"
+        onBack={() => router.push(`/rentals/${rental.id}`)}
+      />
 
       <div className="px-4 py-4 max-w-xl mx-auto space-y-5">
         {error && (
-          <div className="px-4 py-3 bg-red-50 dark:bg-red-400/10 border border-red-200 dark:border-red-400/20 rounded-xl text-sm text-red-600 dark:text-red-300">
+          <div className="px-4 py-3 bg-red-400/10 border border-red-400/20 rounded-xl text-sm text-red-300">
             {error}
           </div>
         )}
 
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
-          <p className="text-xs font-semibold text-shina-blue">LOCAÇÃO ATUAL</p>
-          <p className="text-lg font-bold text-slate-900 dark:text-white mt-1">
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+          <p className="text-xs font-semibold text-shina-cyan">LOCAÇÃO ATUAL</p>
+          <p className="text-lg font-bold text-white mt-1">
             {rental.contract_assets[0]?.assets?.name ?? "Locação"}
           </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-slate-400">
             {formatCurrency(Number(rental.value_amount), rental.value_currency)}/semana
           </p>
         </div>
 
         <div
           onClick={() => router.push("/rentals/invoices")}
-          className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 cursor-pointer hover:border-shina-blue transition"
+          className="bg-white/5 border border-white/10 rounded-2xl p-4 cursor-pointer hover:border-shina-blue/50 hover:bg-white/[0.07] transition"
         >
-          <p className="text-xs font-semibold text-shina-blue">PAGAMENTO</p>
-          <p className="text-xl font-bold text-slate-900 dark:text-white mt-1">
+          <p className="text-xs font-semibold text-shina-cyan">PAGAMENTO</p>
+          <p className="text-xl font-bold text-white mt-1">
             {formatCurrency(pendingTotal, currency)}
           </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-slate-400">
             {pending.length > 0 ? `${pending.length} fatura(s) pendente(s)` : "Nenhuma pendência"}
           </p>
         </div>
 
         {reservations.length > 0 && (
           <div className="space-y-2">
-            <p className="text-sm font-bold text-slate-900 dark:text-white">Suas reservas</p>
+            <p className="text-sm font-bold text-white">Suas reservas</p>
             {reservations.map((r) => (
-              <div
-                key={r.id}
-                className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4"
-              >
+              <div key={r.id} className="bg-white/5 border border-white/10 rounded-2xl p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {r.assets?.name ?? "Veículo"}
-                  </p>
-                  <span className="text-xs font-semibold text-shina-blue">
+                  <p className="text-sm font-semibold text-white">{r.assets?.name ?? "Veículo"}</p>
+                  <span className="text-xs font-semibold text-shina-cyan">
                     {RESERVATION_STATUS_LABEL[r.status]}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-slate-400 mt-1">
                   {new Date(r.period_starts_at).toLocaleDateString("pt-BR")} —{" "}
                   {new Date(r.period_ends_at).toLocaleDateString("pt-BR")}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-400">
                   Sinal: {formatCurrency(r.deposit_amount, r.total_currency)} · Saldo:{" "}
                   {formatCurrency(r.balance_amount, r.total_currency)}
                 </p>
@@ -297,7 +287,7 @@ export default function RenewalPage() {
                     type="button"
                     disabled={submitting}
                     onClick={() => void handlePayBalance(r.id)}
-                    className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-shina-blue hover:bg-blue-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer transition disabled:opacity-60"
+                    className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-shina-blue to-shina-cyan text-white text-xs font-semibold rounded-lg border-0 cursor-pointer transition disabled:opacity-60 hover:opacity-90"
                   >
                     {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Pagar saldo
@@ -309,18 +299,14 @@ export default function RenewalPage() {
         )}
 
         <div className="space-y-2">
-          <p className="text-sm font-bold text-slate-900 dark:text-white">Veículos disponíveis</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Mesmo valor ou superior ao seu plano atual.
-          </p>
+          <p className="text-sm font-bold text-white">Veículos disponíveis</p>
+          <p className="text-xs text-slate-400">Mesmo valor ou superior ao seu plano atual.</p>
 
           <button
             type="button"
             onClick={() => selectOption(currentAssetId ?? "")}
             className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left cursor-pointer transition ${
-              isSameCar
-                ? "border-shina-blue"
-                : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+              isSameCar ? "border-shina-blue bg-white/[0.07]" : "border-white/10 bg-white/5"
             }`}
           >
             {rental.contract_assets[0]?.assets?.metadata?.photo_url ? (
@@ -329,26 +315,26 @@ export default function RenewalPage() {
                 alt={rental.contract_assets[0].assets.name}
                 width={56}
                 height={56}
-                className="w-14 h-14 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
+                className="w-14 h-14 rounded-lg object-cover bg-white/10 shrink-0"
                 unoptimized
               />
             ) : (
-              <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                <span className="text-xs text-slate-500">Atual</span>
+              <div className="w-14 h-14 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                <span className="text-xs text-slate-400">Atual</span>
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+              <p className="text-sm font-semibold text-white truncate">
                 {rental.contract_assets[0]?.assets?.name ?? "Veículo atual"}
               </p>
-              <p className="text-xs font-semibold text-shina-blue">
+              <p className="text-xs font-semibold text-shina-cyan">
                 {formatCurrency(Number(rental.value_amount), rental.value_currency)}/semana
               </p>
             </div>
           </button>
 
           {options.length === 0 ? (
-            <p className="text-center text-sm text-slate-400 py-8">
+            <p className="text-center text-sm text-slate-500 py-8">
               Nenhum outro veículo disponível no momento.
             </p>
           ) : (
@@ -360,9 +346,7 @@ export default function RenewalPage() {
                   type="button"
                   onClick={() => selectOption(opt.id)}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left cursor-pointer transition ${
-                    selected
-                      ? "border-shina-blue"
-                      : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+                    selected ? "border-shina-blue bg-white/[0.07]" : "border-white/10 bg-white/5"
                   }`}
                 >
                   {opt.metadata.photo_url ? (
@@ -371,17 +355,15 @@ export default function RenewalPage() {
                       alt={opt.name}
                       width={56}
                       height={56}
-                      className="w-14 h-14 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
+                      className="w-14 h-14 rounded-lg object-cover bg-white/10 shrink-0"
                       unoptimized
                     />
                   ) : (
-                    <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0" />
+                    <div className="w-14 h-14 rounded-lg bg-white/10 shrink-0" />
                   )}
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                      {opt.name}
-                    </p>
-                    <p className="text-xs font-semibold text-shina-blue">
+                    <p className="text-sm font-semibold text-white truncate">{opt.name}</p>
+                    <p className="text-xs font-semibold text-shina-cyan">
                       {formatCurrency(opt.metadata.weekly_rate ?? 0, currency)}/semana
                     </p>
                   </div>
@@ -396,7 +378,7 @@ export default function RenewalPage() {
             type="button"
             disabled={submitting}
             onClick={() => void handleRenewSameCar()}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-shina-blue hover:bg-blue-600 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-shina-blue to-shina-cyan text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60 hover:opacity-90"
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
             {submitting ? "Abrindo pagamento..." : "Pagar e renovar"}
@@ -404,19 +386,19 @@ export default function RenewalPage() {
         ) : (
           selectedOption && (
             <div className="space-y-3">
-              <p className="text-sm font-bold text-slate-900 dark:text-white">Escolha o período</p>
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+              <p className="text-sm font-bold text-white">Escolha o período</p>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <button
                     type="button"
                     onClick={() =>
                       setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))
                     }
-                    className="px-2 py-1 text-sm text-slate-500 cursor-pointer border-0 bg-transparent"
+                    className="px-2 py-1 text-sm text-slate-400 cursor-pointer border-0 bg-transparent"
                   >
                     ‹
                   </button>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                  <p className="text-sm font-semibold text-white">
                     {viewMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
                   </p>
                   <button
@@ -424,14 +406,14 @@ export default function RenewalPage() {
                     onClick={() =>
                       setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))
                     }
-                    className="px-2 py-1 text-sm text-slate-500 cursor-pointer border-0 bg-transparent"
+                    className="px-2 py-1 text-sm text-slate-400 cursor-pointer border-0 bg-transparent"
                   >
                     ›
                   </button>
                 </div>
                 <div className="grid grid-cols-7 gap-1 text-center">
                   {WEEKDAYS.map((w, i) => (
-                    <span key={i} className="text-[11px] text-slate-400 py-1">
+                    <span key={i} className="text-[11px] text-slate-500 py-1">
                       {w}
                     </span>
                   ))}
@@ -449,10 +431,10 @@ export default function RenewalPage() {
                         onClick={() => onDayClick(dateStr)}
                         className={`text-xs py-1.5 rounded-lg cursor-pointer border-0 transition ${
                           disabled
-                            ? "text-slate-300 dark:text-slate-700 cursor-not-allowed"
+                            ? "text-slate-600 cursor-not-allowed"
                             : inRange || isStart
-                              ? "bg-shina-blue text-white font-semibold"
-                              : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                              ? "bg-gradient-to-r from-shina-blue to-shina-cyan text-white font-semibold"
+                              : "text-slate-300 hover:bg-white/10"
                         }`}
                       >
                         {Number(dateStr.slice(-2))}
@@ -463,14 +445,14 @@ export default function RenewalPage() {
               </div>
 
               {weeks > 0 && (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
-                  <p className="text-xs font-semibold text-shina-blue">
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                  <p className="text-xs font-semibold text-shina-cyan">
                     {weeks} semana(s) selecionada(s)
                   </p>
-                  <p className="text-xl font-bold text-slate-900 dark:text-white mt-1">
+                  <p className="text-xl font-bold text-white mt-1">
                     {formatCurrency(previewTotal, currency)}
                   </p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-sm text-slate-400">
                     Sinal (20%): {formatCurrency(previewDeposit, currency)} agora · Saldo (80%):{" "}
                     {formatCurrency(previewBalance, currency)} até 1 dia antes
                   </p>
@@ -481,7 +463,7 @@ export default function RenewalPage() {
                 type="button"
                 disabled={submitting}
                 onClick={() => void handleReserveDifferentCar()}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-shina-blue hover:bg-blue-600 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-shina-blue to-shina-cyan text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60 hover:opacity-90"
               >
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 {submitting ? "Abrindo pagamento..." : "Reservar com sinal de 20%"}

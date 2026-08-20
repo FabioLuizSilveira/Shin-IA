@@ -76,6 +76,7 @@ export default function TenantDashboardPage() {
           value={loading ? "..." : String(metrics?.activeOperations ?? 0)}
           icon={<Activity className="w-5 h-5" />}
           trend="neutral"
+          href="/tenant/operations"
         />
         <MetricCard
           title="Ativos Disponíveis"
@@ -84,6 +85,7 @@ export default function TenantDashboardPage() {
           }
           icon={<Boxes className="w-5 h-5" />}
           trend="neutral"
+          href="/tenant/assets"
         />
         <MetricCard
           title="Contratos Ativos"
@@ -95,6 +97,7 @@ export default function TenantDashboardPage() {
           }
           icon={<FileSignature className="w-5 h-5" />}
           trend="neutral"
+          href="/tenant/contracts"
         />
         <MetricCard
           title="Faturas em Aberto"
@@ -106,6 +109,7 @@ export default function TenantDashboardPage() {
           }
           icon={<Receipt className="w-5 h-5" />}
           trend={metrics && metrics.invoices.outstanding > 0 ? "down" : "neutral"}
+          href="/tenant/billing"
         />
       </div>
 
