@@ -16,9 +16,15 @@ const SECURITY_HEADERS = [
     value: [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
+      // fonts.googleapis.com serves the Inter/Manrope stylesheet
+      // ((public) layout's <link>), which in turn references woff2 files
+      // hosted on fonts.gstatic.com — without both, the CSP silently
+      // blocked the stylesheet itself, so the custom fonts never actually
+      // loaded and the site fell back to system fonts with no visible error
+      // to a normal visitor (only in devtools/Lighthouse console).
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https:",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://fonts.gstatic.com",
       "connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.stripe.com",
       "frame-ancestors 'none'",
     ].join("; "),
