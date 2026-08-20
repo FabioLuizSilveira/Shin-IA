@@ -41,7 +41,7 @@ function makeManifest(
 // apps/web/src/lib/blueprint-installer.ts for where they get applied).
 
 export const BUILT_IN_BLUEPRINTS: BlueprintManifest[] = [
-  makeManifest("mobility", "Mobility", "mobility", "General mobility and fleet management", [
+  makeManifest("mobility", "Mobilidade", "mobility", "Gestão geral de mobilidade e frota", [
     { key: "plate", label: "Placa", type: "text", required: true },
     { key: "brand", label: "Marca", type: "text", required: false },
     { key: "model", label: "Modelo", type: "text", required: false },
@@ -49,9 +49,9 @@ export const BUILT_IN_BLUEPRINTS: BlueprintManifest[] = [
   ]),
   makeManifest(
     "rental-cars",
-    "Rental Cars",
+    "Aluguel de Carros",
     "mobility",
-    "Car rental operations with driver management",
+    "Operações de locação de veículos com gestão de motoristas",
     [
       { key: "plate", label: "Placa", type: "text", required: true },
       { key: "brand", label: "Marca", type: "text", required: true },
@@ -76,9 +76,9 @@ export const BUILT_IN_BLUEPRINTS: BlueprintManifest[] = [
   ),
   makeManifest(
     "rental-motorcycles",
-    "Rental Motorcycles",
+    "Aluguel de Motos",
     "mobility",
-    "Motorcycle rental with tracking and maintenance",
+    "Locação de motos com rastreamento e manutenção",
     [
       { key: "plate", label: "Placa", type: "text", required: true },
       { key: "brand", label: "Marca", type: "text", required: true },
@@ -95,9 +95,9 @@ export const BUILT_IN_BLUEPRINTS: BlueprintManifest[] = [
   ),
   makeManifest(
     "forklift",
-    "Forklift",
+    "Empilhadeira",
     "industrial",
-    "Forklift fleet management with safety compliance",
+    "Gestão de frota de empilhadeiras com conformidade de segurança",
     [
       { key: "brand", label: "Marca", type: "text", required: true },
       { key: "model", label: "Modelo", type: "text", required: false },
@@ -113,7 +113,7 @@ export const BUILT_IN_BLUEPRINTS: BlueprintManifest[] = [
       { key: "last_inspection_date", label: "Última inspeção", type: "date", required: false },
     ],
   ),
-  makeManifest("munk", "Munk", "industrial", "Munk equipment operations and scheduling", [
+  makeManifest("munk", "Munk", "industrial", "Operações e agendamento de equipamento Munk", [
     { key: "brand", label: "Marca", type: "text", required: true },
     { key: "max_load_kg", label: "Carga máxima (kg)", type: "number", required: true },
     { key: "max_reach_m", label: "Alcance máximo (m)", type: "number", required: false },
@@ -121,9 +121,9 @@ export const BUILT_IN_BLUEPRINTS: BlueprintManifest[] = [
   ]),
   makeManifest(
     "crane",
-    "Crane (Grua)",
+    "Grua Móvel",
     "construction",
-    "Mobile crane operations and load tracking",
+    "Operação de grua móvel e rastreamento de carga",
     [
       { key: "brand", label: "Marca", type: "text", required: true },
       { key: "max_load_ton", label: "Carga máxima (ton)", type: "number", required: true },
@@ -139,9 +139,9 @@ export const BUILT_IN_BLUEPRINTS: BlueprintManifest[] = [
   ),
   makeManifest(
     "tower-crane",
-    "Tower Crane (Guindaste)",
+    "Guindaste de Torre",
     "construction",
-    "Tower crane operations with load limits",
+    "Operação de guindaste de torre com limites de carga",
     [
       { key: "brand", label: "Marca", type: "text", required: true },
       { key: "max_load_ton", label: "Carga máxima (ton)", type: "number", required: true },
@@ -152,9 +152,9 @@ export const BUILT_IN_BLUEPRINTS: BlueprintManifest[] = [
   ),
   makeManifest(
     "agriculture",
-    "Agriculture",
+    "Agricultura",
     "agriculture",
-    "Agricultural equipment fleet and harvest tracking",
+    "Frota de equipamentos agrícolas e rastreamento de colheita",
     [
       { key: "brand", label: "Marca", type: "text", required: true },
       { key: "model", label: "Modelo", type: "text", required: false },
@@ -172,9 +172,9 @@ export const BUILT_IN_BLUEPRINTS: BlueprintManifest[] = [
   ),
   makeManifest(
     "construction",
-    "Construction Equipment",
+    "Equipamentos de Construção",
     "construction",
-    "Heavy construction machinery management",
+    "Gestão de maquinário pesado de construção",
     [
       { key: "brand", label: "Marca", type: "text", required: true },
       { key: "model", label: "Modelo", type: "text", required: false },
@@ -191,9 +191,9 @@ export const BUILT_IN_BLUEPRINTS: BlueprintManifest[] = [
   ),
   makeManifest(
     "generic-assets",
-    "Generic Assets",
+    "Ativos Genéricos",
     "generic",
-    "Flexible blueprint for any asset type",
+    "Template flexível para qualquer tipo de ativo",
     [
       { key: "serial_number", label: "Número de série", type: "text", required: false },
       { key: "brand", label: "Marca", type: "text", required: false },

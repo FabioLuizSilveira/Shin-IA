@@ -7,6 +7,14 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { ArrowLeft, Check, Loader2, Trash2 } from "lucide-react";
 import type { BlueprintManifest } from "@shina/blueprint-runtime";
 
+const CATEGORY_LABEL: Record<string, string> = {
+  mobility: "Mobilidade",
+  industrial: "Industrial",
+  construction: "Construção",
+  agriculture: "Agricultura",
+  generic: "Genérico",
+};
+
 interface InstalledInstance {
   id: string;
   blueprintId: string;
@@ -115,7 +123,7 @@ export default function BlueprintsPage() {
                       </span>
                     )}
                     <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                      {bp.category}
+                      {CATEGORY_LABEL[bp.category] ?? bp.category}
                     </span>
                   </div>
                 </div>
