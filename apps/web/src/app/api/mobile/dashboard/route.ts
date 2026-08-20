@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { requireMobileContext, type TenantUserMobileContext } from "@/lib/mobile-context";
 import { hasTenantPermission } from "@/lib/tenant-context";
 import { resolveOperationsVisibility } from "@/lib/mobile-operations-scope";
@@ -11,11 +12,31 @@ export const dynamic = "force-dynamic";
 // counts are plain reads, financial figures are read straight from
 // `invoices`, recentActivity is the same `tenant_activity_log` table the
 // web dashboard already uses.
+// PERFORMANCE PASS 2 — same opt-in timing pattern as bootstrap/route.ts, see
+// the comment there. Only active when the client sends x-perf-trace: 1.
 export async function GET() {
+  const headerStore = await headers();
+  const traceEnabled = headerStore.get("x-perf-trace") === "1";
+  const t0 = performance.now();
+
   const context = await requireMobileContext();
+  const t1 = performance.now();
+  const contextResolutionMs = t1 - t0;
+
   if ("error" in context) {
     return NextResponse.json({ error: context.error }, { status: context.status });
   }
+
+  const perf = () =>
+    traceEnabled
+      ? {
+          _perf: {
+            contextResolutionMs: Math.round(contextResolutionMs),
+            dataFetchMs: Math.round(performance.now() - t1),
+            totalMs: Math.round(performance.now() - t0),
+          },
+        }
+      : {};
 
   if (context.userType === "unprovisioned") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -77,6 +98,7 @@ export async function GET() {
           createdAt: a.created_at,
         })),
         financial,
+        ...perf(),
       },
     });
   }

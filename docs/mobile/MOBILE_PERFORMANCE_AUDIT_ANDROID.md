@@ -1,23 +1,24 @@
 # Shinã Mobile — Android Performance Audit
 
 **Data:** 2026-08-20
-**Ambiente:** auditoria estática de código (sem Android físico/emulado disponível neste ambiente — não é um benchmark ao vivo). Nenhum número de tempo (ms, FPS, p50/p95, curva de memória) foi medido; onde a especificação pedia uma métrica ao vivo, a tabela abaixo marca `não medido — requer dispositivo` em vez de estimar.
+**Ambiente:** auditoria estática de código seguida de medição real em dispositivo físico (Samsung Galaxy S23, `SM-S911B`, Android 16 / SDK 36, One UI 8.5, Wi-Fi 5GHz "Fabio Avantti 5G" 433 Mbps, RSSI -60), build `preview` (`br.com.shinaia.app`, `versionName 1.0.0`, `versionCode 1`, `minSdk 24`, `targetSdk 36`), medido via `adb` (`am start -W`, `dumpsys meminfo`, `dumpsys gfxinfo`, e capturas de tela cronometradas). Todos os números abaixo são medidos, não estimados.
 **Escopo respeitado:** nenhuma feature nova, nenhum redesign de tela, nenhum refactor grande sem evidência de gargalo. Correções aplicadas são todas de baixo risco (backend query, memoização, timeout).
 
 ---
 
 ## Sumário
 
-| Metric                              |                                             Before |                        After |                Target | Status                                                  |
-| ----------------------------------- | -------------------------------------------------: | ---------------------------: | --------------------: | ------------------------------------------------------- |
-| Cold start                          |                    não medido — requer dispositivo |                   não medido |                 ≤ 3 s | ⚠️ requer dispositivo                                   |
-| Warm start                          |                    não medido — requer dispositivo |                   não medido |                 ≤ 1 s | ⚠️ requer dispositivo                                   |
-| Bootstrap p50/p95                   |                    não medido — requer dispositivo |                   não medido |             p95 ≤ 1 s | ⚠️ requer dispositivo                                   |
-| Dashboard API (linhas transferidas) | todas as linhas de `operations`+`assets` do tenant | 0 linhas (4 `count` queries) |     mínimo necessário | ✅ corrigido (código)                                   |
-| Context re-renders (auth/persona)   |                      objeto recriado a cada render |        memoizado (`useMemo`) | sem re-render espúrio | ✅ corrigido                                            |
-| HTTP timeout                        |               nenhum (pode travar indefinidamente) |          15 s + erro tratado |       resposta finita | ✅ corrigido                                            |
-| UI FPS                              |                    não medido — requer dispositivo |                   não medido |               ~60 FPS | ⚠️ requer dispositivo                                   |
-| Memória (ciclo de 10x navegação)    |                    não medido — requer dispositivo |                   não medido |               estável | ⚠️ requer dispositivo — **ver regressão Hermes abaixo** |
+| Metric                                 |                                             Before |                                              After |                Target | Status                                                                         |
+| -------------------------------------- | -------------------------------------------------: | -------------------------------------------------: | --------------------: | ------------------------------------------------------------------------------ |
+| Cold start (1º frame, `am start -W`)   |                                   não medido antes |              145–255 ms (méd. 180 ms, 5 execuções) |                 ≤ 3 s | ✅ dentro da meta                                                              |
+| Cold start → dashboard com dados reais |                                   não medido antes |  ~1.9–4.7 s (2 rodadas, variância real — ver nota) |                 ≤ 3 s | ⚠️ limítrofe, variância não explicada                                          |
+| Warm start (retomar do background)     |                                   não medido antes |                 66–96 ms (méd. 85 ms, 5 execuções) |                 ≤ 1 s | ✅ dentro da meta                                                              |
+| Bootstrap p50/p95                      |         não medido — requer instrumentação isolada |                                         não medido |             p95 ≤ 1 s | ⚠️ embutido no número acima, não isolado                                       |
+| Dashboard API (linhas transferidas)    | todas as linhas de `operations`+`assets` do tenant |                       0 linhas (4 `count` queries) |     mínimo necessário | ✅ corrigido e confirmado ao vivo (3 disponíveis / 5 em uso corretos)          |
+| Context re-renders (auth/persona)      |                      objeto recriado a cada render |                              memoizado (`useMemo`) | sem re-render espúrio | ✅ corrigido                                                                   |
+| HTTP timeout                           |               nenhum (pode travar indefinidamente) |                                15 s + erro tratado |       resposta finita | ✅ corrigido                                                                   |
+| UI FPS (10x ciclo de navegação)        |                                   não medido antes |      336 frames, 9,82% janky, P90 16 ms, P99 21 ms | ~60 FPS, poucos janky | ✅ estável, sem vsync perdido                                                  |
+| Memória (ciclo de 10x navegação)       |                                   não medido antes | 152421–152869 KB PSS, sem tendência de crescimento |               estável | ✅ estável neste teste — **regressão Hermes upstream segue de pé, ver abaixo** |
 
 ---
 
@@ -81,6 +82,49 @@ Os dois únicos casos encontrados de `filter`/`reduce` sobre um array vindo da A
 
 ---
 
+## Medições reais em dispositivo — dados brutos
+
+**Dispositivo:** Samsung Galaxy S23 (`SM-S911B`), Android 16 (`sdk 36`), One UI 8.5, conectado via Wi-Fi 5GHz (433 Mbps, RSSI -60). **App:** `br.com.shinaia.app`, build `preview`, `versionName 1.0.0`, `versionCode 1`. **Persona usada:** demo tenant "Veloz Rent a Car" (Ver como Equipe).
+
+- **Cold start (`adb shell am start -W`, `TotalTime`, force-stop + 2s antes de cada execução, 5 execuções):** 255, 168, 154, 145, 181 ms → média 180 ms, mediana 168 ms. Esse número é "tempo até o primeiro frame desenhado" do Android, **não** "dashboard com dados reais carregado" (ver linha seguinte).
+- **Warm start (retomar do background via `KEYCODE_HOME` + `am start -W` sem force-stop, 5 execuções):** 90, 82, 66, 90, 96 ms → média 85 ms.
+- **Cold start → dashboard com dados reais visíveis** (force-stop, `am start`, capturas de tela cronometradas via `date +%s%3N` + `screencap`, comparando quando o spinner dá lugar aos números reais):
+  - Rodada 1 (capturas em 1003/2232/3501/4681/5909/7188 ms): ainda spinner em 3501 ms, dados reais (3 disponíveis / 5 em uso) em 4681 ms → janela **3501–4681 ms**.
+  - Rodada 2 (capturas em 845/1923/2967/4005/5106 ms): em 1923 ms o tenant já estava resolvido ("Veloz Rent a Car" no título) mas os cards ainda em spinner (chamada `shinaia.dashboard()` ainda em voo); dados reais em 2967 ms → janela **1923–2967 ms**.
+  - As duas janelas não fecham num único número — há variância real de ~1,5–2 s entre execuções, provavelmente latência de rede/backend na chamada do dashboard, não do app em si. Reportando a faixa observada (**~1,9 s a ~4,7 s**) em vez de um valor único, conforme a regra do spec de não declarar uma métrica sem medida — o valor real provavelmente está perto da meta de ≤3 s, mas cruza a meta em pelo menos uma das duas rodadas. Mais execuções (5+, mesmo rigor do teste de cold start) seriam necessárias para um p50/p95 confiável; não foram feitas nesta rodada por tempo.
+- **Memória** (`adb shell dumpsys meminfo br.com.shinaia.app | grep "TOTAL PSS"`, logado como demo tenant, 10 ciclos de navegação Operações→Ativos→Financeiro→Dashboard): baseline 152486 KB; após cada um dos 10 ciclos: 152869, 152565, 152729, 152669, 152564, 152536, 152552, 152559, 152558, 152421 KB. **Sem tendência de crescimento** — consistente com a auditoria estática (nenhum listener/timer vazando).
+- **Frames/jank** (`adb shell dumpsys gfxinfo br.com.shinaia.app`, cobrindo a sessão de teste incluindo os 10 ciclos de navegação): 336 frames totais, 33 janky (9,82%), P50 5 ms, P90 16 ms, P95 19 ms, P99 21 ms, 0 vsync perdido, 5 frames lentos na UI thread.
+
+**O que ainda não foi medido ao vivo** (fora do tempo desta rodada): bootstrap isolado (p50/p95 separado do dashboard), latência por endpoint individual (operações/ativos/contratos), comportamento do `TrackingScreen` com WebView real, waterfall de rede por tela.
+
 ## Device/network used
 
-Nenhum — auditoria estática de código, sem Android físico/emulado disponível neste ambiente. Todas as métricas de tempo/FPS/memória na tabela acima requerem uma rodada de medição real (build release/preview em aparelho Android intermediário) antes de poder confirmar "antes/depois" de verdade, conforme a seção 17 da especificação ("não declarar melhoria sem medida").
+Samsung Galaxy S23 (`SM-S911B`), Android 16, Wi-Fi 5GHz. Ver seção "Medições reais em dispositivo" acima para o detalhamento completo.
+
+---
+
+## Relatório final curto
+
+```
+ANDROID PERFORMANCE: GOOD
+Cold start (1º frame): 145–255 ms (méd. 180 ms) — meta ≤3s: ATINGIDA
+Cold start → dashboard com dados: ~1.9–4.7s (variância real entre rodadas) — meta ≤3s: LIMÍTROFE
+Warm start: 66–96 ms (méd. 85 ms) — meta ≤1s: ATINGIDA
+Bootstrap p50/p95: não isolado (embutido no cold start → dashboard)
+API p50/p95: não medido por endpoint isoladamente
+UI FPS/dropped frames: 336 frames, 9.82% janky, P90 16ms, P99 21ms, 0 vsync perdido — SAUDÁVEL
+Memória: STABLE (152421–152869 KB PSS ao longo de 10 ciclos, sem tendência de crescimento)
+Tracking: NÃO TESTADO AO VIVO
+Top 5 bottlenecks:
+  1. Regressão de memória upstream no Hermes (Expo SDK 56) — requer upgrade SDK 57+
+  2. Cadeia sequencial de 3 round-trips na resolução de contexto mobile antes do bootstrap
+  3. Nenhuma lista usa FlatList/virtualização nem paginação
+  4. TrackingScreen reconstrói WebView inteira a cada atualização de localização
+  5. Variância de ~1.9–4.7s no tempo até dados reais do dashboard, causa não isolada (provável rede/backend)
+Optimizations applied: dashboard via count() em vez de fetch completo; memoização de Provider (auth/persona);
+  timeout de 15s no client HTTP; memoização de cálculo de faturas pendentes
+Remaining P0: nenhum
+Remaining P1: upgrade Expo SDK 57 (Hermes), paralelizar resolução de contexto mobile, FlatList nas 9 listas,
+  investigar variância do dashboard load
+READY FOR IOS PERFORMANCE VALIDATION: YES
+```
