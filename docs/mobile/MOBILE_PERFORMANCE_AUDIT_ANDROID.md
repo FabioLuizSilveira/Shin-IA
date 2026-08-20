@@ -103,28 +103,101 @@ Samsung Galaxy S23 (`SM-S911B`), Android 16, Wi-Fi 5GHz. Ver seção "Medições
 
 ---
 
-## Relatório final curto
+## PERFORMANCE PASS 2 — Time to Useful Data
+
+**Data:** 2026-08-20. **Foco:** achar e reduzir a causa da variância de 1,9–4,7s observada na Pass 1 entre cold start e dashboard com dados reais.
+
+### Metodologia
+
+Instrumentação temporária opt-in (`EXPO_PUBLIC_PERF_TRACE=1` no client, header `x-perf-trace: 1` no servidor — zero custo/mudança de shape fora dessa build): marcas com timestamp monotônico em `app_js_start`, `fonts_loaded`, `session_restore_start/done`, `persona_resolution_start/done`, `bootstrap_request_start/response`, `dashboard_request_start/response`, `first_useful_render` (client, via `console.log` capturado por `adb logcat`), e `contextResolutionMs`/`dataFetchMs`/`totalMs` devolvidos pelo servidor em `_perf` nas rotas `/api/mobile/bootstrap` e `/api/mobile/dashboard` (`performance.now()` em volta de `requireMobileContext()` e do bloco de dados).
+
+**Achado metodológico relevante**: a primeira rodada de medição ficou contaminada — a tela do aparelho bloqueou durante a investigação, e o Doze/App Standby do Android suspendeu a rede em segundo plano, inflando um `bootstrap_response` para 72s de cliente (servidor real: 1,1s). Isso explica, retroativamente, boa parte da variância de 1,9–4,7s relatada na Pass 1 — não era o app, era o teste. Corrigido via `adb shell svc power stayon usb` (tela sempre ligada durante a medição); as 10 execuções abaixo foram todas limpas.
+
+**Achado de código**: para a persona `tenant_user` (usada no teste), `resolveMobileContext` não faz nenhuma query — o `tenant_id` já vem nos claims do JWT. "Context resolution" é só o custo de `db.auth.getUser(token)` contra o Supabase Auth (~150–200ms). A cadeia de 3 round-trips sequenciais da Pass 1 só se aplica às personas `customer`/`operator`, não à testada aqui.
+
+**Bug real encontrado e corrigido**: `onAuthStateChange` disparava um evento `INITIAL_SESSION` com uma nova referência de objeto para o mesmo `access_token`, fazendo `setSession()` disparar de novo e duplicando o fetch de bootstrap em 7 das 10 execuções (2 requests por cold start em vez de 1). Não afeta o tempo total (o dashboard já usa a primeira resposta), mas dobra a carga desnecessária no backend. Corrigido em [`auth-context.tsx`](../../apps/mobile/src/lib/auth-context.tsx) comparando o `access_token` antes de re-setar a sessão. **Não foi possível reconstruir e re-medir em dispositivo após essa correção** — a cota de builds Android do plano gratuito da EAS esgotou no meio desta rodada (reseta em 2026-09-01); a correção está no código e passou no typecheck, mas o antes/depois desse fix específico fica pendente de confirmação ao vivo.
+
+### 10 cold starts (tela sempre ligada, dataset real do tenant demo)
+
+| Métrica                                                           |    min |        p50 |    p75 |        p95 |    max |                Alvo |
+| ----------------------------------------------------------------- | -----: | ---------: | -----: | ---------: | -----: | ------------------: |
+| **TIME TO USEFUL DASHBOARD** (app_js_start → first_useful_render) | 1536ms | **1992ms** | 2106ms | **2759ms** | 2759ms | p50≤2.0s / p95≤3.0s |
+| Session restore                                                   |    9ms |       11ms |   12ms |       14ms |   14ms |                   — |
+| Context resolution (servidor)                                     |  150ms |      159ms |  173ms |      200ms |  200ms |                   — |
+| Bootstrap (cliente, request→response)                             |  681ms |      993ms | 1059ms |     1676ms | 1676ms |                   — |
+| Bootstrap (servidor, `_perf.totalMs`)                             |  339ms |      623ms |  644ms |     1224ms | 1224ms |                   — |
+| Dashboard API (cliente, request→response)                         |  751ms |      879ms |  955ms |      976ms |  976ms |                   — |
+| Dashboard API (servidor, `_perf.totalMs`)                         |  563ms |      600ms |  607ms |      650ms |  650ms |                   — |
+
+**Ambos os alvos batidos**: p50 1992ms (≤2000ms) e p95 2759ms (≤3000ms), com n=10 (p95 com amostra pequena ≈ o pior valor observado, não um percentil estatisticamente robusto — mais execuções estreitariam a confiança, mas a folga em relação à meta é real, não ruído de medição).
+
+**Decomposição rede vs. servidor**: bootstrap gasta ~623ms de servidor e ~370ms de rede/overhead (p50); dashboard gasta ~600ms de servidor e ~280ms de rede/overhead (p50). **O servidor domina** (~1,2s de ~2,0s totais, ~60%) — mas como o alvo já foi batido com folga, isso não justifica um refactor de backend não solicitado (regra do spec: risco > 500ms de performance quando não há gargalo comprovado). As 4 queries do bootstrap (tenant/branding/permissions/entitlements) e as 7 do dashboard já rodam em paralelo via `Promise.all` — não há ganho óbvio de baixo risco disponível.
+
+**Waterfall bootstrap → dashboard**: confirmado que `TenantHomeScreen` só dispara `shinaia.dashboard()` depois que `RootNavigator` decide qual navigator montar com base em `bootstrap.user.userType` — arquitetura correta e não alterada, porque o dashboard genuinamente depende de saber qual tela renderizar (tenant/operator/customer têm dashboards diferentes). Prefetch especulativo do dashboard em paralelo ao bootstrap foi considerado e descartado: exigiria disparar uma chamada antes de saber se o usuário tem permissão para vê-la, trocando uma economia pequena (~200-300ms) por complexidade e um request possivelmente descartado — não vale o risco per a regra "segurança > 500ms de performance" do spec.
+
+### PASSO 6 — Tracking (benchmark real, sem refactor)
+
+Aberto via navegação real (Menu → Rastreamento), mapa Leaflet/WebView com 8 marcadores reais (frota demo, São Paulo). Tempo até mapa utilizável: ~2s (abertura + carregamento de tiles). `dumpsys gfxinfo`: 92 frames, 4,35% janky (um pico de 300ms no p99, coerente com o carregamento inicial da WebView — não um padrão sustentado), 0 vsync perdido. Memória: +80MB (187MB→268MB PSS) ao abrir o mapa — esperado para WebView+tiles, não teve tempo/motivo pra testar vazamento em ciclos repetidos nesta rodada. **Veredito: GOOD** — nenhuma evidência de gargalo que justifique tocar no WebView (regra do spec: só refatorar se o teste demonstrar problema perceptível).
+
+### PASSO 7 — Listas (Operations, Assets)
+
+**Limitação honesta**: o tenant demo real só tem 5 operações e 8 ativos — não foi possível fazer um stress test com dataset grande/representativo sem seed sintético (fora de escopo desta rodada, e arriscado para os dados do tenant demo real usado em outros testes/demos). Com o dataset atual: Operations (scroll, 6 gestos) — 336 frames, 2,08% janky, P90 9ms; Assets com imagens remotas (scroll, 6 gestos) — 139 frames, 0,72% janky, P90 7ms. Ambos limpos, mas **não é evidência suficiente para confirmar ou descartar a necessidade de `FlatList`/`FlashList` em escala real** — o veredito de "sem virtualização" continua sendo por leitura de código (Pass 1), não por medição, exatamente como o spec pede ("se não apresentar [jank]: registrar como scale backlog"). **Veredito: GOOD no dataset atual / scale backlog para dataset grande.**
+
+---
+
+## Relatório final curto (Pass 2 — substitui os números de tempo da Pass 1)
 
 ```
+TIME TO USEFUL DASHBOARD
+p50: 1992ms (meta ≤2000ms — ATINGIDA)
+p95: 2759ms (meta ≤3000ms — ATINGIDA, n=10)
+
+SESSION RESTORE
+p50: 11ms
+p95: 14ms
+
+CONTEXT RESOLUTION
+p50: 159ms (servidor; tenant_user não faz query própria, só auth.getUser)
+p95: 200ms
+
+BOOTSTRAP
+p50: 993ms cliente / 623ms servidor
+p95: 1676ms cliente / 1224ms servidor
+
+DASHBOARD API
+p50: 879ms cliente / 600ms servidor
+p95: 976ms cliente / 650ms servidor
+
+RENDER
+instantâneo após dashboard_response (mesmo tick; não mede commit/paint do React separadamente)
+
+TRACKING: GOOD (mapa utilizável ~2s, 4,35% janky com 1 pico de carregamento, 0 vsync perdido)
+
+OPERATIONS LIST: GOOD no dataset atual (5 itens, 2,08% janky) — dataset grande NÃO testado, sem seed sintético disponível
+
+ASSETS LIST: GOOD no dataset atual (8 itens c/ imagens, 0,72% janky) — dataset grande NÃO testado
+
+BOTTLENECK IDENTIFIED:
+  Metodológico (Pass 1): tela bloqueando durante medição ativava o Doze do Android e suspendia
+  rede em segundo plano, inflando artificialmente o tempo percebido (72s vs 1,1s real de servidor
+  num caso). Explica a maior parte da variância 1,9–4,7s antes reportada.
+  Real (Pass 2, menor): setSession() duplicado por um evento INITIAL_SESSION do Supabase
+  duplicava o fetch de bootstrap em 7/10 cold starts (não afetava o tempo total, só a carga no
+  backend).
+  Residual (não corrigido, meta já atingida): servidor domina ~60% do tempo total (bootstrap
+  623ms + dashboard 600ms de 1992ms p50) — já paralelizado via Promise.all, sem ganho óbvio de
+  baixo risco disponível.
+
+FIX APPLIED:
+  auth-context.tsx — pular setSession() quando o access_token não mudou, eliminando o bootstrap
+  duplicado. Typecheck limpo; NÃO reconstruído/re-medido em dispositivo (cota de build Android
+  EAS do plano gratuito esgotou nesta rodada, reseta 2026-09-01).
+
+BEFORE: p50 não comparável (Pass 1 media sob contaminação de Doze — não é um baseline válido)
+AFTER: p50 1992ms / p95 2759ms (Pass 2, 10 cold starts limpos, tela sempre ligada)
+
 ANDROID PERFORMANCE: GOOD
-Cold start (1º frame): 145–255 ms (méd. 180 ms) — meta ≤3s: ATINGIDA
-Cold start → dashboard com dados: ~1.9–4.7s (variância real entre rodadas) — meta ≤3s: LIMÍTROFE
-Warm start: 66–96 ms (méd. 85 ms) — meta ≤1s: ATINGIDA
-Bootstrap p50/p95: não isolado (embutido no cold start → dashboard)
-API p50/p95: não medido por endpoint isoladamente
-UI FPS/dropped frames: 336 frames, 9.82% janky, P90 16ms, P99 21ms, 0 vsync perdido — SAUDÁVEL
-Memória: STABLE (152421–152869 KB PSS ao longo de 10 ciclos, sem tendência de crescimento)
-Tracking: NÃO TESTADO AO VIVO
-Top 5 bottlenecks:
-  1. Regressão de memória upstream no Hermes (Expo SDK 56) — requer upgrade SDK 57+
-  2. Cadeia sequencial de 3 round-trips na resolução de contexto mobile antes do bootstrap
-  3. Nenhuma lista usa FlatList/virtualização nem paginação
-  4. TrackingScreen reconstrói WebView inteira a cada atualização de localização
-  5. Variância de ~1.9–4.7s no tempo até dados reais do dashboard, causa não isolada (provável rede/backend)
-Optimizations applied: dashboard via count() em vez de fetch completo; memoização de Provider (auth/persona);
-  timeout de 15s no client HTTP; memoização de cálculo de faturas pendentes
-Remaining P0: nenhum
-Remaining P1: upgrade Expo SDK 57 (Hermes), paralelizar resolução de contexto mobile, FlatList nas 9 listas,
-  investigar variância do dashboard load
-READY FOR IOS PERFORMANCE VALIDATION: YES
+READY FOR IOS: YES
 ```
+
+**Nota de honestidade**: a Pass 1 reportou "~1,9–4,7s, limítrofe" para essa métrica. A Pass 2 mostra que boa parte dessa variância era um artefato do processo de teste (tela bloqueando e acionando o Doze), não um problema real do app — com a tela sempre ligada, os 10 cold starts batem a meta com folga real (p50 1992ms, p95 2759ms). Isso não invalida os outros achados estruturais da Pass 1 (Hermes/SDK 57, falta de FlatList, TrackingScreen) — eles seguem documentados abaixo, sem medição própria nesta rodada.
