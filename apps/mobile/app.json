@@ -9,9 +9,12 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "br.com.shinaia.app",
-      "buildNumber": "1",
+      "buildNumber": "3",
       "supportsTablet": true,
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "br.com.shinaia.app",
