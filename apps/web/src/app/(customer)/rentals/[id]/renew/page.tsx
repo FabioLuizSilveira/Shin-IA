@@ -323,9 +323,20 @@ export default function RenewalPage() {
                 : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
             }`}
           >
-            <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
-              <span className="text-xs text-slate-500">Atual</span>
-            </div>
+            {rental.contract_assets[0]?.assets?.metadata?.photo_url ? (
+              <Image
+                src={rental.contract_assets[0].assets.metadata.photo_url}
+                alt={rental.contract_assets[0].assets.name}
+                width={56}
+                height={56}
+                className="w-14 h-14 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
+                unoptimized
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                <span className="text-xs text-slate-500">Atual</span>
+              </div>
+            )}
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
                 {rental.contract_assets[0]?.assets?.name ?? "Veículo atual"}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   fetchMyRentals,
   fetchMyInvoices,
@@ -98,6 +99,7 @@ export default function RentalsListPage() {
                 const first = rental.contract_assets[0]?.assets?.name ?? "Locação";
                 const extra =
                   rental.contract_assets.length > 1 ? ` +${rental.contract_assets.length - 1}` : "";
+                const photoUrl = rental.contract_assets[0]?.assets?.metadata?.photo_url;
                 return (
                   <div
                     key={rental.id}
@@ -105,9 +107,21 @@ export default function RentalsListPage() {
                   >
                     <Link
                       href={`/rentals/${rental.id}`}
-                      className="flex items-center justify-between gap-3 hover:opacity-80 transition"
+                      className="flex items-center gap-3 hover:opacity-80 transition"
                     >
-                      <div className="min-w-0">
+                      {photoUrl ? (
+                        <Image
+                          src={photoUrl}
+                          alt={first}
+                          width={48}
+                          height={48}
+                          className="w-12 h-12 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0" />
+                      )}
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
                             {first}
