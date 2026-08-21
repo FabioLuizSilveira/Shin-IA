@@ -6,8 +6,28 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Sparkles, Eye, EyeOff } from "lucide-react";
+import { Sparkles, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { Suspense } from "react";
+
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+      <path
+        fill="#4285F4"
+        d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3a7.2 7.2 0 0 1-10.8-3.8H1.2v3.1A12 12 0 0 0 12 24z"
+      />
+      <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.2a12 12 0 0 0 0 10.8l4.1-3.1z" />
+      <path
+        fill="#EA4335"
+        d="M12 4.8c1.8 0 3.4.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.2 6.6l4.1 3.1A7.2 7.2 0 0 1 12 4.8z"
+      />
+    </svg>
+  );
+}
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -20,7 +40,8 @@ function LoginForm() {
   // password. We treat it as "maybe no account yet" and point at signup
   // instead of just repeating the confusing raw Supabase message.
   const [noAccount, setNoAccount] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<"password" | "google" | "magic" | null>(null);
+  const [magicSent, setMagicSent] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   // Only allow internal paths — a full URL here would be an open redirect.
@@ -30,7 +51,7 @@ function LoginForm() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    setLoading("password");
     setError(null);
     setNoAccount(false);
 
@@ -43,12 +64,57 @@ function LoginForm() {
       } else {
         setError(error.message);
       }
-      setLoading(false);
+      setLoading(null);
       return;
     }
 
     router.push(next);
     router.refresh();
+  }
+
+  // Mesma conta usada em app.shinaia.com.br — muitas contas nunca tiveram
+  // senha (login sempre foi via Google ou magic link no resto da
+  // plataforma), então o formulário de senha sozinho deixava essas contas
+  // sem como entrar aqui. Reaproveita o /api/auth/callback já existente
+  // (usado hoje só pelo signup), passando `next` para diferenciar os dois
+  // fluxos — ver comentário na rota.
+  async function handleGoogleLogin() {
+    setLoading("google");
+    setError(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(next)}`,
+      },
+    });
+    if (error) {
+      setError(error.message);
+      setLoading(null);
+    }
+  }
+
+  // shouldCreateUser: false — login nunca cria conta nova em silêncio
+  // (mesma regra já usada no magic-link do app mobile).
+  async function handleMagicLink(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setLoading("magic");
+    setError(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(next)}`,
+      },
+    });
+    if (error) {
+      setError(error.message);
+    } else {
+      setMagicSent(true);
+    }
+    setLoading(null);
   }
 
   return (
@@ -66,6 +132,24 @@ function LoginForm() {
         <div className="card-glass rounded-2xl p-8">
           <h1 className="text-xl font-bold text-white mb-1">Bem-vindo de volta</h1>
           <p className="text-sm text-slate-400 mb-6">Acesse seu workspace de marketing</p>
+
+          <div className="space-y-3 mb-4">
+            <button
+              type="button"
+              onClick={() => void handleGoogleLogin()}
+              disabled={loading !== null}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-slate-100 text-slate-900 text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
+            >
+              {loading === "google" ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleIcon />}
+              Continuar com Google
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-px flex-1 bg-white/10" />
+            <span className="text-xs text-slate-500">ou</span>
+            <div className="h-px flex-1 bg-white/10" />
+          </div>
 
           <form onSubmit={(e) => void handleLogin(e)} className="space-y-4">
             <div>
@@ -130,12 +214,32 @@ function LoginForm() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading !== null}
               className="w-full py-3 px-6 rounded-xl bg-mkt-primary hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all cursor-pointer border-0"
             >
-              {loading ? "Entrando..." : "Entrar"}
+              {loading === "password" ? "Entrando..." : "Entrar"}
             </button>
           </form>
+
+          {magicSent ? (
+            <div className="mt-4 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-300 text-center">
+              Link enviado! Verifique seu e-mail para entrar.
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => void handleMagicLink(e)}
+              disabled={loading !== null || !email.trim()}
+              className="w-full flex items-center justify-center gap-2 mt-3 py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-medium border-0 cursor-pointer transition disabled:opacity-50"
+            >
+              {loading === "magic" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Mail className="w-4 h-4" />
+              )}
+              Enviar link de acesso por e-mail
+            </button>
+          )}
         </div>
 
         <p className="text-center text-xs text-slate-500 mt-6">
