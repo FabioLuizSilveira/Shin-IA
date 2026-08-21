@@ -57,8 +57,8 @@ export function Topbar({ title, onMenuClick }: TopbarProps) {
         </button>
         {isPlatform ? <PlatformNotificationBell /> : <NotificationBell />}
         <WorkspaceSwitcher />
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-shina-blue to-shina-cyan flex items-center justify-center text-white text-xs font-bold ml-1">
-          T
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-shina-blue to-shina-cyan flex items-center justify-center text-white text-[10px] font-bold ml-1">
+          {isPlatform ? "ADM" : "T"}
         </div>
       </div>
     </header>

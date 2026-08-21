@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+import { MktCommandMenu } from "@/components/layout/command-menu";
+import { MktNotificationBell } from "@/components/layout/notification-bell";
 import { useShinaTheme } from "@shina/theme";
 import {
   Sparkles,
@@ -21,6 +23,7 @@ import {
   Bot,
   Sun,
   Moon,
+  Search,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -98,7 +101,22 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-slate-200 dark:border-white/5">
           <h1 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h1>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }),
+                );
+              }}
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-sm text-slate-400 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer border-0"
+            >
+              <Search className="w-4 h-4" />
+              <span className="text-xs">Buscar...</span>
+              <kbd className="text-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded px-1 ml-1">
+                ⌘K
+              </kbd>
+            </button>
             <button
               type="button"
               onClick={() => setPreference(preference === "dark" ? "light" : "dark")}
@@ -107,11 +125,16 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
             >
               {theme.mode === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
+            <MktNotificationBell />
             <WorkspaceSwitcher />
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-mkt-primary to-mkt-secondary flex items-center justify-center text-white text-[10px] font-bold ml-1">
+              MKT
+            </div>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
+      <MktCommandMenu />
     </div>
   );
 }
