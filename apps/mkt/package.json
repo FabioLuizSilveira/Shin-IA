@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@shina/ai-platform": "workspace:*",
     "@shina/billing-platform": "workspace:*",
     "@shina/commercial-platform": "workspace:*",
     "@shina/marketing-ai": "workspace:*",

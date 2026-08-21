@@ -72,6 +72,9 @@ importers:
 
   apps/mkt:
     dependencies:
+      '@shina/ai-platform':
+        specifier: workspace:*
+        version: link:../../packages/ai-platform
       '@shina/billing-platform':
         specifier: workspace:*
         version: link:../../packages/billing-platform
@@ -9525,7 +9528,7 @@ snapshots:
       pathe: 1.1.2
       picocolors: 1.1.1
       sirv: 2.0.4
-      vitest: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
+      vitest: 1.6.1(@types/node@20.19.43)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
 
   '@vitest/utils@1.6.1':
     dependencies:

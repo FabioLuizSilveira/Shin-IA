@@ -58,8 +58,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       perfMark("session_restore_done", { hasSession: !!data.session });
     });
 
+    // Perf pass 2 finding: supabase-js fires an INITIAL_SESSION event here
+    // shortly after getSession() above already resolved, with a new session
+    // object referencing the *same* access_token. Calling setSession()
+    // unconditionally made that a second "real" state change (new object
+    // reference), which re-ran every consumer effect keyed on `session` —
+    // concretely, PersonaProvider's bootstrap fetch — a second time on every
+    // cold start (confirmed via [PERF] logs: two bootstrap_request_start
+    // marks a few ms apart). Skipping the update when the token hasn't
+    // actually changed keeps every other event (real sign-in, sign-out,
+    // token refresh) working exactly as before.
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
+      setSession((current) => {
+        if (current?.access_token === newSession?.access_token) return current;
+        return newSession;
+      });
       if (newSession) setDemoMode(false);
     });
 

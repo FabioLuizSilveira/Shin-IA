@@ -1,8 +1,15 @@
 # Mobile Release Checklist
 
-Data: 2026-08-15 (Wave 4) · atualizado 2026-08-17 (gate M22). Baseado em auditoria real do código de
+Data: 2026-08-15 (Wave 4) · atualizado 2026-08-17 (gate M22) · **atualizado 2026-08-20 (iOS device
+validation, sem dispositivo físico disponível)**. Baseado em auditoria real do código de
 `apps/mobile` e `apps/web` — não é uma lista genérica de boas práticas, cada item reflete o estado
 real confirmado nesta sessão.
+
+**Nota 2026-08-20**: a maior parte deste documento é do gate M22 (agosto) e está desatualizada em
+relação ao app atual — muitas telas/endpoints listados como `❌` abaixo já existem hoje (ver
+`docs/mobile/MOBILE_PERFORMANCE_AUDIT_ANDROID.md`, que audita o app como ele é agora). Esta rodada
+só corrigiu as linhas efetivamente reverificadas durante a validação iOS (bundle id, `eas.json`,
+push, Apple Sign-In) — uma reauditoria completa do restante do documento está fora de escopo aqui.
 
 **Legenda**: ✅ pronto · ⚠️ parcial/gap documentado · ❌ bloqueador real
 
@@ -91,12 +98,12 @@ obrigatórios além de tudo já registrado abaixo; nenhum item antigo foi removi
 
 ## Billing / Reports / Notifications
 
-| Item                                               | Status | Nota                                                                                                                                                                                         |
-| -------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Endpoints reais, read-only, permission-gated       | ✅     | Wave 4 Phase A/B.                                                                                                                                                                            |
-| Push delivery real (Expo)                          | ✅     | Wave 4 Phase C — `MobilePushProvider`/`ExpoPushProvider`, pipeline completo.                                                                                                                 |
-| **Client mobile registra push token**              | ❌     | **`expo-notifications` não está instalado no app** — o servidor sabe enviar push, o app não tem nenhum código para pedir permissão, obter token, ou registrar em `POST /api/mobile/devices`. |
-| Telas mobile (billing/reports/notification center) | ❌     | Não existem ainda.                                                                                                                                                                           |
+| Item                                               | Status                                            | Nota                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Endpoints reais, read-only, permission-gated       | ✅                                                | Wave 4 Phase A/B.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Push delivery real (Expo)                          | ✅                                                | Wave 4 Phase C — `MobilePushProvider`/`ExpoPushProvider`, pipeline completo.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **Client mobile registra push token**              | ✅ código / ⚠️ config não verificada (2026-08-20) | `expo-notifications` instalado, `push-registration.ts` implementado (`registerForPushNotifications()` → `POST /api/mobile/devices`), plugin listado em `app.json`. **Não verificado nesta rodada**: se as credenciais APNs (push key) estão de fato configuradas no projeto EAS — não checável sem `EXPO_TOKEN` válido nem dispositivo físico para testar o prompt de permissão/token real. Registrar como `PUSH IOS: MANUAL CONFIG REQUIRED / NOT TESTED` até confirmação em dispositivo. |
+| Telas mobile (billing/reports/notification center) | ❌                                                | Não existem ainda.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## Deep Links
 
@@ -128,16 +135,16 @@ obrigatórios além de tudo já registrado abaixo; nenhum item antigo foi removi
 
 ## App Config (iOS/Android)
 
-| Item                                               | Status | Nota                                                                                                                                                                                            |
-| -------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bundle identifier (iOS)                            | ❌     | **Ausente em `app.json`** — bloqueia `eas build`/App Store submission. Requer decisão de produto (ex. `br.com.shinaia.customer`), não uma escolha técnica que deva ser inventada sem aprovação. |
-| Package name (Android)                             | ❌     | **Ausente.** Mesma observação.                                                                                                                                                                  |
-| Build number (iOS) / version code (Android)        | ❌     | **Ausentes.**                                                                                                                                                                                   |
-| `eas.json` (build profiles dev/preview/production) | ❌     | **Não existe.** Nenhuma configuração de build nesta wave — precisa ser criado antes de qualquer build real.                                                                                     |
-| Splash screen                                      | ❌     | Sem `splash` configurado em `app.json`.                                                                                                                                                         |
-| Deep-link scheme registrado                        | ✅     | `"scheme": "shinacustomer"`.                                                                                                                                                                    |
-| Associated domains (universal links iOS)           | ⚠️     | Ausente — só relevante se universal links (https://) forem exigidos além do custom scheme; documentado como gap, não necessariamente bloqueador dependendo do requisito de produto.             |
-| Versão do app                                      | ✅     | `"version": "1.0.0"` presente.                                                                                                                                                                  |
+| Item                                               | Status                     | Nota                                                                                                                                                                                                   |
+| -------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Bundle identifier (iOS)                            | ✅ (atualizado 2026-08-20) | `br.com.shinaia.app`, registrado e confirmado ao vivo via App Store Connect API (`GET /v1/apps/6803529227`) — não é mais proposta, é o app real "Shinã", SKU `shina-customer-app`.                     |
+| Package name (Android)                             | ✅                         | `br.com.shinaia.app` — mesmo identificador, já usado nos builds Android desta sessão (ver auditoria de performance Android).                                                                           |
+| Build number (iOS) / version code (Android)        | ✅ (atualizado 2026-08-20) | iOS `buildNumber: "4"` em `app.json`, confirmado `VALID`/não-expirado no App Store Connect (build enviado 2026-08-20). Android `versionCode: 1`.                                                       |
+| `eas.json` (build profiles dev/preview/production) | ✅ (atualizado 2026-08-20) | Existe com os 3 profiles (`development`/`preview`/`production`) + `submit.production.ios` configurado com ASC API key — usado ao vivo nesta sessão pros builds Android e pro submit iOS ao TestFlight. |
+| Splash screen                                      | ❌                         | Sem `splash` configurado em `app.json`.                                                                                                                                                                |
+| Deep-link scheme registrado                        | ✅                         | `"scheme": "shinacustomer"`.                                                                                                                                                                           |
+| Associated domains (universal links iOS)           | ⚠️                         | Ausente — só relevante se universal links (https://) forem exigidos além do custom scheme; documentado como gap, não necessariamente bloqueador dependendo do requisito de produto.                    |
+| Versão do app                                      | ✅                         | `"version": "1.0.0"` presente.                                                                                                                                                                         |
 
 ## Testes
 
@@ -151,22 +158,28 @@ obrigatórios além de tudo já registrado abaixo; nenhum item antigo foi removi
 ## Resumo — bloqueadores reais (❌) antes de qualquer submissão a loja
 
 **Atualização M22**: itens 1 e 4 (logout, código de Apple Sign-In) foram resolvidos nesta milestone.
-Bundle id/package agora têm um valor _proposto_ em `app.json` (`br.com.shinaia.app`), mas continuam
-bloqueadores até serem confirmados/registrados externamente (fora do alcance desta sessão).
+
+**Atualização 2026-08-20 (validação iOS)**: itens 2 (`eas.json`) e 7 (bundle id/package) abaixo estão
+**resolvidos e confirmados** — `eas.json` existe e foi usado ao vivo, `br.com.shinaia.app` está
+registrado de verdade no App Store Connect (build #4, `VALID`). Item 4 (push) tem o código pronto
+(`expo-notifications` instalado), mas a configuração de credenciais APNs segue **não verificada**
+por falta de dispositivo físico/token EAS válido nesta rodada. Itens 5 e 6 (cobertura de tela e
+testes) não foram reauditados nesta rodada — o app cresceu muito desde o M22 (ver
+`MOBILE_PERFORMANCE_AUDIT_ANDROID.md`), mas confirmar o estado atual exigiria uma varredura própria,
+fora do escopo da validação iOS.
 
 1. ~~Nenhum fluxo de logout no app~~ — **resolvido (M22.13)**.
-2. `eas.json` não existe — build de release ainda não é possível como está, mesmo com bundle
-   id/package agora propostos em `app.json`.
+2. ~~`eas.json` não existe~~ — **resolvido**, confirmado em uso real (Android builds + iOS TestFlight submit).
 3. Apple Sign-In: código pronto, mas depende de capability no Apple Developer + provider configurado
    no painel Supabase — **MANUAL CONFIGURATION REQUIRED**, não algo que o código sozinho resolve.
-4. `expo-notifications` não instalado — push do backend não chega a lugar nenhum no client ainda.
-5. Cobertura de tela mobile muito atrás do backend — telas mínimas por persona existem (M22), mas o
-   shell completo do Emergent (5 módulos tenant_user + módulos operator) ainda não foi portado —
-   M23.
-6. Zero testes automatizados no app mobile.
-7. Bundle identifier/package propostos (`br.com.shinaia.app`) mas não confirmados como livres de
-   colisão nem registrados em App Store Connect/Google Play Console.
+   Não testável sem dispositivo físico iOS (nenhum aqui nesta rodada).
+4. Push: código pronto (`expo-notifications` + `push-registration.ts`), mas credenciais APNs no EAS
+   **não verificadas** — checar antes do release, testar prompt/token/notificação real em device.
+5. Cobertura de tela mobile — desatualizado nesta linha, reauditar separadamente (não é escopo desta
+   validação iOS).
+6. Cobertura de teste automatizado no app mobile — não reauditado nesta rodada.
+7. ~~Bundle identifier/package propostos~~ — **resolvido**, `br.com.shinaia.app` registrado e
+   confirmado via App Store Connect API real.
 
-Itens 2, 3, 4, 5, 6, 7 não são resolvidos nesta wave — decisões de produto, acesso a consoles
-externos, ou trabalho de UI real fora do escopo do gate M22. Documentados para que a aprovação humana
-decida a próxima iniciativa (M23).
+Itens 3, 4, 5, 6 seguem não resolvidos — configuração externa (Apple Developer/Supabase/EAS push
+key), acesso a dispositivo físico, ou trabalho fora do escopo desta rodada de validação iOS.
