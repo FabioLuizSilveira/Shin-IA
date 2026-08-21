@@ -2,8 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { internalError } from "@/lib/api-error";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
-import { analyzeImage, parseJsonResponse, AIProviderError } from "@/lib/ai/anthropic";
-import { resolveAnthropicKey } from "@/lib/ai/byok";
+import { parseJsonResponse, AIProviderError } from "@/lib/ai/anthropic";
+import { runAiGateway, DuplicateRequestError } from "@/lib/ai/gateway";
+import { AiPolicyError } from "@/lib/ai/types";
+import { InsufficientCreditsError } from "@/lib/ai/credits";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -104,9 +106,17 @@ Responda SOMENTE com JSON válido:
       .filter(Boolean)
       .join("\n\n");
 
-    const started = Date.now();
-    const apiKey = await resolveAnthropicKey(ctx.workspaceId);
-    const result = await analyzeImage({ system, prompt, imageUrl: sourceUrl.toString(), apiKey });
+    const idempotencyKey = req.headers.get("x-idempotency-key");
+    const result = await runAiGateway({
+      ctx,
+      operation: "clone_ad",
+      capability: "vision",
+      entityType: "cloned_ad",
+      system,
+      prompt,
+      imageUrl: sourceUrl.toString(),
+      idempotencyKey,
+    });
     const clone = parseJsonResponse<CloneResult>(result.text);
 
     const { data: saved, error: saveError } = await supabase
@@ -132,24 +142,21 @@ Responda SOMENTE com JSON válido:
 
     if (saveError) return internalError(saveError);
 
-    await supabase.from("mkt_ai_usage").insert({
-      workspace_id: ctx.workspaceId,
-      tenant_id: ctx.tenantId,
-      user_id: ctx.userId,
-      provider: "anthropic",
-      model: result.model,
-      operation: "clone_ad",
-      tokens_in: result.tokensIn,
-      tokens_out: result.tokensOut,
-      duration_ms: Date.now() - started,
-      entity_type: "cloned_ad",
-      entity_id: saved.id,
-    });
+    await supabase.from("mkt_ai_usage").update({ entity_id: saved.id }).eq("id", result.usageId);
 
     return NextResponse.json({ data: saved }, { status: 201 });
   } catch (e) {
     if (e instanceof MktContextError) {
       return NextResponse.json({ error: e.message }, { status: e.status });
+    }
+    if (e instanceof AiPolicyError) {
+      return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
+    }
+    if (e instanceof InsufficientCreditsError) {
+      return NextResponse.json({ error: e.message, code: "insufficient_credits" }, { status: 402 });
+    }
+    if (e instanceof DuplicateRequestError) {
+      return NextResponse.json({ error: e.message, code: "duplicate_request" }, { status: 409 });
     }
     if (e instanceof AIProviderError) {
       return NextResponse.json({ error: e.message }, { status: e.status });

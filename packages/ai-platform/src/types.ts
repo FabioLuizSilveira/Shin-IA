@@ -16,6 +16,14 @@ export interface ModelRequest {
   temperature?: number;
   tools?: ToolDefinition[];
   stream?: boolean;
+  // Per-request credential override. Optional and additive: a provider
+  // registered once at process start (the original design, one credential
+  // per provider for the whole runtime) ignores this; a multi-tenant
+  // caller resolving a different key per request/workspace (Shinã MKT's
+  // SHINA/BYOK AI gateway) can pass it here instead of instantiating a new
+  // ModelProvider per call. Never logged, never echoed back in a
+  // ModelResponse.
+  credentials?: { apiKey: string };
 }
 
 export interface ModelResponse {

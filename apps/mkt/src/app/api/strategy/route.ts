@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
-import { generateText, parseJsonResponse, AIProviderError } from "@/lib/ai/anthropic";
-import { resolveAnthropicKey } from "@/lib/ai/byok";
+import { parseJsonResponse, AIProviderError } from "@/lib/ai/anthropic";
+import { runAiGateway, DuplicateRequestError } from "@/lib/ai/gateway";
+import { AiPolicyError } from "@/lib/ai/types";
+import { InsufficientCreditsError } from "@/lib/ai/credits";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -60,9 +62,17 @@ Responda SOMENTE com JSON válido:
       .filter(Boolean)
       .join("\n\n");
 
-    const started = Date.now();
-    const apiKey = await resolveAnthropicKey(ctx.workspaceId);
-    const result = await generateText({ system, prompt, maxTokens: 3000, apiKey });
+    const idempotencyKey = req.headers.get("x-idempotency-key");
+    const result = await runAiGateway({
+      ctx,
+      operation: "strategy",
+      capability: "text",
+      entityType: "campaign",
+      maxTokens: 3000,
+      system,
+      prompt,
+      idempotencyKey,
+    });
     const strategy = parseJsonResponse<Strategy>(result.text);
 
     await supabase
@@ -71,24 +81,21 @@ Responda SOMENTE com JSON válido:
       .eq("id", campaign.id)
       .eq("workspace_id", ctx.workspaceId);
 
-    await supabase.from("mkt_ai_usage").insert({
-      workspace_id: ctx.workspaceId,
-      tenant_id: ctx.tenantId,
-      user_id: ctx.userId,
-      provider: "anthropic",
-      model: result.model,
-      operation: "strategy",
-      tokens_in: result.tokensIn,
-      tokens_out: result.tokensOut,
-      duration_ms: Date.now() - started,
-      entity_type: "campaign",
-      entity_id: campaign.id,
-    });
+    await supabase.from("mkt_ai_usage").update({ entity_id: campaign.id }).eq("id", result.usageId);
 
     return NextResponse.json({ data: strategy });
   } catch (e) {
     if (e instanceof MktContextError) {
       return NextResponse.json({ error: e.message }, { status: e.status });
+    }
+    if (e instanceof AiPolicyError) {
+      return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
+    }
+    if (e instanceof InsufficientCreditsError) {
+      return NextResponse.json({ error: e.message, code: "insufficient_credits" }, { status: 402 });
+    }
+    if (e instanceof DuplicateRequestError) {
+      return NextResponse.json({ error: e.message, code: "duplicate_request" }, { status: 409 });
     }
     if (e instanceof AIProviderError) {
       return NextResponse.json({ error: e.message }, { status: e.status });

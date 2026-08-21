@@ -25,7 +25,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("mkt_ai_providers")
       .select(
-        "id, provider, default_model, base_url, is_active, is_default, monthly_limit_usd, api_key_enc",
+        "id, provider, default_model, base_url, is_active, is_default, monthly_limit_usd, api_key_enc, created_at, updated_at, last_validated_at",
       )
       .eq("workspace_id", ctx.workspaceId)
       .order("provider");
@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
       is_default: body.is_default ?? false,
       monthly_limit_usd: body.monthly_limit_usd ?? null,
       is_active: true,
+      updated_at: new Date().toISOString(),
     };
     if (body.api_key?.trim()) {
       record.api_key_enc = await encryptSecret(body.api_key.trim());
