@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@shina/design-system";
+import { ThemeProvider } from "@/lib/theme/theme-context";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.shinaia.com.br"),
@@ -47,10 +48,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-slate-950 text-slate-100 antialiased">
         {/* Wave 2.5 ORBIT: Toast oficial disponível ao app inteiro. Tema
-            continua no ThemeProvider local (lib/theme) — dashboard tenant/
-            admin já tem toggle claro/escuro funcional; migrar para
-            ShinaThemeProvider é trabalho de Wave 3, não desta etapa. */}
-        <ToastProvider>{children}</ToastProvider>
+            via ThemeProvider local (lib/theme) — migrar para
+            ShinaThemeProvider é trabalho de Wave 3, não desta etapa.
+            Bug fix: ThemeProvider estava definido mas nunca montado em
+            lugar nenhum da árvore, então o toggle claro/escuro (Topbar)
+            sempre usava o contexto padrão (toggleTheme no-op). */}
+        <ThemeProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
