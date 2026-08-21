@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Search,
   X,
@@ -14,6 +14,9 @@ import {
   Package,
   ArrowRight,
   Loader2,
+  Building2,
+  CreditCard,
+  LifeBuoy,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -58,45 +61,79 @@ interface QuickLink {
 }
 
 // ── Quick nav links (always shown when query is empty) ──────────────────────
+// Bug fix: these used to be bare paths ("/operations", "/assets", ...) with
+// no /tenant or /platform prefix — every one of them 404'd, because no
+// route exists at that bare path (see apps/web/src/app/(tenant)/tenant/*
+// and (platform)/platform/*). Also, Operations/Assets/Contracts/CRM/Reports
+// are tenant-only concepts (confirmed: no platform equivalent route exists)
+// — platform gets its own distinct set instead of a naive prefix swap.
 
-const QUICK_LINKS: QuickLink[] = [
+const TENANT_QUICK_LINKS: QuickLink[] = [
   {
     label: "Dashboard",
-    href: "/dashboard",
+    href: "/tenant/dashboard",
     icon: <LayoutDashboard className="w-4 h-4" />,
   },
   {
     label: "Operações",
-    href: "/operations",
+    href: "/tenant/operations",
     icon: <Zap className="w-4 h-4" />,
     shortcut: "O",
   },
   {
     label: "Frota & Ativos",
-    href: "/assets",
+    href: "/tenant/assets",
     icon: <Truck className="w-4 h-4" />,
     shortcut: "A",
   },
   {
     label: "Contratos",
-    href: "/contracts",
+    href: "/tenant/contracts",
     icon: <FileText className="w-4 h-4" />,
     shortcut: "C",
   },
   {
     label: "Clientes & Parceiros",
-    href: "/crm",
+    href: "/tenant/crm",
     icon: <Users className="w-4 h-4" />,
     shortcut: "P",
   },
   {
     label: "Relatórios",
-    href: "/reports",
+    href: "/tenant/reports",
     icon: <BarChart2 className="w-4 h-4" />,
   },
   {
     label: "Configurações",
-    href: "/settings",
+    href: "/tenant/settings",
+    icon: <Settings className="w-4 h-4" />,
+  },
+];
+
+const PLATFORM_QUICK_LINKS: QuickLink[] = [
+  {
+    label: "Dashboard",
+    href: "/platform/dashboard",
+    icon: <LayoutDashboard className="w-4 h-4" />,
+  },
+  {
+    label: "Tenants",
+    href: "/platform/tenants",
+    icon: <Building2 className="w-4 h-4" />,
+  },
+  {
+    label: "Faturamento",
+    href: "/platform/billing",
+    icon: <CreditCard className="w-4 h-4" />,
+  },
+  {
+    label: "Suporte",
+    href: "/platform/support",
+    icon: <LifeBuoy className="w-4 h-4" />,
+  },
+  {
+    label: "Configurações",
+    href: "/platform/settings",
     icon: <Settings className="w-4 h-4" />,
   },
 ];
@@ -150,6 +187,9 @@ export function CommandMenu() {
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const pathname = usePathname();
+  const isPlatform = pathname.startsWith("/platform");
+  const quickLinks = isPlatform ? PLATFORM_QUICK_LINKS : TENANT_QUICK_LINKS;
 
   // Open/close with Cmd+K / Ctrl+K and Escape
   useEffect(() => {
@@ -173,9 +213,12 @@ export function CommandMenu() {
     }
   }, [open]);
 
-  // Debounced search
+  // Debounced search — entity search only makes sense in tenant context
+  // (operations/assets/contracts/organizations are all tenant-scoped; a
+  // platform admin's session has no tenant_id, so /api/search would just
+  // 401/403 for them).
   useEffect(() => {
-    if (query.length < 2) {
+    if (query.length < 2 || isPlatform) {
       setResults(null);
       return;
     }
@@ -190,7 +233,7 @@ export function CommandMenu() {
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, isPlatform]);
 
   const navigate = useCallback(
     (href: string) => {
@@ -252,7 +295,7 @@ export function CommandMenu() {
               <p className="px-4 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                 Navegação rápida
               </p>
-              {QUICK_LINKS.map((link) => (
+              {quickLinks.map((link) => (
                 <button
                   key={link.href}
                   onClick={() => navigate(link.href)}
@@ -291,7 +334,7 @@ export function CommandMenu() {
               {results.operations.map((op) => (
                 <button
                   key={op.id}
-                  onClick={() => navigate("/operations")}
+                  onClick={() => navigate("/tenant/operations")}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left"
                 >
                   <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
@@ -322,7 +365,7 @@ export function CommandMenu() {
               {results.assets.map((asset) => (
                 <button
                   key={asset.id}
-                  onClick={() => navigate("/assets")}
+                  onClick={() => navigate("/tenant/assets")}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left"
                 >
                   <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center shrink-0">
@@ -354,7 +397,7 @@ export function CommandMenu() {
               {results.contracts.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => navigate("/contracts")}
+                  onClick={() => navigate("/tenant/contracts")}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left"
                 >
                   <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
@@ -395,7 +438,7 @@ export function CommandMenu() {
               {results.organizations.map((org) => (
                 <button
                   key={org.id}
-                  onClick={() => navigate("/crm")}
+                  onClick={() => navigate("/tenant/crm")}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left"
                 >
                   <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
