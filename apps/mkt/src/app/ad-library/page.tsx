@@ -186,7 +186,7 @@ export default function AdLibraryPage() {
   return (
     <MktShell title="Ad Library">
       {/* Tabs */}
-      <div className="flex items-center gap-1 mb-6 border-b border-white/5">
+      <div className="flex items-center gap-1 mb-6 border-b border-slate-200 dark:border-white/5">
         {(
           [
             ["search", "Buscar anúncios"],
@@ -202,7 +202,7 @@ export default function AdLibraryPage() {
               "px-4 py-2.5 text-sm font-medium transition border-0 bg-transparent cursor-pointer border-b-2",
               tab === id
                 ? "text-mkt-glow border-mkt-primary"
-                : "text-slate-400 hover:text-white border-transparent",
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-transparent",
             ].join(" ")}
           >
             {label}
@@ -227,13 +227,13 @@ export default function AdLibraryPage() {
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void search()}
                 placeholder="Buscar por marca, headline ou copy..."
-                className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-mkt-primary/40"
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-mkt-primary/40"
               />
             </div>
             <select
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
-              className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none"
+              className="px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white text-sm focus:outline-none"
             >
               <option value="">Todas as plataformas</option>
               {PLATFORMS.map((p) => (
@@ -252,7 +252,7 @@ export default function AdLibraryPage() {
             <button
               type="button"
               onClick={() => setShowAddAd(true)}
-              className="flex items-center gap-1.5 px-4 py-2.5 border border-white/10 hover:border-white/20 text-white text-sm font-medium rounded-xl transition bg-transparent cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2.5 border border-slate-200 dark:border-white/10 hover:border-white/20 text-slate-900 dark:text-white text-sm font-medium rounded-xl transition bg-transparent cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Indexar anúncio
             </button>
@@ -264,11 +264,13 @@ export default function AdLibraryPage() {
               className="card-glass rounded-2xl p-5 mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3"
             >
               <div className="sm:col-span-2 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-white">Indexar anúncio manualmente</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Indexar anúncio manualmente
+                </h3>
                 <button
                   type="button"
                   onClick={() => setShowAddAd(false)}
-                  className="p-1 text-slate-500 hover:text-white bg-transparent border-0 cursor-pointer"
+                  className="p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white bg-transparent border-0 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -334,13 +336,13 @@ export default function AdLibraryPage() {
           )}
 
           {loading ? (
-            <div className="flex items-center gap-2 text-slate-400 text-sm py-12 justify-center">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm py-12 justify-center">
               <Loader2 className="w-4 h-4 animate-spin" /> Buscando...
             </div>
           ) : ads.length === 0 ? (
             <div className="card-glass rounded-2xl p-10 text-center">
               <Library className="w-8 h-8 text-mkt-glow mx-auto mb-3" />
-              <p className="text-sm text-slate-400 max-w-md mx-auto">
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
                 Nenhum anúncio no índice ainda. Indexe anúncios manualmente ou use a extensão Chrome
                 (em breve) para capturar direto do feed.
               </p>
@@ -357,22 +359,28 @@ export default function AdLibraryPage() {
                       className="w-full h-40 object-cover"
                     />
                   ) : (
-                    <div className="w-full h-24 bg-white/5 flex items-center justify-center">
-                      <Eye className="w-5 h-5 text-slate-600" />
+                    <div className="w-full h-24 bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                      <Eye className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                     </div>
                   )}
                   <div className="p-4 flex-1 flex flex-col">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold text-white">{ad.brand_name}</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-slate-400">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">
+                        {ad.brand_name}
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400">
                         {ad.platform}
                       </span>
                     </div>
                     {ad.headline && (
-                      <p className="text-sm font-semibold text-slate-200 mb-1">{ad.headline}</p>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">
+                        {ad.headline}
+                      </p>
                     )}
                     {ad.body_copy && (
-                      <p className="text-xs text-slate-400 line-clamp-3 mb-2">{ad.body_copy}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3 mb-2">
+                        {ad.body_copy}
+                      </p>
                     )}
                     <div className="mt-auto flex items-center justify-between pt-2">
                       {ad.landing_url ? (
@@ -380,7 +388,7 @@ export default function AdLibraryPage() {
                           href={ad.landing_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[11px] text-slate-500 hover:text-white flex items-center gap-1 no-underline"
+                          className="text-[11px] text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center gap-1 no-underline"
                         >
                           <ExternalLink className="w-3 h-3" /> Landing
                         </a>
@@ -410,7 +418,7 @@ export default function AdLibraryPage() {
         (swipe.length === 0 ? (
           <div className="card-glass rounded-2xl p-10 text-center">
             <Bookmark className="w-8 h-8 text-mkt-glow mx-auto mb-3" />
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Seu swipe file está vazio. Salve anúncios vencedores da busca para consultar depois.
             </p>
           </div>
@@ -419,10 +427,10 @@ export default function AdLibraryPage() {
             {swipe.map((item) => (
               <div key={item.id} className="card-glass rounded-2xl p-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
                     {item.ad?.headline ?? item.title ?? item.custom_ad_url ?? "Anúncio salvo"}
                   </p>
-                  <p className="text-xs text-slate-400 truncate">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                     {item.ad ? `${item.ad.brand_name} · ${item.ad.platform}` : (item.notes ?? "")}
                   </p>
                 </div>
@@ -456,7 +464,7 @@ export default function AdLibraryPage() {
             </button>
           </form>
           {competitors.length === 0 ? (
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Nenhum concorrente monitorado. Adicione marcas para acompanhar os anúncios delas.
             </p>
           ) : (
@@ -464,7 +472,9 @@ export default function AdLibraryPage() {
               {competitors.map((c) => (
                 <div key={c.id} className="card-glass rounded-xl p-4 flex items-center gap-3">
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-white">{c.brand_name}</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {c.brand_name}
+                    </p>
                     <p className="text-xs text-slate-500">{c.platforms.join(", ")}</p>
                   </div>
                   <button
@@ -485,4 +495,4 @@ export default function AdLibraryPage() {
 }
 
 const inputCls =
-  "px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-mkt-primary/40 transition";
+  "px-3 py-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-mkt-primary/40 transition";

@@ -99,7 +99,7 @@ export default function DashboardPage() {
   return (
     <MktShell title="Dashboard">
       {loading ? (
-        <div className="flex items-center gap-2 text-slate-400 text-sm py-12 justify-center">
+        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm py-12 justify-center">
           <Loader2 className="w-4 h-4 animate-spin" /> Carregando métricas...
         </div>
       ) : (
@@ -112,15 +112,17 @@ export default function DashboardPage() {
                   key={kpi.label}
                   href={kpi.href}
                   className={[
-                    "card-glass rounded-2xl p-5 no-underline hover:bg-white/[0.06] transition",
+                    "card-glass rounded-2xl p-5 no-underline hover:bg-slate-100 dark:hover:bg-white/[0.06] transition",
                     "alert" in kpi && kpi.alert ? "ring-1 ring-amber-500/40" : "",
                   ].join(" ")}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium text-slate-400">{kpi.label}</span>
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {kpi.label}
+                    </span>
                     <Icon className="w-4 h-4 text-mkt-glow" />
                   </div>
-                  <p className="text-2xl font-black text-white">{kpi.value}</p>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white">{kpi.value}</p>
                 </Link>
               );
             })}
@@ -128,8 +130,10 @@ export default function DashboardPage() {
 
           {metrics && metrics.brand_kits === 0 && (
             <div className="card-glass rounded-2xl p-8 text-center">
-              <h2 className="text-lg font-bold text-white mb-2">Comece pelo seu Brand Kit</h2>
-              <p className="text-sm text-slate-400 max-w-md mx-auto mb-5">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+                Comece pelo seu Brand Kit
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-5">
                 Cadastre logo, cores, tipografia e tom de voz da sua marca. A IA usará esses dados
                 em todas as gerações de anúncios.
               </p>

@@ -41,12 +41,12 @@ interface BrandKit {
 }
 
 const STATUS_LABELS: Record<string, [string, string]> = {
-  draft: ["Rascunho", "bg-slate-500/15 text-slate-400"],
+  draft: ["Rascunho", "bg-slate-500/15 text-slate-500 dark:text-slate-400"],
   pending_approval: ["Aguardando aprovação", "bg-amber-500/15 text-amber-400"],
   approved: ["Aprovada", "bg-emerald-500/15 text-emerald-400"],
   active: ["Ativa", "bg-emerald-500/15 text-emerald-400"],
   paused: ["Pausada", "bg-orange-500/15 text-orange-400"],
-  completed: ["Concluída", "bg-slate-500/15 text-slate-400"],
+  completed: ["Concluída", "bg-slate-500/15 text-slate-500 dark:text-slate-400"],
   archived: ["Arquivada", "bg-slate-500/15 text-slate-500"],
 };
 
@@ -153,7 +153,7 @@ export default function CampaignsPage() {
     <MktShell title="Campanhas">
       <div className="max-w-4xl">
         <div className="flex items-center justify-between mb-6">
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Toda campanha nasce como rascunho e exige aprovação humana antes de ir ao ar.
           </p>
           <button
@@ -198,11 +198,13 @@ export default function CampaignsPage() {
         {showForm && (
           <form onSubmit={(e) => void handleCreate(e)} className="card-glass rounded-2xl p-5 mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-white">Nova campanha (rascunho)</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                Nova campanha (rascunho)
+              </h2>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="p-1 text-slate-500 hover:text-white bg-transparent border-0 cursor-pointer"
+                className="p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white bg-transparent border-0 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -273,13 +275,13 @@ export default function CampaignsPage() {
         )}
 
         {loading ? (
-          <div className="flex items-center gap-2 text-slate-400 text-sm py-12 justify-center">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm py-12 justify-center">
             <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
           </div>
         ) : campaigns.length === 0 ? (
           <div className="card-glass rounded-2xl p-10 text-center">
             <Megaphone className="w-8 h-8 text-mkt-glow mx-auto mb-3" />
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Nenhuma campanha aprovada ainda. Crie um rascunho e aprove na Central de Aprovações.
             </p>
           </div>
@@ -288,7 +290,7 @@ export default function CampaignsPage() {
             {campaigns.map((c) => {
               const [label, cls] = STATUS_LABELS[c.status] ?? [
                 c.status,
-                "bg-white/5 text-slate-400",
+                "bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400",
               ];
               const s = c.ai_strategy;
               const expanded = expandedStrategy === c.id;
@@ -296,8 +298,10 @@ export default function CampaignsPage() {
                 <div key={c.id} className="card-glass rounded-2xl p-4">
                   <div className="flex items-center gap-4">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-white truncate">{c.name}</p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                        {c.name}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         {c.platform} {c.objective ? `· ${c.objective}` : ""}{" "}
                         {c.budget_daily ? `· R$${c.budget_daily}/dia` : ""}
                       </p>
@@ -331,24 +335,30 @@ export default function CampaignsPage() {
                   </div>
 
                   {s && expanded && (
-                    <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                       {s.target_audience && (
                         <div>
-                          <p className="font-semibold text-slate-400 mb-1">Público-alvo</p>
-                          <p className="text-slate-300">{s.target_audience}</p>
+                          <p className="font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                            Público-alvo
+                          </p>
+                          <p className="text-slate-700 dark:text-slate-300">{s.target_audience}</p>
                         </div>
                       )}
                       {s.key_message && (
                         <div>
-                          <p className="font-semibold text-slate-400 mb-1">Mensagem-chave</p>
-                          <p className="text-slate-300">{s.key_message}</p>
+                          <p className="font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                            Mensagem-chave
+                          </p>
+                          <p className="text-slate-700 dark:text-slate-300">{s.key_message}</p>
                         </div>
                       )}
                       {s.funnel && s.funnel.length > 0 && (
                         <div>
-                          <p className="font-semibold text-slate-400 mb-1">Funil</p>
+                          <p className="font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                            Funil
+                          </p>
                           {s.funnel.map((f, i) => (
-                            <p key={i} className="text-slate-300">
+                            <p key={i} className="text-slate-700 dark:text-slate-300">
                               <span className="text-mkt-glow font-semibold">{f.stage}:</span>{" "}
                               {f.tactic}
                             </p>
@@ -357,18 +367,23 @@ export default function CampaignsPage() {
                       )}
                       {s.expected_kpis && s.expected_kpis.length > 0 && (
                         <div>
-                          <p className="font-semibold text-slate-400 mb-1">KPIs esperados</p>
+                          <p className="font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                            KPIs esperados
+                          </p>
                           {s.expected_kpis.map((k, i) => (
-                            <p key={i} className="text-slate-300">
-                              {k.metric}: <span className="text-white">{k.target}</span>
+                            <p key={i} className="text-slate-700 dark:text-slate-300">
+                              {k.metric}:{" "}
+                              <span className="text-slate-900 dark:text-white">{k.target}</span>
                             </p>
                           ))}
                         </div>
                       )}
                       {s.next_steps && s.next_steps.length > 0 && (
                         <div className="sm:col-span-2">
-                          <p className="font-semibold text-slate-400 mb-1">Próximos passos</p>
-                          <ul className="list-disc list-inside text-slate-300 space-y-0.5">
+                          <p className="font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                            Próximos passos
+                          </p>
+                          <ul className="list-disc list-inside text-slate-700 dark:text-slate-300 space-y-0.5">
                             {s.next_steps.map((step, i) => (
                               <li key={i}>{step}</li>
                             ))}
@@ -388,4 +403,4 @@ export default function CampaignsPage() {
 }
 
 const inputCls =
-  "w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-mkt-primary/40 transition";
+  "w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-mkt-primary/40 transition";

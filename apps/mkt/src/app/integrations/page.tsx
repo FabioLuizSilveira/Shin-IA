@@ -25,8 +25,8 @@ interface Integration {
 }
 
 const STATUS_LABELS: Record<Integration["status"], [string, string]> = {
-  not_configured: ["Configuração pendente", "bg-slate-500/15 text-slate-400"],
-  disconnected: ["Desconectado", "bg-slate-500/15 text-slate-400"],
+  not_configured: ["Configuração pendente", "bg-slate-500/15 text-slate-500 dark:text-slate-400"],
+  disconnected: ["Desconectado", "bg-slate-500/15 text-slate-500 dark:text-slate-400"],
   pending: ["Conectando...", "bg-amber-500/15 text-amber-400"],
   connected: ["Conectado", "bg-emerald-500/15 text-emerald-400"],
   error: ["Erro", "bg-red-500/15 text-red-400"],
@@ -101,7 +101,7 @@ function IntegrationsContent() {
   return (
     <div className="max-w-2xl space-y-6">
       <div className="card-glass rounded-2xl p-5">
-        <h2 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
+        <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
           <Plug className="w-4 h-4 text-mkt-glow" /> Integrações de Ads
         </h2>
         <p className="text-xs text-slate-500">
@@ -128,7 +128,7 @@ function IntegrationsContent() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-slate-400 text-sm py-6 justify-center">
+        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm py-6 justify-center">
           <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
         </div>
       ) : (
@@ -140,7 +140,9 @@ function IntegrationsContent() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-white">{integration.label}</h3>
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {integration.label}
+                      </h3>
                       <span
                         className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${statusCls}`}
                       >
@@ -156,7 +158,7 @@ function IntegrationsContent() {
                       </p>
                     )}
                     {!integration.configured && (
-                      <p className="text-xs text-slate-600 mt-1">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                         Faltam: {integration.missingEnv.join(", ")}
                       </p>
                     )}
@@ -169,7 +171,7 @@ function IntegrationsContent() {
                           type="button"
                           onClick={() => void handleSync(integration.platform)}
                           disabled={syncing === integration.platform}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-60 text-white text-xs font-medium rounded-lg transition border-0 cursor-pointer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-60 text-slate-900 dark:text-white text-xs font-medium rounded-lg transition border-0 cursor-pointer"
                         >
                           {syncing === integration.platform ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -197,7 +199,7 @@ function IntegrationsContent() {
                         className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
                           integration.configured
                             ? "bg-mkt-primary hover:bg-indigo-500 text-white cursor-pointer"
-                            : "bg-white/5 text-slate-500 cursor-not-allowed pointer-events-none"
+                            : "bg-slate-100 dark:bg-white/5 text-slate-500 cursor-not-allowed pointer-events-none"
                         }`}
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
@@ -208,7 +210,7 @@ function IntegrationsContent() {
                 </div>
 
                 {integration.status === "connected" && integration.metrics && (
-                  <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-white/5">
+                  <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-200 dark:border-white/5">
                     <Metric
                       label="Impressões"
                       value={integration.metrics.impressions.toLocaleString("pt-BR")}
@@ -236,7 +238,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-[11px] text-slate-500">{label}</p>
-      <p className="text-sm font-semibold text-white">{value}</p>
+      <p className="text-sm font-semibold text-slate-900 dark:text-white">{value}</p>
     </div>
   );
 }

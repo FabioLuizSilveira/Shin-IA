@@ -12,8 +12,10 @@ export default function McpPage() {
               <Bot className="w-5 h-5 text-mkt-glow" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white mb-1">Ads MCP Server</h2>
-              <p className="text-sm text-slate-400">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+                Ads MCP Server
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 Conecte Claude, Cursor, n8n e outros agentes para operar suas campanhas por
                 linguagem natural. Toda ação mutante cria um rascunho que exige aprovação humana —
                 nada é publicado automaticamente.
@@ -22,7 +24,7 @@ export default function McpPage() {
           </div>
         </div>
 
-        <h3 className="text-sm font-semibold text-slate-300 mb-3">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
           Tools disponíveis ({MKT_MCP_TOOLS.length})
         </h3>
         <div className="space-y-2">
@@ -34,16 +36,20 @@ export default function McpPage() {
                 <Eye className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               )}
               <div className="min-w-0">
-                <code className="text-sm font-semibold text-white">{tool.name}</code>
-                <p className="text-xs text-slate-400 mt-0.5">{tool.description}</p>
+                <code className="text-sm font-semibold text-slate-900 dark:text-white">
+                  {tool.name}
+                </code>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {tool.description}
+                </p>
               </div>
             </div>
           ))}
         </div>
 
         <div className="card-glass rounded-2xl p-5 mt-6">
-          <h3 className="text-sm font-bold text-white mb-2">Como conectar</h3>
-          <p className="text-xs text-slate-400 mb-3">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2">Como conectar</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
             Endpoint MCP (Streamable HTTP) com autenticação por bearer token:
           </p>
           <pre className="text-xs text-slate-300 bg-black/30 rounded-xl p-3 overflow-x-auto">

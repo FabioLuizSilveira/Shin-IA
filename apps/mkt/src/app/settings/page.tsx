@@ -108,12 +108,14 @@ export default function SettingsPage() {
           <div className="card-glass rounded-2xl p-5">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-bold text-white">{workspace.name}</h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {workspace.name}
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Plano <span className="text-mkt-glow font-semibold">{workspace.plan}</span>
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <Coins className="w-4 h-4 text-mkt-glow" />
                 {workspace.credits_used.toLocaleString("pt-BR")} /{" "}
                 {workspace.credits_limit.toLocaleString("pt-BR")} créditos
@@ -124,7 +126,7 @@ export default function SettingsPage() {
 
         {/* BYOK */}
         <div className="card-glass rounded-2xl p-5">
-          <h2 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
             <KeyRound className="w-4 h-4 text-mkt-glow" /> Provedores de IA (BYOK)
           </h2>
           <p className="text-xs text-slate-500 mb-5">
@@ -133,7 +135,7 @@ export default function SettingsPage() {
           </p>
 
           {loading ? (
-            <div className="flex items-center gap-2 text-slate-400 text-sm py-6 justify-center">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm py-6 justify-center">
               <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
             </div>
           ) : (
@@ -141,9 +143,14 @@ export default function SettingsPage() {
               {providers.length > 0 && (
                 <div className="space-y-2 mb-5">
                   {providers.map((p) => (
-                    <div key={p.id} className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
+                    <div
+                      key={p.id}
+                      className="flex items-center gap-3 rounded-xl bg-slate-100 dark:bg-white/5 p-3"
+                    >
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-white capitalize">{p.provider}</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white capitalize">
+                          {p.provider}
+                        </p>
                         <p className="text-xs text-slate-500">
                           {p.has_key ? "Chave configurada ✓" : "Sem chave"}
                           {p.default_model ? ` · ${p.default_model}` : ""}
@@ -236,4 +243,4 @@ export default function SettingsPage() {
 }
 
 const inputCls =
-  "w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-mkt-primary/40 transition";
+  "w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-mkt-primary/40 transition";

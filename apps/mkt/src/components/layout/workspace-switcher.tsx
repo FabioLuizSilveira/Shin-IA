@@ -62,19 +62,19 @@ export function WorkspaceSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors bg-transparent border-0 cursor-pointer"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors bg-transparent border-0 cursor-pointer"
       >
         <LayoutGrid className="w-3.5 h-3.5" />
         Trocar produto
         <ChevronDown className="w-3 h-3" />
       </button>
       {open && (
-        <div className="absolute right-0 mt-1.5 w-48 bg-slate-900 rounded-xl border border-white/10 shadow-lg py-1 z-50">
+        <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-white/10 shadow-lg py-1 z-50">
           {workspaces.map((w) => (
             <a
               key={w.key}
               href={w.href}
-              className="flex items-center justify-between px-3 py-2 text-sm text-slate-200 hover:bg-white/5 no-underline"
+              className="flex items-center justify-between px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 no-underline"
             >
               {w.label}
               {w.key === "mkt" && <Check className="w-3.5 h-3.5 text-mkt-glow" />}

@@ -78,7 +78,7 @@ export default function ApprovalsPage() {
   return (
     <MktShell title="Aprovações">
       <div className="max-w-3xl">
-        <p className="text-sm text-slate-400 mb-6">
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
           Nenhuma ação chega às plataformas de ads sem passar por aqui. Rascunhos criados por
           usuários ou agentes (MCP) aguardam sua revisão.
         </p>
@@ -90,18 +90,20 @@ export default function ApprovalsPage() {
         )}
 
         {loading ? (
-          <div className="flex items-center gap-2 text-slate-400 text-sm py-12 justify-center">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm py-12 justify-center">
             <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
           </div>
         ) : (
           <>
-            <h2 className="text-sm font-semibold text-slate-300 mb-3">
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
               Pendentes ({pending.length})
             </h2>
             {pending.length === 0 ? (
               <div className="card-glass rounded-2xl p-8 text-center mb-8">
                 <ShieldCheck className="w-7 h-7 text-emerald-400 mx-auto mb-2" />
-                <p className="text-sm text-slate-400">Nenhum rascunho aguardando aprovação.</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Nenhum rascunho aguardando aprovação.
+                </p>
               </div>
             ) : (
               <div className="space-y-3 mb-8">
@@ -120,7 +122,7 @@ export default function ApprovalsPage() {
                           <User className="w-3 h-3" /> Usuário
                         </span>
                       )}
-                      <span className="text-xs font-bold text-white">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">
                         {ACTION_LABELS[draft.action] ?? draft.action} {draft.entity_type}
                       </span>
                       <span className="text-[10px] text-slate-500 ml-auto">
@@ -160,7 +162,9 @@ export default function ApprovalsPage() {
               </div>
             )}
 
-            <h2 className="text-sm font-semibold text-slate-300 mb-3">Histórico recente</h2>
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+              Histórico recente
+            </h2>
             {history.length === 0 ? (
               <p className="text-sm text-slate-500">Nenhuma decisão registrada.</p>
             ) : (
@@ -176,7 +180,7 @@ export default function ApprovalsPage() {
                     >
                       {draft.status === "applied" ? "Aprovado" : "Rejeitado"}
                     </span>
-                    <span className="text-xs text-slate-300 flex-1 truncate">
+                    <span className="text-xs text-slate-700 dark:text-slate-300 flex-1 truncate">
                       {ACTION_LABELS[draft.action] ?? draft.action} {draft.entity_type}
                       {typeof draft.payload.name === "string" ? ` — ${draft.payload.name}` : ""}
                     </span>

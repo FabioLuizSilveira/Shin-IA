@@ -137,7 +137,7 @@ export default function BrandKitPage() {
     <MktShell title="Brand Kit">
       <div className="max-w-3xl">
         <div className="flex items-center justify-between mb-6">
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             A IA usa os dados da marca em todas as gerações de anúncios e copies.
           </p>
           <button
@@ -161,13 +161,13 @@ export default function BrandKitPage() {
         )}
 
         {loading ? (
-          <div className="flex items-center gap-2 text-slate-400 text-sm py-12 justify-center">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm py-12 justify-center">
             <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
           </div>
         ) : kits.length === 0 && !showForm ? (
           <div className="card-glass rounded-2xl p-10 text-center">
             <Palette className="w-8 h-8 text-mkt-glow mx-auto mb-3" />
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Nenhuma marca cadastrada. Crie o primeiro brand kit para habilitar as gerações com IA.
             </p>
           </div>
@@ -179,7 +179,7 @@ export default function BrandKitPage() {
                   {(kit.palette ?? []).slice(0, 4).map((c, i) => (
                     <span
                       key={i}
-                      className="w-6 h-6 rounded-full border border-white/10"
+                      className="w-6 h-6 rounded-full border border-slate-200 dark:border-white/10"
                       style={{ backgroundColor: c.hex }}
                       title={c.name}
                     />
@@ -187,14 +187,16 @@ export default function BrandKitPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-white truncate">{kit.name}</h3>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                      {kit.name}
+                    </h3>
                     {kit.is_default && (
                       <span className="px-2 py-0.5 bg-mkt-primary/15 text-mkt-glow text-[10px] font-semibold rounded-full">
                         Padrão
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-400 truncate">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                     {kit.tagline ?? kit.website_url ?? "—"}
                   </p>
                 </div>
@@ -204,7 +206,7 @@ export default function BrandKitPage() {
                       type="button"
                       title="Definir como padrão"
                       onClick={() => void handleSetDefault(kit.id)}
-                      className="p-2 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-white/5 transition bg-transparent border-0 cursor-pointer"
+                      className="p-2 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-white/5 transition bg-transparent border-0 cursor-pointer"
                     >
                       <Star className="w-4 h-4" />
                     </button>
@@ -213,7 +215,7 @@ export default function BrandKitPage() {
                     type="button"
                     title="Editar"
                     onClick={() => startEdit(kit)}
-                    className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition bg-transparent border-0 cursor-pointer"
+                    className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition bg-transparent border-0 cursor-pointer"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
@@ -221,7 +223,7 @@ export default function BrandKitPage() {
                     type="button"
                     title="Excluir"
                     onClick={() => void handleDelete(kit.id)}
-                    className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-white/5 transition bg-transparent border-0 cursor-pointer"
+                    className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-100 dark:hover:bg-white/5 transition bg-transparent border-0 cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -234,13 +236,13 @@ export default function BrandKitPage() {
         {showForm && (
           <form onSubmit={(e) => void handleSave(e)} className="card-glass rounded-2xl p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-bold text-white">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
                 {editingId ? "Editar marca" : "Nova marca"}
               </h2>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-white bg-transparent border-0 cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white bg-transparent border-0 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -319,7 +321,9 @@ export default function BrandKitPage() {
             </Field>
 
             <div className="mt-4">
-              <p className="text-xs font-medium text-slate-400 mb-2">Paleta de cores</p>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">
+                Paleta de cores
+              </p>
               <div className="space-y-2">
                 {form.colors.map((color, i) => (
                   <div key={i} className="flex items-center gap-2">
@@ -327,7 +331,7 @@ export default function BrandKitPage() {
                       type="color"
                       value={color.hex}
                       onChange={(e) => updateColor(i, { hex: e.target.value })}
-                      className="w-9 h-9 rounded-lg border border-white/10 bg-transparent cursor-pointer"
+                      className="w-9 h-9 rounded-lg border border-slate-200 dark:border-white/10 bg-transparent cursor-pointer"
                     />
                     <input
                       value={color.name}
@@ -368,7 +372,7 @@ export default function BrandKitPage() {
                     colors: [...f.colors, { name: "", hex: "#8B5CF6", role: "secondary" }],
                   }))
                 }
-                className="mt-2 text-xs text-mkt-glow hover:text-white transition bg-transparent border-0 cursor-pointer"
+                className="mt-2 text-xs text-mkt-glow hover:text-slate-900 dark:hover:text-white transition bg-transparent border-0 cursor-pointer"
               >
                 + Adicionar cor
               </button>
@@ -378,7 +382,7 @@ export default function BrandKitPage() {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition bg-transparent border-0 cursor-pointer"
+                className="px-4 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition bg-transparent border-0 cursor-pointer"
               >
                 Cancelar
               </button>
@@ -399,7 +403,7 @@ export default function BrandKitPage() {
 }
 
 const inputCls =
-  "w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-mkt-primary/40 transition";
+  "w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-mkt-primary/40 transition";
 
 function Field({
   label,
@@ -412,7 +416,9 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <label className="block text-xs font-medium text-slate-400 mb-1.5">{label}</label>
+      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+        {label}
+      </label>
       {children}
     </div>
   );

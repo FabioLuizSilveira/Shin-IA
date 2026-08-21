@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+import { useShinaTheme } from "@shina/theme";
 import {
   Sparkles,
   LayoutDashboard,
@@ -18,6 +19,8 @@ import {
   Settings,
   LogOut,
   Bot,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -36,6 +39,7 @@ const NAV_ITEMS = [
 export function MktShell({ children, title }: { children: ReactNode; title: string }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { theme, preference, setPreference } = useShinaTheme();
 
   async function handleLogout() {
     const supabase = createClient();
@@ -45,13 +49,13 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-950">
-      <aside className="w-60 shrink-0 border-r border-white/5 flex flex-col">
-        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-white/5">
+    <div className="flex h-screen overflow-hidden bg-white dark:bg-slate-950">
+      <aside className="w-60 shrink-0 border-r border-slate-200 dark:border-white/5 flex flex-col">
+        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-slate-200 dark:border-white/5">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mkt-primary to-mkt-secondary flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="text-sm font-bold text-white leading-tight">
+          <span className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
             Marketing IA
             <span className="block text-[10px] font-medium text-slate-500">by Shinã</span>
           </span>
@@ -69,7 +73,7 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
                   "flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors no-underline",
                   active
                     ? "bg-mkt-primary/15 text-mkt-glow"
-                    : "text-slate-400 hover:text-white hover:bg-white/5",
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5",
                 ].join(" ")}
               >
                 <Icon className="w-4 h-4 shrink-0" />
@@ -79,11 +83,11 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
           })}
         </nav>
 
-        <div className="p-3 border-t border-white/5 space-y-1">
+        <div className="p-3 border-t border-slate-200 dark:border-white/5 space-y-1">
           <button
             type="button"
             onClick={() => void handleLogout()}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-colors bg-transparent border-0 cursor-pointer"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors bg-transparent border-0 cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
             Sair
@@ -92,9 +96,19 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-white/5">
-          <h1 className="text-lg font-bold text-white">{title}</h1>
-          <WorkspaceSwitcher />
+        <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-slate-200 dark:border-white/5">
+          <h1 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h1>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPreference(preference === "dark" ? "light" : "dark")}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors bg-transparent border-0 cursor-pointer"
+              title={theme.mode === "dark" ? "Modo claro" : "Modo escuro"}
+            >
+              {theme.mode === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <WorkspaceSwitcher />
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>

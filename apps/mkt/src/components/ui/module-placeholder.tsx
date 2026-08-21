@@ -18,9 +18,9 @@ export function ModulePlaceholder({
       <div className="w-12 h-12 rounded-2xl bg-mkt-primary/10 flex items-center justify-center mx-auto mb-5">
         <Icon className="w-6 h-6 text-mkt-glow" />
       </div>
-      <h2 className="text-xl font-bold text-white mb-2">{title}</h2>
-      <p className="text-sm text-slate-400 mb-5">{description}</p>
-      <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-400">
+      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{title}</h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">{description}</p>
+      <span className="inline-block px-3 py-1 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-medium text-slate-500 dark:text-slate-400">
         Em desenvolvimento — {milestone}
       </span>
     </div>
