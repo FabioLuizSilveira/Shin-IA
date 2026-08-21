@@ -80,7 +80,6 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
         </nav>
 
         <div className="p-3 border-t border-white/5 space-y-1">
-          <WorkspaceSwitcher />
           <button
             type="button"
             onClick={() => void handleLogout()}
@@ -93,8 +92,9 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="h-16 shrink-0 flex items-center px-6 border-b border-white/5">
+        <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-white/5">
           <h1 className="text-lg font-bold text-white">{title}</h1>
+          <WorkspaceSwitcher />
         </header>
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
