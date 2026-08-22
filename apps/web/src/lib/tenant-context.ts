@@ -1,8 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { headers } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { decodeSessionClaims } from "@/lib/jwt-claims";
+import { identityProvider } from "@/lib/identity";
 import { getActiveImpersonation } from "@/lib/impersonation";
 
 export interface TenantScope {
@@ -34,40 +33,24 @@ export async function requireTenantScope(): Promise<
     ? authHeader.slice("bearer ".length).trim()
     : null;
 
-  let userId: string;
-  let claims: ReturnType<typeof decodeSessionClaims>;
+  const session = bearerToken
+    ? await identityProvider.getSessionFromBearerToken(bearerToken)
+    : await identityProvider.getSessionFromCookies();
+  if (!session) return { error: "Unauthorized", status: 401 };
+  const { uid: userId, tenantId, tenantRole, platformRole } = session.identity;
 
-  if (bearerToken) {
-    const adminForAuth = createAdminClient();
-    const {
-      data: { user },
-      error,
-    } = await adminForAuth.auth.getUser(bearerToken);
-    if (error || !user) return { error: "Unauthorized", status: 401 };
-    userId = user.id;
-    claims = decodeSessionClaims(bearerToken);
-  } else {
-    const supabase = await createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) return { error: "Unauthorized", status: 401 };
-    userId = session.user.id;
-    claims = decodeSessionClaims(session.access_token);
-  }
-
-  if (claims.tenant_id) {
+  if (tenantId) {
     return {
-      tenantId: claims.tenant_id,
+      tenantId,
       userId,
-      tenantRole: claims.tenant_role ?? null,
+      tenantRole: tenantRole ?? null,
       isImpersonating: false,
       accessMode: "full",
       db: createAdminClient(),
     };
   }
 
-  if (claims.platform_role) {
+  if (platformRole) {
     const impersonation = await getActiveImpersonation(userId);
     if (!impersonation) {
       return { error: "No active tenant context — start impersonation first", status: 403 };
