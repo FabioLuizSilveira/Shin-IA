@@ -7,7 +7,7 @@
 **AUTHORIZATION: SHINÃ IAM / RBAC / ABAC (unchanged)**
 **CANONICAL USER ID: SHINÃ (`shina_user_id`)**
 
-Status: **Phase 1 (Firebase Foundation) implemented and tested. Phase 2/3 not started — blocked on a real Firebase project.**
+Status: **Phase 1 (Firebase Foundation) complete. Phase 2 (App Integration + Demo Users) in progress — Owner Safety Gate PASS and all 3 relevant demo accounts provisioned; no production login UI touched yet. Phase 3 not started.**
 
 ## What's migrating and what isn't
 
@@ -173,6 +173,24 @@ Full real round trip, real browser, real project — no mocks:
 The temporary diagnostic page/route/middleware exemption used for this test
 (`/dev-firebase-probe`) were all deleted immediately after — never merged,
 never deployed.
+
+## Demo users (spec item 22)
+
+Platform Owner, Tenant Demo, and Customer Demo all have real Firebase
+accounts now, linked to their existing `shina_user_id` via
+`external_identities` (no new tenant/customer created — reused what already
+existed, per spec). Real sign-in confirmed for all three against the fixed
+API key:
+
+| Account                                       | Firebase uid                   | Resolved via `resolve_shina_authorization_context`                                                                                                                                                                                                                                                                            |
+| --------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform Owner (`fabio@shinaia.com.br`)       | `VWsdoQaGAbeEwIWWwZmpCsSFH5t2` | `platform_role: platform_owner`, `tenant_role: tenant_admin`                                                                                                                                                                                                                                                                  |
+| Tenant Demo (`demo.equipe@shinaia.com.br`)    | `pJrJQgAoTKbeINtyEVLK6cHpi8q1` | `tenant_role: fleet_manager`                                                                                                                                                                                                                                                                                                  |
+| Customer Demo (`demo.cliente@shinaia.com.br`) | `LwrlDkUXLuhJ8BsjDSFMUUSEt602` | all null — **correct, not a bug**: customers were never tenant staff and never carried `tenant_role`/`platform_role` claims; their real authorization is the RLS-direct `auth.uid()` chain (`rental_customers.auth_user_id`) described in the critical audit finding above, which a Firebase token doesn't satisfy on its own |
+
+Operator Demo not created — no demo operator account exists in the
+codebase today, and spec item 22 makes it conditional ("somente se
+necessário aos testes").
 
 ## What Phase 2 needs from the user before it can start
 
