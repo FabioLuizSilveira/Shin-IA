@@ -4,9 +4,11 @@ import {
   resolveActiveIdentityProviderKind,
   type IdentityProvider,
 } from "@shina/identity";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getFirebaseAdminAuth } from "@/lib/firebase-admin";
+import { FIREBASE_SESSION_COOKIE } from "@/lib/firebase-session-cookie";
 
 // The one place apps/web decides which IdentityProvider is active and
 // constructs it — every call site depends on the IdentityProvider contract,
@@ -22,11 +24,10 @@ function buildIdentityProvider(): IdentityProvider {
   const kind = resolveActiveIdentityProviderKind(process.env);
 
   if (kind === "firebase") {
-    return new FirebaseIdentityProvider(
-      getFirebaseAdminAuth,
-      createAdminClient,
-      () => null, // web cookie-based Firebase sessions land in Phase 2
-    );
+    return new FirebaseIdentityProvider(getFirebaseAdminAuth, createAdminClient, async () => {
+      const cookieStore = await cookies();
+      return cookieStore.get(FIREBASE_SESSION_COOKIE)?.value ?? null;
+    });
   }
 
   return new SupabaseIdentityProvider(createClient, createAdminClient);

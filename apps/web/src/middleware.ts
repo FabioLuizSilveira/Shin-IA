@@ -1,8 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasLiveSubscription } from "@shina/billing-platform/claims";
+import { resolveActiveIdentityProviderKind } from "@shina/identity";
 import { MFA_COOKIE_NAME, verifyMfaCookie } from "@/lib/auth/mfa-cookie";
 import { decodeSessionClaims, type SessionClaims } from "@/lib/jwt-claims";
+import {
+  FIREBASE_SESSION_COOKIE,
+  verifyFirebaseSessionCookie,
+  resolveFirebaseSessionClaims,
+} from "@/lib/firebase-session-cookie";
 import { IMPERSONATION_COOKIE } from "@/lib/impersonation-cookie";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
@@ -230,54 +236,78 @@ export async function middleware(request: NextRequest) {
 
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      global: { fetch: fetchWithTimeout },
-      cookieOptions: { domain: authCookieDomain(hostname) },
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
-        },
-      },
-    },
-  );
+  const identityProviderKind = resolveActiveIdentityProviderKind(process.env);
 
   const isPublic = isAppPublicPath(pathname) || isSitePath(pathname);
 
   // Public paths that never inspect `user` (everything except "/" and
   // "/login", which redirect differently for signed-in visitors) skip the
-  // Supabase round trip entirely — this is what actually keeps a webhook
-  // or a marketing page up during a Supabase auth hiccup, the timeout above
+  // session round trip entirely — this is what actually keeps a webhook or
+  // a marketing page up during an auth-provider hiccup, the timeout below
   // is only a fallback for paths that truly need the session.
   if (isPublic && pathname !== "/" && pathname !== "/login") {
     return supabaseResponse;
   }
 
-  // getUser() (not getSession()) so the session is actually revalidated —
-  // but user.app_metadata reflects auth.users' stored column, not the
-  // tenant_role/platform_role claims custom_access_token_hook injects into
-  // the issued JWT, so role checks below decode the session's access token
-  // instead (see jwt-claims.ts).
-  const user = await supabase.auth
-    .getUser()
-    .then(({ data }) => data.user)
-    .catch(() => null);
+  let user: { id: string } | null = null;
+  let claims: SessionClaims = {};
 
-  const claims: SessionClaims = user
-    ? await supabase.auth
-        .getSession()
-        .then(({ data }) => (data.session ? decodeSessionClaims(data.session.access_token) : {}))
-        .catch(() => ({}))
-    : {};
+  if (identityProviderKind === "firebase") {
+    // Edge-safe verification (jose, not firebase-admin — see
+    // lib/firebase-session-cookie.ts) of the cookie apps/web/src/app/api/
+    // auth/firebase/session/route.ts mints. No revocation check happens
+    // here (that needs the Admin SDK, Node-only) — this only gates
+    // redirects; the actual data-access routes re-verify via
+    // requireTenantScope() -> FirebaseIdentityProvider, which does use the
+    // Admin SDK and would still reject a revoked session.
+    const sessionCookie = request.cookies.get(FIREBASE_SESSION_COOKIE)?.value;
+    if (sessionCookie) {
+      const verified = await verifyFirebaseSessionCookie(sessionCookie);
+      const resolved = verified ? await resolveFirebaseSessionClaims(verified.uid) : null;
+      if (resolved) {
+        user = { id: resolved.userId };
+        claims = resolved.claims;
+      }
+    }
+  } else {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: { fetch: fetchWithTimeout },
+        cookieOptions: { domain: authCookieDomain(hostname) },
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+            supabaseResponse = NextResponse.next({ request });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              supabaseResponse.cookies.set(name, value, options),
+            );
+          },
+        },
+      },
+    );
+
+    // getUser() (not getSession()) so the session is actually revalidated —
+    // but user.app_metadata reflects auth.users' stored column, not the
+    // tenant_role/platform_role claims custom_access_token_hook injects into
+    // the issued JWT, so role checks below decode the session's access token
+    // instead (see jwt-claims.ts).
+    user = await supabase.auth
+      .getUser()
+      .then(({ data }) => data.user)
+      .catch(() => null);
+
+    claims = user
+      ? await supabase.auth
+          .getSession()
+          .then(({ data }) => (data.session ? decodeSessionClaims(data.session.access_token) : {}))
+          .catch(() => ({}))
+      : {};
+  }
 
   // ── General API rate limiting ──────────────────────────────────────────────
   // /api/webhooks and /api/auth already returned/were checked above — this

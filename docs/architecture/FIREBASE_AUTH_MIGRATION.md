@@ -7,7 +7,7 @@
 **AUTHORIZATION: SHINÃ IAM / RBAC / ABAC (unchanged)**
 **CANONICAL USER ID: SHINÃ (`shina_user_id`)**
 
-Status: **Phase 1 (Firebase Foundation) complete. Phase 2 (App Integration + Demo Users) in progress — Owner Safety Gate PASS and all 3 relevant demo accounts provisioned; no production login UI touched yet. Phase 3 not started.**
+Status: **Phase 1 (Firebase Foundation) complete. Phase 2 (App Integration + Demo Users) in progress — real Firebase session cookies, middleware, and the real apps/web login page (Google + both demo accounts) all built and working end-to-end in local dev only. Nothing of this is active in Vercel/production — `IDENTITY_PROVIDER`/`NEXT_PUBLIC_IDENTITY_PROVIDER` are only set in `apps/web/.env.local`, never in Vercel, specifically because apps/mobile hasn't been migrated yet (see "Mobile not migrated yet" below) and would break if the server-side switch flipped in production. Phase 3 not started.**
 
 ## What's migrating and what isn't
 
@@ -191,6 +191,140 @@ API key:
 Operator Demo not created — no demo operator account exists in the
 codebase today, and spec item 22 makes it conditional ("somente se
 necessário aos testes").
+
+## Real login screen, session cookies, and middleware (spec items 15/16/24) — local dev only
+
+Built and verified end-to-end, **not deployed to Vercel**:
+
+- `apps/web/src/app/api/auth/firebase/session/route.ts` — exchanges a
+  Firebase ID token for an httpOnly session cookie
+  (`__shina_firebase_session`), via Admin SDK `createSessionCookie()`.
+  Mirrors Firebase's own documented Next.js session pattern.
+- `apps/web/src/lib/identity.ts` — the cookie factory passed to
+  `FirebaseIdentityProvider` now actually reads that cookie (was a `() =>
+null` stub through Phase 1).
+- `apps/web/src/lib/firebase-session-cookie.ts` — **Edge-safe**
+  verification for `middleware.ts` (Next's Edge runtime can't run
+  `firebase-admin`, which needs Node's `crypto`). Uses `jose` +
+  Google's public keys directly, plus a Supabase lookup
+  (`external_identities` → `resolve_shina_authorization_context`) to
+  produce the same `SessionClaims` shape `decodeSessionClaims()` already
+  produces for Supabase — every existing gate (MFA/subscription/contract)
+  in `middleware.ts` works unchanged regardless of which provider is
+  active, branching only once at the top on
+  `resolveActiveIdentityProviderKind(process.env)`.
+- `apps/web/src/components/auth/auth-options.tsx` — real login UI changes,
+  gated behind `NEXT_PUBLIC_IDENTITY_PROVIDER === "firebase"` (client
+  components can't read the server-only `IDENTITY_PROVIDER`, hence the
+  separate public mirror — **never set in Vercel**, see the status line
+  above): "Continuar com Google" now uses Firebase's
+  `signInWithPopup(GoogleAuthProvider)`; the two demo buttons use a new
+  `POST /api/auth/firebase/demo-login` (mints a Firebase custom token
+  server-side for `DEMO_TENANT_EMAIL`/`DEMO_CUSTOMER_EMAIL` — the client
+  never sees the demo password, same posture as the pre-existing Supabase
+  demo-login route). Magic Link and Facebook are hidden (not deleted) when
+  `USE_FIREBASE` is true — both still only produce a Supabase session,
+  which the backend wouldn't recognize once cut over.
+
+### Four real bugs found and fixed while getting this to actually work
+
+All confirmed live, in a real browser, not guessed at:
+
+1. **CSP `connect-src`** missing `identitytoolkit`/`securetoken.googleapis.com`
+   (documented above, Phase 1) — blocked every Firebase Auth call.
+2. **Session cookie `secure: true` unconditionally** — silently dropped by
+   both real browsers and curl on `http://localhost` (no HTTPS). Fixed:
+   `secure: process.env.NODE_ENV === "production"`.
+3. **Wrong JWKS endpoint for session-cookie verification.** Session cookies
+   are signed by a _different_ key set than ID tokens — neither the
+   securetoken JWK endpoint nor its x509 sibling had a matching `kid` for a
+   real session cookie (`JWKSNoMatchingKey`), even though Firebase Admin's
+   own `verifySessionCookie()` verified the exact same cookie successfully.
+   The correct endpoint, confirmed live, is
+   `https://www.googleapis.com/identitytoolkit/v3/relyingparty/publicKeys`
+   — not documented anywhere obvious, found via targeted search after two
+   failed guesses.
+4. **CSP `script-src`/`frame-src` + Next.js's default COOP header** all
+   blocked `signInWithPopup(GoogleAuthProvider)` in three separate, oddly-
+   shaped ways: `script-src` blocked `apis.google.com/js/api.js` (Google's
+   popup-flow script) and surfaced only as opaque `auth/internal-error`;
+   `frame-src` (added to fix the first issue) then blocked Firebase's own
+   internal auth iframe (`https://shinaia-8f787.firebaseapp.com`) framing
+   itself; and Next.js's default `Cross-Origin-Opener-Policy: same-origin`
+   silently broke the popup→opener `window.closed` signal Firebase's SDK
+   polls, surfacing as a false `auth/popup-closed-by-user` even though the
+   user completed the flow. Fixed: `script-src` allows `apis.google.com`,
+   `frame-src` allows `'self'`, `accounts.google.com`, and
+   `*.firebaseapp.com`, and `Cross-Origin-Opener-Policy` is explicitly set
+   to `same-origin-allow-popups`.
+
+All four are now in `apps/web/next.config.mjs`, each with an inline comment
+explaining what it fixes — a future contributor removing an "unused-
+looking" CSP entry should read those first.
+
+### Owner Google sign-in — real account linking needed
+
+The Owner's real Google account (`fabioshinaia@gmail.com`) is a different
+Google Identity from `fabio@shinaia.com.br` (their Shinã login, normally
+used via Supabase magic link) — signing in with Google via Firebase
+creates a **new, distinct** Firebase UID
+(`rcHF3c3BJbhQSxdeUR3DLcuk7t53`), unrelated to the email/password Firebase
+account created for the Owner Safety Gate test
+(`VWsdoQaGAbeEwIWWwZmpCsSFH5t2`). Per spec item 7, an unlinked Firebase UID
+correctly resolves to "authenticated but unprovisioned" — confirmed live
+(the Owner signed in successfully but had zero tenant/platform access
+until linked). Linked manually via `external_identities` after the fact
+(same `shina_user_id`, `dea846ea-...`); the next request resolved
+`platform_owner` correctly with no need to sign in again, since claims are
+resolved fresh on every request rather than cached at session-issue time.
+
+**Not solved, deliberately out of scope**: there is currently no UI/flow
+for a user to link a second Firebase identity (e.g., Google) to an
+account they first created via password/custom-token — this manual,
+one-off `external_identities` upsert isn't a repeatable product flow. A
+real "link another sign-in method" feature is Phase-2-adjacent work not
+covered by the original spec's item list.
+
+### MFA gate — confirmed working, but blocked on a real, separate migration
+
+The Owner's `tenant_admin` role requires MFA (`MFA_REQUIRED_ROLES`,
+`middleware.ts`). With a real Firebase session, `middleware.ts` correctly
+resolved `mfa_enrolled: true` and redirected to
+`/auth/mfa-challenge?next=/tenant/dashboard` exactly as designed — **this
+confirms the whole cookie → middleware → claims chain works correctly**,
+including gates that were never touched. The redirect target itself then
+failed with `Error: Nenhum fator MFA encontrado`, because
+`(public)/auth/mfa-challenge/page.tsx` calls Supabase's native
+`supabase.auth.mfa.listFactors()` directly — Supabase's TOTP MFA is a
+first-party Supabase Auth feature with no Firebase equivalent reachable
+the same way (Firebase has its own, separately-shaped multi-factor API,
+`TotpMultiFactorGenerator`, requiring its own enrollment flow).
+
+Per spec item 21 ("Não bloquear migração por MFA... Não implementar
+política completa nesta migração se ainda não existir"): **not fixed
+now, intentionally**. Migrating MFA enrollment/verification to Firebase's
+TOTP API is real, separate feature work, not a config tweak — tracked
+here as a known gap blocking a _complete_ end-to-end test for any
+MFA-enrolled account, not as something broken by this migration. The gate
+itself was left completely untouched and still correctly blocks access,
+which is the security-correct outcome to leave in place until Firebase
+MFA is actually built.
+
+## Mobile not migrated yet — the actual reason Vercel stays untouched
+
+`apps/mobile` still authenticates entirely via Supabase
+(`auth-context.tsx`) and sends Supabase-issued bearer tokens to every
+`apps/web` API route it calls. If `IDENTITY_PROVIDER=firebase` were ever
+set in Vercel before mobile is migrated, `FirebaseIdentityProvider.
+getSessionFromBearerToken()` would reject every one of those tokens
+(wrong issuer/signature) — the entire mobile app (tenant staff, customer,
+and operator personas alike) would 401 on every API call. This is why
+every Firebase env var affecting _behavior_ (`IDENTITY_PROVIDER`,
+`NEXT_PUBLIC_IDENTITY_PROVIDER`) is local-only right now — the _config_
+values (`NEXT_PUBLIC_FIREBASE_*`, `FIREBASE_ADMIN_*`) are in Vercel
+(harmless on their own, since nothing reads them unless the provider is
+switched), but the switch itself is not. Migrating mobile is the
+explicit next step before any production cutover consideration.
 
 ## What Phase 2 needs from the user before it can start
 

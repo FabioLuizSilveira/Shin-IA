@@ -6,9 +6,17 @@
 // Supabase Auth. O redirect passa pelo /auth/callback já existente.
 
 import { useState } from "react";
+import { GoogleAuthProvider, signInWithCustomToken, signInWithPopup } from "firebase/auth";
 import { createClient } from "@/lib/supabase/client";
+import { firebaseAuth } from "@/lib/firebase-client";
 import { appUrl } from "@/lib/domain";
 import { Loader2, Mail } from "lucide-react";
+
+// Client-side mirror of IDENTITY_PROVIDER — see .env.local's comment next
+// to NEXT_PUBLIC_IDENTITY_PROVIDER for why this must never be set in
+// Vercel yet. Only "firebase" changes behavior; anything else (including
+// unset) keeps today's Supabase-only flow untouched.
+const USE_FIREBASE = process.env.NEXT_PUBLIC_IDENTITY_PROVIDER === "firebase";
 
 const DEMO_DESTINATION: Record<"tenant" | "customer", string> = {
   tenant: appUrl("/tenant/dashboard"),
@@ -58,7 +66,39 @@ export function AuthOptions() {
   const [showMore, setShowMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Exchanges a fresh Firebase ID token for the httpOnly session cookie
+  // requireTenantScope() and middleware.ts's edge verifier both read (see
+  // app/api/auth/firebase/session/route.ts) — a Firebase client-side sign-in
+  // alone never touches the backend's own session state.
+  async function establishFirebaseSession(idToken: string) {
+    const res = await fetch("/api/auth/firebase/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
+    if (!res.ok) throw new Error("Falha ao estabelecer sessão.");
+    // "/" (not a specific dashboard) so middleware's existing role-based
+    // redirect (accessCount/homeForUser) decides the destination — same
+    // logic already used for the Supabase flow, not duplicated here.
+    window.location.href = "/";
+  }
+
+  async function handleFirebaseGoogle() {
+    setLoading("google");
+    setError(null);
+    try {
+      const cred = await signInWithPopup(firebaseAuth, new GoogleAuthProvider());
+      const idToken = await cred.user.getIdToken();
+      await establishFirebaseSession(idToken);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao iniciar login.");
+      setLoading(null);
+    }
+  }
+
   async function handleOAuth(provider: "google" | "facebook") {
+    if (provider === "google" && USE_FIREBASE) return handleFirebaseGoogle();
+
     setLoading(provider);
     setError(null);
     try {
@@ -92,7 +132,29 @@ export function AuthOptions() {
   // (see lib/supabase/client.ts), then a full navigation to the app
   // subdomain picks it up — a relative router.push wouldn't survive a
   // cross-subdomain jump when rendered from the marketing host.
+  async function handleFirebaseDemoLogin(persona: "tenant" | "customer") {
+    setLoading(`demo-${persona}`);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/firebase/demo-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ persona }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "Falha ao entrar em modo demonstração.");
+      const cred = await signInWithCustomToken(firebaseAuth, json.customToken);
+      const idToken = await cred.user.getIdToken();
+      await establishFirebaseSession(idToken);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao entrar em modo demonstração.");
+      setLoading(null);
+    }
+  }
+
   async function handleDemoLogin(persona: "tenant" | "customer") {
+    if (USE_FIREBASE) return handleFirebaseDemoLogin(persona);
+
     setLoading(`demo-${persona}`);
     setError(null);
     try {
@@ -162,59 +224,72 @@ export function AuthOptions() {
         </span>
       </button>
 
-      <div className="flex items-center gap-3 py-1">
-        <div className="flex-1 h-px bg-white/10" />
-        <span className="text-xs text-slate-400">ou</span>
-        <div className="flex-1 h-px bg-white/10" />
-      </div>
+      {/* Magic Link and Facebook still only produce a Supabase session —
+          with the backend cut over to Firebase (USE_FIREBASE), that
+          session wouldn't be recognized by requireTenantScope() or
+          middleware.ts, so both are hidden rather than left silently
+          broken. Re-enable once they have a Firebase-backed equivalent. */}
+      {!USE_FIREBASE && (
+        <>
+          <div className="flex items-center gap-3 py-1">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-xs text-slate-400">ou</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
 
-      {magicSent ? (
-        <div className="px-4 py-3 bg-green-400/10 border border-green-400/20 rounded-xl text-sm text-green-300 text-center">
-          Link enviado! Verifique seu e-mail para entrar.
-        </div>
-      ) : (
-        <form onSubmit={(e) => void handleMagicLink(e)} className="space-y-2">
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="voce@empresa.com.br"
-            className="w-full px-4 py-2.5 bg-black/20 border border-white/10 rounded-xl text-white text-sm placeholder:text-slate-500"
-          />
-          <button
-            type="submit"
-            disabled={loading !== null}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
-          >
-            {loading === "magic" ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Mail className="w-4 h-4" />
-            )}
-            Continuar com E-mail
-          </button>
-        </form>
-      )}
+          {magicSent ? (
+            <div className="px-4 py-3 bg-green-400/10 border border-green-400/20 rounded-xl text-sm text-green-300 text-center">
+              Link enviado! Verifique seu e-mail para entrar.
+            </div>
+          ) : (
+            <form onSubmit={(e) => void handleMagicLink(e)} className="space-y-2">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="voce@empresa.com.br"
+                className="w-full px-4 py-2.5 bg-black/20 border border-white/10 rounded-xl text-white text-sm placeholder:text-slate-500"
+              />
+              <button
+                type="submit"
+                disabled={loading !== null}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
+              >
+                {loading === "magic" ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4" />
+                )}
+                Continuar com E-mail
+              </button>
+            </form>
+          )}
 
-      {showMore ? (
-        <button
-          type="button"
-          onClick={() => void handleOAuth("facebook")}
-          disabled={loading !== null}
-          className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
-        >
-          {loading === "facebook" ? <Loader2 className="w-4 h-4 animate-spin" /> : <FacebookIcon />}
-          Continuar com Facebook
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setShowMore(true)}
-          className="w-full text-xs text-slate-400 hover:text-slate-300 bg-transparent border-0 cursor-pointer py-1"
-        >
-          Mais opções
-        </button>
+          {showMore ? (
+            <button
+              type="button"
+              onClick={() => void handleOAuth("facebook")}
+              disabled={loading !== null}
+              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
+            >
+              {loading === "facebook" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FacebookIcon />
+              )}
+              Continuar com Facebook
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowMore(true)}
+              className="w-full text-xs text-slate-400 hover:text-slate-300 bg-transparent border-0 cursor-pointer py-1"
+            >
+              Mais opções
+            </button>
+          )}
+        </>
       )}
 
       <div className="flex items-center gap-3 py-1">

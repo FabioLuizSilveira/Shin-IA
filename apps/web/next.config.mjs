@@ -11,11 +11,33 @@ const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  // Next.js sets Cross-Origin-Opener-Policy: same-origin by default, which
+  // silently breaks Firebase's signInWithPopup(GoogleAuthProvider): the
+  // popup completes the OAuth handshake correctly, but same-origin COOP
+  // blocks the opener window from detecting that via window.closed, so
+  // Firebase's SDK times out and reports "auth/popup-closed-by-user" even
+  // though the user never closed anything. same-origin-allow-popups keeps
+  // the cross-origin isolation Next.js wants while allowing that one
+  // opener/popup relationship.
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
   {
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      // apis.google.com — Firebase's signInWithPopup(GoogleAuthProvider)
+      // loads Google's gapi/api.js into the popup to run the OAuth
+      // handshake; without this the script load is blocked and Firebase
+      // surfaces it only as an opaque "auth/internal-error", not a CSP
+      // violation, which is why this one took an actual DevTools Network
+      // trace to find.
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com",
+      // accounts.google.com — Google's OAuth consent/account-chooser UI,
+      // embedded by the popup. *.firebaseapp.com — Firebase Auth's own
+      // hidden iframe (authDomain), which the JS SDK uses internally to
+      // manage sign-in state across the popup handshake; without it the
+      // popup flow fails with an opaque "Framing ... violates ... frame-src"
+      // CSP error, not an auth-specific one.
+      "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com",
       // fonts.googleapis.com serves the Inter/Manrope stylesheet
       // ((public) layout's <link>), which in turn references woff2 files
       // hosted on fonts.gstatic.com — without both, the CSP silently
