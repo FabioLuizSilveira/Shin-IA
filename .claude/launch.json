@@ -18,6 +18,25 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@shina/storybook", "dev"],
       "port": 6006
+    },
+    {
+      "name": "avantti-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:/Users/fabio/Avantti-Site", "run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "riviera-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:/Users/fabio/LinhaRiviera", "run", "dev"],
+      "port": 3001
+    },
+    {
+      "name": "guardian-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:/Users/fabio/.antigravity/production-guardian", "run", "dev"],
+      "port": 8080,
+      "autoPort": true
     }
   ]
 }
