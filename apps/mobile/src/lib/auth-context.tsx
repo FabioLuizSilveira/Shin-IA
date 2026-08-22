@@ -8,16 +8,34 @@ import {
   type ReactNode,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
+import type { User as FirebaseUser } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signInWithCustomToken as firebaseSignInWithCustomToken,
+  signOut as firebaseSignOut,
+} from "firebase/auth";
 import { supabase } from "./supabase";
+import { getFirebaseAuth } from "./firebase";
 import { areMocksAllowed } from "./mock-policy";
 import { perfMark } from "./perf-trace";
 
+// Mirrors apps/web's NEXT_PUBLIC_IDENTITY_PROVIDER gate. Firebase-provider
+// consumers only ever read `session` for truthiness (see persona-context.tsx,
+// navigation.tsx) — no screen destructures Supabase-specific fields — so
+// exposing a FirebaseUser under the same `session` name here is a drop-in
+// swap, not a breaking change to any consumer.
+const USE_FIREBASE = process.env.EXPO_PUBLIC_IDENTITY_PROVIDER === "firebase";
+
 interface AuthContextValue {
-  session: Session | null;
+  session: Session | FirebaseUser | null;
   loading: boolean;
   demoMode: boolean;
   signOut: () => Promise<void>;
   enterDemoMode: () => void;
+  // Only meaningful when USE_FIREBASE — LoginScreen's demo buttons need to
+  // complete a custom-token sign-in themselves (server round trip to mint
+  // the token), this just finishes it and updates context state.
+  signInWithCustomToken: (token: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -26,9 +44,51 @@ const AuthContext = createContext<AuthContextValue>({
   demoMode: false,
   signOut: async () => {},
   enterDemoMode: () => {},
+  signInWithCustomToken: async () => {},
 });
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+function useFirebaseAuthProvider(): AuthContextValue {
+  const [session, setSession] = useState<FirebaseUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [demoMode, setDemoMode] = useState(false);
+
+  useEffect(() => {
+    perfMark("session_restore_start");
+    const auth = getFirebaseAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setSession(user);
+      setLoading(false);
+      if (user) setDemoMode(false);
+      perfMark("session_restore_done", { hasSession: !!user });
+    });
+    return unsubscribe;
+  }, []);
+
+  const enterDemoMode = useCallback(() => {
+    if (!areMocksAllowed()) return;
+    setDemoMode(true);
+    setLoading(false);
+  }, []);
+
+  const signOut = useCallback(async () => {
+    setDemoMode(false);
+    if (session) await firebaseSignOut(getFirebaseAuth());
+    setSession(null);
+  }, [session]);
+
+  const signInWithCustomToken = useCallback(async (token: string) => {
+    await firebaseSignInWithCustomToken(getFirebaseAuth(), token);
+    // onAuthStateChanged above picks up the resulting user and updates
+    // `session` — no need to setSession() here too.
+  }, []);
+
+  return useMemo(
+    () => ({ session, loading, demoMode, signOut, enterDemoMode, signInWithCustomToken }),
+    [session, loading, demoMode, signOut, enterDemoMode, signInWithCustomToken],
+  );
+}
+
+function useSupabaseAuthProvider(): AuthContextValue {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [demoMode, setDemoMode] = useState(false);
@@ -79,11 +139,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.subscription.unsubscribe();
   }, []);
 
-  // M22.5 — demo mode never touches Supabase; it is a purely local UI state
-  // that only exists to preview mock-backed screens without a real
-  // session. It is a no-op unless __DEV__ AND EXPO_PUBLIC_ENABLE_MOCKS are
-  // both true — see mock-policy.ts, which this function delegates to so
-  // there is exactly one place that decides "is mock/demo allowed here".
   const enterDemoMode = useCallback(() => {
     if (!areMocksAllowed()) return;
     setDemoMode(true);
@@ -103,14 +158,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, [session]);
 
+  const signInWithCustomToken = useCallback(async () => {
+    throw new Error(
+      "signInWithCustomToken is only available when EXPO_PUBLIC_IDENTITY_PROVIDER=firebase",
+    );
+  }, []);
+
   // Perf audit finding: this object literal was rebuilt every render with
   // no memoization, so every useAuth() consumer re-rendered on any change
   // to any field, even ones it doesn't read.
-  const value = useMemo(
-    () => ({ session, loading, demoMode, signOut, enterDemoMode }),
-    [session, loading, demoMode, signOut, enterDemoMode],
+  return useMemo(
+    () => ({ session, loading, demoMode, signOut, enterDemoMode, signInWithCustomToken }),
+    [session, loading, demoMode, signOut, enterDemoMode, signInWithCustomToken],
   );
+}
 
+export function AuthProvider({ children }: { children: ReactNode }) {
+  // Hook choice is a build-time constant (env var), not conditional per
+  // render — safe despite looking like "calling a hook conditionally":
+  // USE_FIREBASE never changes within a running app instance.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const value = USE_FIREBASE ? useFirebaseAuthProvider() : useSupabaseAuthProvider();
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

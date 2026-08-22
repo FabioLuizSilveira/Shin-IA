@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -11,24 +11,57 @@ import {
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
+import * as Google from "expo-auth-session/providers/google";
 import * as AppleAuthentication from "expo-apple-authentication";
+import { GoogleAuthProvider, OAuthProvider, signInWithCredential } from "firebase/auth";
 import { supabase } from "../lib/supabase";
+import { getFirebaseAuth } from "../lib/firebase";
 import { areMocksAllowed } from "../lib/mock-policy";
 import { useAuth } from "../lib/auth-context";
 import { shinaia, ApiError } from "../lib/shinaia-api";
 
 WebBrowser.maybeCompleteAuthSession();
 
+const USE_FIREBASE = process.env.EXPO_PUBLIC_IDENTITY_PROVIDER === "firebase";
+
 const redirectTo = makeRedirectUri({ scheme: "shinacustomer", path: "auth/callback" });
 
 export function LoginScreen() {
-  const { enterDemoMode } = useAuth();
+  const { enterDemoMode, signInWithCustomToken } = useAuth();
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState<"tenant" | "customer" | null>(null);
+
+  // Google OAuth client IDs are per-platform and separate from the
+  // Firebase project's own web client — MANUAL CONFIGURATION REQUIRED:
+  // create OAuth 2.0 Client IDs (type "iOS"/"Android"/"Web application")
+  // in the Firebase project's linked Google Cloud Console
+  // (APIs & Services -> Credentials), matching this app's bundle
+  // identifier/package name and SHA-1 fingerprint, then set
+  // EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID / EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID /
+  // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID. Until then, useAuthRequest below
+  // returns a null `request` and the button below is disabled with an
+  // explanatory label rather than crashing.
+  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  });
+
+  useEffect(() => {
+    if (!USE_FIREBASE || googleResponse?.type !== "success") return;
+    const idToken = googleResponse.params.id_token;
+    if (!idToken) return;
+    setGoogleLoading(true);
+    signInWithCredential(getFirebaseAuth(), GoogleAuthProvider.credential(idToken))
+      .catch((err) =>
+        Alert.alert("Erro", err instanceof Error ? err.message : "Falha ao entrar com Google"),
+      )
+      .finally(() => setGoogleLoading(false));
+  }, [googleResponse]);
 
   // The approved (Emergent) design had a single "Entrar em modo
   // demonstração" button on this screen, but backed by a fully mocked,
@@ -37,15 +70,19 @@ export function LoginScreen() {
   // This is the real equivalent: two fixed, dedicated accounts already
   // provisioned against the real Veloz Rent a Car tenant (a real staff
   // login and a real customer login, both with real data behind them) —
-  // POST /api/mobile/demo-login signs in as one of them and returns real
-  // tokens, which hydrate a real Supabase session exactly like Google/
-  // Apple/magic-link do. No mock data, no bypassed backend.
+  // signs in as one of them and returns a real session, exactly like
+  // Google/Apple/magic-link do. No mock data, no bypassed backend.
   async function handleDemoLogin(persona: "tenant" | "customer") {
     setDemoLoading(persona);
     try {
-      const { access_token, refresh_token } = await shinaia.demoLogin(persona);
-      const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-      if (error) throw error;
+      if (USE_FIREBASE) {
+        const { customToken } = await shinaia.firebaseDemoLogin(persona);
+        await signInWithCustomToken(customToken);
+      } else {
+        const { access_token, refresh_token } = await shinaia.demoLogin(persona);
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (error) throw error;
+      }
     } catch (err) {
       Alert.alert(
         "Erro",
@@ -64,8 +101,21 @@ export function LoginScreen() {
   // operators), never via "an auth user exists" — a Google login with no
   // membership row anywhere comes back userType: "unprovisioned" and gets
   // zero operational access, regardless of how the auth identity was
-  // created (Wave 0.1/0.2).
+  // created (Wave 0.1/0.2). Same guarantee applies to the Firebase path —
+  // resolveMobileContext() never trusts anything but real membership rows.
   async function handleGoogleLogin() {
+    if (USE_FIREBASE) {
+      if (!googleRequest) {
+        Alert.alert(
+          "Google indisponível",
+          "Configuração pendente (EXPO_PUBLIC_GOOGLE_*_CLIENT_ID) — ver docs/architecture/FIREBASE_AUTH_MIGRATION.md.",
+        );
+        return;
+      }
+      await promptGoogleAsync();
+      return;
+    }
+
     setGoogleLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -85,15 +135,17 @@ export function LoginScreen() {
 
   // M22.3 — Apple Sign-In. Uses the native Sign in with Apple button
   // (iOS-only per Apple's own HIG/App Review requirement — there is no
-  // Android/web equivalent), exchanging Apple's identityToken for a real
-  // Supabase session via signInWithIdToken(). This still requires two
-  // pieces of external configuration this code cannot verify itself:
-  // (1) "Sign In with Apple" capability enabled on the app's Apple Developer
-  // identifier, and (2) the Apple provider configured in the Supabase
-  // dashboard (Authentication → Providers → Apple, with the Services ID/
-  // key). MANUAL CONFIGURATION REQUIRED for both before this button will
-  // actually authenticate — the code path is real and correct, but cannot
-  // self-verify infrastructure it doesn't control.
+  // Android/web equivalent). Exchanges Apple's identityToken for a real
+  // session — Supabase's signInWithIdToken() normally, or Firebase's
+  // OAuthProvider('apple.com') credential when USE_FIREBASE. Either path
+  // still requires the same two pieces of external configuration this code
+  // cannot verify itself: (1) "Sign In with Apple" capability enabled on
+  // the app's Apple Developer identifier, and (2) the Apple provider
+  // configured in the relevant auth dashboard (Supabase's, or Firebase
+  // Console -> Authentication -> Sign-in method -> Apple, with the
+  // Services ID/key). MANUAL CONFIGURATION REQUIRED for both before this
+  // button will actually authenticate — the code path is real and correct,
+  // but cannot self-verify infrastructure it doesn't control.
   async function handleAppleLogin() {
     setAppleLoading(true);
     try {
@@ -104,11 +156,18 @@ export function LoginScreen() {
         ],
       });
       if (!credential.identityToken) throw new Error("Apple não retornou um identityToken");
-      const { error } = await supabase.auth.signInWithIdToken({
-        provider: "apple",
-        token: credential.identityToken,
-      });
-      if (error) throw error;
+
+      if (USE_FIREBASE) {
+        const provider = new OAuthProvider("apple.com");
+        const firebaseCredential = provider.credential({ idToken: credential.identityToken });
+        await signInWithCredential(getFirebaseAuth(), firebaseCredential);
+      } else {
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: "apple",
+          token: credential.identityToken,
+        });
+        if (error) throw error;
+      }
     } catch (err) {
       const code = (err as { code?: string })?.code;
       if (code === "ERR_REQUEST_CANCELED") return;
@@ -170,38 +229,48 @@ export function LoginScreen() {
       )}
       {appleLoading && <ActivityIndicator style={{ marginTop: 8 }} />}
 
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>ou</Text>
-        <View style={styles.dividerLine} />
-      </View>
-
-      {sent ? (
-        <Text style={styles.sentText}>
-          Enviamos um link de acesso para {email}. Abra-o neste dispositivo para entrar.
-        </Text>
-      ) : (
+      {/* Magic Link still only produces a Supabase session — with the
+          backend cut over to Firebase (USE_FIREBASE), that session
+          wouldn't be recognized by requireMobileContext(), so it's hidden
+          rather than left silently broken. Firebase's email-link
+          equivalent needs its own Dynamic Links / deep-link redirect
+          domain setup, not done yet — see FIREBASE_AUTH_MIGRATION.md. */}
+      {!USE_FIREBASE && (
         <>
-          <TextInput
-            style={styles.input}
-            placeholder="seu@email.com"
-            placeholderTextColor="#94A3B8"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <Pressable
-            style={[styles.button, styles.magicLinkButton]}
-            onPress={() => void handleMagicLink()}
-            disabled={sending || !email.trim()}
-          >
-            {sending ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.magicLinkButtonText}>Enviar link de acesso</Text>
-            )}
-          </Pressable>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ou</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {sent ? (
+            <Text style={styles.sentText}>
+              Enviamos um link de acesso para {email}. Abra-o neste dispositivo para entrar.
+            </Text>
+          ) : (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="seu@email.com"
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
+              />
+              <Pressable
+                style={[styles.button, styles.magicLinkButton]}
+                onPress={() => void handleMagicLink()}
+                disabled={sending || !email.trim()}
+              >
+                {sending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.magicLinkButtonText}>Enviar link de acesso</Text>
+                )}
+              </Pressable>
+            </>
+          )}
         </>
       )}
 

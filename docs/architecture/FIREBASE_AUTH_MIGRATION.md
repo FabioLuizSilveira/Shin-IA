@@ -7,7 +7,7 @@
 **AUTHORIZATION: SHINÃ IAM / RBAC / ABAC (unchanged)**
 **CANONICAL USER ID: SHINÃ (`shina_user_id`)**
 
-Status: **Phase 1 (Firebase Foundation) complete. Phase 2 (App Integration + Demo Users) in progress — real Firebase session cookies, middleware, and the real apps/web login page (Google + both demo accounts) all built and working end-to-end in local dev only. Nothing of this is active in Vercel/production — `IDENTITY_PROVIDER`/`NEXT_PUBLIC_IDENTITY_PROVIDER` are only set in `apps/web/.env.local`, never in Vercel, specifically because apps/mobile hasn't been migrated yet (see "Mobile not migrated yet" below) and would break if the server-side switch flipped in production. Phase 3 not started.**
+Status: **Phase 1 complete. Phase 2 in progress — apps/web's real login (Google + both demo accounts) built and verified end-to-end in local dev; the mobile-API backend gap (`requireMobileContext()` bypassing the identity provider) found and fixed; apps/mobile's client-side code written and gated behind `EXPO_PUBLIC_IDENTITY_PROVIDER`, but NOT device-tested (see "apps/mobile — built, not device-verified" below). Nothing of this is active in Vercel/production or any EAS build profile — every Firebase-provider env var stays local-only until mobile is actually confirmed working on a real device. Phase 3 not started.**
 
 ## What's migrating and what isn't
 
@@ -310,21 +310,82 @@ itself was left completely untouched and still correctly blocks access,
 which is the security-correct outcome to leave in place until Firebase
 MFA is actually built.
 
-## Mobile not migrated yet — the actual reason Vercel stays untouched
+## Backend gap found and fixed: `requireMobileContext()` bypassed the identity provider
 
-`apps/mobile` still authenticates entirely via Supabase
-(`auth-context.tsx`) and sends Supabase-issued bearer tokens to every
-`apps/web` API route it calls. If `IDENTITY_PROVIDER=firebase` were ever
-set in Vercel before mobile is migrated, `FirebaseIdentityProvider.
-getSessionFromBearerToken()` would reject every one of those tokens
-(wrong issuer/signature) — the entire mobile app (tenant staff, customer,
-and operator personas alike) would 401 on every API call. This is why
-every Firebase env var affecting _behavior_ (`IDENTITY_PROVIDER`,
-`NEXT_PUBLIC_IDENTITY_PROVIDER`) is local-only right now — the _config_
-values (`NEXT_PUBLIC_FIREBASE_*`, `FIREBASE_ADMIN_*`) are in Vercel
-(harmless on their own, since nothing reads them unless the provider is
-switched), but the switch itself is not. Migrating mobile is the
-explicit next step before any production cutover consideration.
+Scoping the mobile migration surfaced a second, separate backend bug: unlike
+`requireTenantScope()` (already provider-aware since Phase 1),
+`apps/web/src/lib/mobile-context.ts`'s `requireMobileContext()` — used by
+~20 `/api/mobile/*` routes the mobile app calls — called
+`db.auth.getUser(bearerToken)` directly. Migrating mobile's client alone
+would have hit a wall here regardless. Fixed the same way
+`requireTenantScope()` already was: token verification now goes through
+`identityProvider`, `resolveMobileContext()`'s pure tenant/customer/
+operator/unprovisioned resolution logic is untouched. Verified live —
+`/api/mobile/bootstrap` resolves correctly through a real Firebase ID
+token.
+
+## apps/mobile — built, not device-verified
+
+Client-side code written, gated behind `EXPO_PUBLIC_IDENTITY_PROVIDER`
+(mirrors `NEXT_PUBLIC_IDENTITY_PROVIDER`) — every consumer of
+`useAuth().session` across the app only ever checks truthiness (confirmed
+by reading every call site), never a Supabase-specific field, so swapping
+the underlying object for a Firebase `User` was a safe, drop-in change:
+
+- `apps/mobile/src/lib/firebase.ts` — client init via `initializeAuth` +
+  `getReactNativePersistence(AsyncStorage)` (AsyncStorage was already a
+  dependency). Hit a known upstream TypeScript gap
+  (firebase-js-sdk#9316/#7615): `getReactNativePersistence` exists at
+  runtime under `"firebase/auth"` — Metro's bundler-time module resolution
+  picks the react-native-specific build that has it — but `tsc`'s plain
+  Node resolution lands on the generic build's `.d.ts`, which doesn't
+  declare it. Fixed with a `@ts-expect-error` and a comment citing the
+  upstream issue, not by disabling the check more broadly.
+- `apps/mobile/src/lib/auth-context.tsx` — two full provider
+  implementations (`useFirebaseAuthProvider`/`useSupabaseAuthProvider`),
+  selected once by the env var, not branched inline throughout the file.
+- `apps/mobile/src/lib/shinaia-api.ts` — `authHeader()` sends a Firebase ID
+  token instead of the Supabase access token when the flag is set; a new
+  `firebaseDemoLogin()` calls the same `/api/auth/firebase/demo-login`
+  route apps/web's login screen uses (server-minted custom token, demo
+  password never touches the client).
+- `apps/mobile/src/screens/LoginScreen.tsx` — demo buttons fully rewired
+  (custom-token sign-in, same pattern as web); Google via
+  `expo-auth-session`'s `useIdTokenAuthRequest` +
+  `signInWithCredential(GoogleAuthProvider.credential(idToken))`; Apple via
+  the existing native `expo-apple-authentication` credential +
+  `signInWithCredential(OAuthProvider('apple.com').credential(...))`; Magic
+  Link hidden when the flag is set (same reasoning as apps/web — it would
+  only produce a session the Firebase-cut-over backend doesn't recognize).
+
+**Cannot verify without a real device/simulator, which this environment
+doesn't have** — explicitly out of scope for this session, not skipped by
+oversight:
+
+- Google sign-in needs its own OAuth 2.0 Client IDs per platform
+  (`EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`/`_ANDROID_CLIENT_ID`/`_WEB_CLIENT_ID`,
+  separate from the Firebase project's default web client) —
+  `MANUAL CONFIGURATION REQUIRED`, unset placeholders in `.env.example`.
+  Until set, the button shows an explanatory alert instead of crashing.
+- Apple sign-in via Firebase needs the same Apple Developer Services ID/
+  Key/Team ID configuration the pre-existing Supabase path already
+  required, plus Apple enabled as a provider in Firebase Console
+  specifically (separate from Supabase's own Apple provider config).
+- AsyncStorage-backed session persistence across app restarts, and the
+  full demo-login round trip through the actual Expo app — the equivalent
+  flow was verified via curl against the real backend (see above), but
+  never through the RN app's own network/storage stack.
+
+## Mobile client is written but production cutover is still blocked on real-device verification
+
+`IDENTITY_PROVIDER=firebase`/`NEXT_PUBLIC_IDENTITY_PROVIDER=firebase`/
+`EXPO_PUBLIC_IDENTITY_PROVIDER=firebase` all remain local-only — none are
+set in Vercel or any EAS build profile. Setting the web ones in Vercel
+before the mobile app above is confirmed working on a real device would
+401 every `/api/mobile/*` call from whatever mobile builds are already
+installed, even though the backend-side bug is now fixed — the risk left
+is purely "does the untested client code actually work," not "is the
+backend ready."
 
 ## What Phase 2 needs from the user before it can start
 

@@ -1,7 +1,10 @@
 import { supabase } from "./supabase";
+import { getFirebaseAuth } from "./firebase";
 import { areMocksAllowed } from "./mock-policy";
 import { MOCK } from "./mocks";
 import { perfMark, PERF_TRACE_ENABLED } from "./perf-trace";
+
+const USE_FIREBASE = process.env.EXPO_PUBLIC_IDENTITY_PROVIDER === "firebase";
 
 // M22/M23 — typed data-access layer. Single point of HTTP for the whole
 // app; no screen ever calls fetch() directly. Paths corrected against the
@@ -12,6 +15,10 @@ import { perfMark, PERF_TRACE_ENABLED } from "./perf-trace";
 const API_BASE = (process.env.EXPO_PUBLIC_SHINAIA_API_URL ?? "").replace(/\/$/, "");
 
 async function authHeader(): Promise<Record<string, string>> {
+  if (USE_FIREBASE) {
+    const token = await getFirebaseAuth().currentUser?.getIdToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -215,6 +222,14 @@ export const shinaia = {
     request<{ access_token: string; refresh_token: string }>("POST", "/api/mobile/demo-login", {
       persona,
     }),
+
+  // Firebase equivalent of demoLogin() above — mints a custom token
+  // server-side (apps/web's api/auth/firebase/demo-login, shared with the
+  // web login screen) so the app never handles the demo account's real
+  // password. LoginScreen exchanges the token for a real Firebase session
+  // via signInWithCustomToken.
+  firebaseDemoLogin: (persona: "tenant" | "customer") =>
+    request<{ customToken: string }>("POST", "/api/auth/firebase/demo-login", { persona }),
 
   // Customer contract renewal — real Stripe Checkout, no fake mocks (the
   // demo customer login already gets real data; these hit the real
