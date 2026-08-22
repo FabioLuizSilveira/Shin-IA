@@ -18,6 +18,7 @@ const SITE_PATHS = [
   "/about",
   "/demo",
   "/privacidade",
+  "/termos",
   // Next.js metadata routes (app/robots.ts, app/sitemap.ts) plus the
   // static public/llms.txt — the middleware matcher only excludes image
   // extensions (see config.matcher below), so these .txt/.xml requests
@@ -50,6 +51,7 @@ const APP_PUBLIC_PATHS = [
   // session on both the marketing domain (SITE_PATHS) and the app
   // subdomain, since /onboarding itself lives on the app subdomain.
   "/privacidade",
+  "/termos",
   "/api/commercial",
   "/api/auth",
   "/api/webhooks",
