@@ -6,6 +6,7 @@ import Link from "next/link";
 const FOOTER_LINKS = [
   { label: "Plataforma", href: "/#plataforma" },
   { label: "Soluções", href: "/#solucoes" },
+  { label: "Termos de Uso", href: "/termos" },
   { label: "Privacidade", href: "/privacidade" },
   { label: "Contato", href: "/contact" },
 ];
