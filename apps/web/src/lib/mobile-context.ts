@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { headers } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { decodeSessionClaims, type SessionClaims } from "@/lib/jwt-claims";
+import { identityProvider } from "@/lib/identity";
+import { type SessionClaims } from "@/lib/jwt-claims";
 import { getActiveImpersonation } from "@/lib/impersonation";
 
 // Wave 0.4 — the mobile equivalent of TenantScope (tenant-context.ts), but
@@ -201,35 +201,19 @@ export async function requireMobileContext(): Promise<MobileContext | MobileCont
 
   const db = createAdminClient();
 
-  if (bearerToken) {
-    const {
-      data: { user },
-      error,
-    } = await db.auth.getUser(bearerToken);
-    if (error || !user) return { error: "Unauthorized", status: 401 };
-
-    const claims = decodeSessionClaims(bearerToken);
-    return resolveMobileContext({
-      claims,
-      userId: user.id,
-      email: user.email ?? null,
-      db,
-    });
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const session = bearerToken
+    ? await identityProvider.getSessionFromBearerToken(bearerToken)
+    : await identityProvider.getSessionFromCookies();
   if (!session) return { error: "Unauthorized", status: 401 };
 
-  const claims = decodeSessionClaims(session.access_token);
-  return resolveMobileContext({
-    claims,
-    userId: session.user.id,
-    email: session.user.email ?? null,
-    db,
-  });
+  const { uid: userId, email, tenantId, tenantRole, platformRole } = session.identity;
+  const claims: SessionClaims = {
+    tenant_id: tenantId,
+    tenant_role: tenantRole,
+    platform_role: platformRole,
+  };
+
+  return resolveMobileContext({ claims, userId, email, db });
 }
 
 export function isUnprovisioned(context: MobileContext): context is UnprovisionedMobileContext {
