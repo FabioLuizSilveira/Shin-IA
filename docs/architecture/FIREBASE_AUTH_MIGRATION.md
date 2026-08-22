@@ -124,39 +124,58 @@ Verified live against the real project (not mocked):
 - Full real round trip: created a real temporary Firebase user via Admin
   SDK → confirmed the Admin SDK's own capabilities are fully live.
 
-**One real gap found, unresolved — deferred to Phase 2, not a Phase 1
-blocker**: signing in through Firebase's client-facing Identity Toolkit
-REST endpoint (`accounts:signInWithPassword`, the same call the `firebase`
-client SDK makes under the hood) with `NEXT_PUBLIC_FIREBASE_API_KEY`
-consistently returns `400 API key not valid` from a server-side script
-(Node `fetch`/`curl`), even after confirming, live, all of: the key value
-matches exactly what's configured; "Restrições do aplicativo" = Nenhum;
-"Restrições de API" includes both Identity Toolkit API and Token Service
-API (25 APIs total, both present); the Identity Toolkit API is enabled at
-the project level and shows real logged requests. Every checkable cause on
-the Google Cloud Console side was ruled out across 4 rounds of live
-verification.
+## Two real bugs found and fixed, both now resolved
 
-The Admin SDK path — what `FirebaseIdentityProvider` actually uses in
-production to verify tokens — is fully confirmed working (real project,
-real `listUsers()`, real user create/delete, real garbage-token rejection).
-This gap only affects testing the raw REST sign-in call from a script
-outside a browser; it's possible a real browser session (proper Origin/
-`X-Client-Version` headers the official `firebase` SDK sends, which a bare
-`fetch`/`curl` doesn't replicate) behaves differently, or there's an
-account/org-level Google Cloud policy invisible from the Console screens
-checked so far. Decision (2026-08-22): stop debugging this via synthetic
-server-side requests and re-test it for real once Phase 2 builds the
-actual login screen with the official SDK running in a browser — that's a
-more representative test than a Node script pretending to be a browser
-anyway.
+**Bug 1 — CSP blocked every client-side Firebase Auth call.**
+`apps/web/next.config.mjs`'s `connect-src` CSP directive didn't allow
+`identitytoolkit.googleapis.com`/`securetoken.googleapis.com`, so any
+browser running the real `firebase` client SDK had every Auth request
+silently blocked before it left the page (`auth/network-request-failed`,
+zero network requests actually sent — confirmed via `read_network_requests`
+during the Owner Safety Gate test). Fixed by adding both domains to
+`connect-src`. This is the same bug class fixed earlier this session for
+Google Fonts on `apps/mkt` — a CSP allowlist missing a legitimate
+third-party origin the app actually needs.
+
+**Bug 2 — the original `NEXT_PUBLIC_FIREBASE_API_KEY` was genuinely dead.**
+After the CSP fix, both a real browser and the server-side script still got
+`400 auth/api-key-not-valid` from Google directly — ruling out CSP,
+sandbox, and every Console-visible cause (API enablement, key/app/API
+restrictions, correct key value, all confirmed across 4 rounds of live
+checks). Created a second, brand-new unrestricted API key in the same
+project as an isolation test — it worked immediately, confirming the
+original key itself was broken (not the project, not an org policy). The
+working key (`AIzaSyBiOwgvKL2w_JScnZNHEsuguiRdipXKoh4`) has replaced the
+old one in `apps/web/.env.local`, `apps/mkt/.env.local`, and all Vercel
+environments for both apps. The old key was left as-is in Google Cloud
+Console (dead, unrestricted-but-non-functional) — safe to delete there
+whenever convenient, not urgent since it doesn't work anyway.
+
+## Owner Safety Gate (spec item 23): PASS
+
+Full real round trip, real browser, real project — no mocks:
+
+1. Created the Platform Owner's Firebase account (linked via
+   `external_identities`: `firebase` provider, uid
+   `VWsdoQaGAbeEwIWWwZmpCsSFH5t2` → existing `shina_user_id`
+   `dea846ea-f473-4032-9b01-0d60b21058c0`, the owner's pre-existing
+   Supabase auth uid).
+2. Signed in from a real browser using the real `firebase` client SDK
+   (after the CSP fix) — got a real ID token.
+3. Verified that token with Firebase Admin — same call
+   `FirebaseIdentityProvider` makes in production.
+4. Resolved the canonical identity via `external_identities` +
+   `resolve_shina_authorization_context` — got back
+   `platform_role: platform_owner`, `tenant_role: tenant_admin`,
+   `platform_contract_current: true`, matching the owner's real,
+   pre-existing authorization state exactly.
+
+The temporary diagnostic page/route/middleware exemption used for this test
+(`/dev-firebase-probe`) were all deleted immediately after — never merged,
+never deployed.
 
 ## What Phase 2 needs from the user before it can start
 
-- Re-test client-side Email/Password sign-in with the real `firebase` SDK
-  in a browser once the login screen exists — if the same error appears
-  there, it needs a fresh diagnosis (possibly Google Cloud Support, if it's
-  an account/org-level policy).
 - Apple sign-in shows as enabled in Firebase Console already, but per spec
   items 19/20, actually exercising it also needs an Apple Developer Service
   ID/Key/Team ID and a registered redirect — not yet confirmed configured.

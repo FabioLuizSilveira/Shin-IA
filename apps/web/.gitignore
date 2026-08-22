@@ -3,3 +3,11 @@
 
 .vercel
 .env*
+
+# Temporary scratch scripts/artifacts used for one-off local verification —
+# never meant to be committed.
+*.local
+check_owner.mjs
+create_owner_firebase.mjs
+cleanup_test_user.mjs
+verify_*.mjs

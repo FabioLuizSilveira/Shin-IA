@@ -25,7 +25,14 @@ const SECURITY_HEADERS = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https:",
       "font-src 'self' data: https://fonts.gstatic.com",
-      "connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.stripe.com",
+      // identitytoolkit/securetoken.googleapis.com — Firebase Auth's REST
+      // endpoints (sign-in, token refresh), called directly by the
+      // `firebase` client SDK. Missing this silently blocked every
+      // Firebase auth call client-side with a generic "network-request-
+      // failed", while a server-side curl to the same endpoint got a real
+      // (and separately investigated) response — the two failures looked
+      // identical from the app but had different causes.
+      "connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.stripe.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
       "frame-ancestors 'none'",
     ].join("; "),
   },
