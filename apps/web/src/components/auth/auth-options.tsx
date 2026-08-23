@@ -6,11 +6,19 @@
 // Supabase Auth. O redirect passa pelo /auth/callback já existente.
 
 import { useState } from "react";
-import { GoogleAuthProvider, signInWithCustomToken, signInWithPopup } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  sendSignInLinkToEmail,
+  signInWithCustomToken,
+  signInWithPopup,
+} from "firebase/auth";
 import { createClient } from "@/lib/supabase/client";
 import { firebaseAuth } from "@/lib/firebase-client";
+import { establishFirebaseSession } from "@/lib/firebase-session";
 import { appUrl } from "@/lib/domain";
 import { Loader2, Mail } from "lucide-react";
+
+const MAGIC_LINK_EMAIL_STORAGE_KEY = "shina_magic_link_email";
 
 // Client-side mirror of IDENTITY_PROVIDER — see .env.local's comment next
 // to NEXT_PUBLIC_IDENTITY_PROVIDER for why this must never be set in
@@ -65,23 +73,6 @@ export function AuthOptions() {
   const [magicSent, setMagicSent] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Exchanges a fresh Firebase ID token for the httpOnly session cookie
-  // requireTenantScope() and middleware.ts's edge verifier both read (see
-  // app/api/auth/firebase/session/route.ts) — a Firebase client-side sign-in
-  // alone never touches the backend's own session state.
-  async function establishFirebaseSession(idToken: string) {
-    const res = await fetch("/api/auth/firebase/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken }),
-    });
-    if (!res.ok) throw new Error("Falha ao estabelecer sessão.");
-    // "/" (not a specific dashboard) so middleware's existing role-based
-    // redirect (accessCount/homeForUser) decides the destination — same
-    // logic already used for the Supabase flow, not duplicated here.
-    window.location.href = "/";
-  }
 
   async function handleFirebaseGoogle() {
     setLoading("google");
@@ -178,7 +169,41 @@ export function AuthOptions() {
     }
   }
 
+  // Firebase's sendSignInLinkToEmail() has no shouldCreateUser:false
+  // equivalent — /api/auth/firebase/magic-link/precheck (server-side)
+  // decides whether an account actually exists first; the UI always shows
+  // "link enviado" regardless, so a failed precheck doesn't leak which
+  // emails have accounts (same anti-enumeration posture the Supabase flow
+  // already had).
+  async function handleFirebaseMagicLink(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading("magic");
+    setError(null);
+    try {
+      const precheckRes = await fetch("/api/auth/firebase/magic-link/precheck", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const precheckJson = await precheckRes.json();
+      if (precheckJson?.data?.allowed) {
+        window.localStorage.setItem(MAGIC_LINK_EMAIL_STORAGE_KEY, email);
+        await sendSignInLinkToEmail(firebaseAuth, email, {
+          url: `${window.location.origin}/auth/magic-link-callback`,
+          handleCodeInApp: true,
+        });
+      }
+      setMagicSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao enviar o link.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
   async function handleMagicLink(e: React.FormEvent) {
+    if (USE_FIREBASE) return handleFirebaseMagicLink(e);
+
     e.preventDefault();
     setLoading("magic");
     setError(null);
@@ -224,73 +249,70 @@ export function AuthOptions() {
         </span>
       </button>
 
-      {/* Magic Link and Facebook still only produce a Supabase session —
-          with the backend cut over to Firebase (USE_FIREBASE), that
-          session wouldn't be recognized by requireTenantScope() or
-          middleware.ts, so both are hidden rather than left silently
-          broken. Re-enable once they have a Firebase-backed equivalent. */}
-      {!USE_FIREBASE && (
-        <>
-          <div className="flex items-center gap-3 py-1">
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="text-xs text-slate-400">ou</span>
-            <div className="flex-1 h-px bg-white/10" />
-          </div>
+      <div className="flex items-center gap-3 py-1">
+        <div className="flex-1 h-px bg-white/10" />
+        <span className="text-xs text-slate-400">ou</span>
+        <div className="flex-1 h-px bg-white/10" />
+      </div>
 
-          {magicSent ? (
-            <div className="px-4 py-3 bg-green-400/10 border border-green-400/20 rounded-xl text-sm text-green-300 text-center">
-              Link enviado! Verifique seu e-mail para entrar.
-            </div>
-          ) : (
-            <form onSubmit={(e) => void handleMagicLink(e)} className="space-y-2">
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="voce@empresa.com.br"
-                className="w-full px-4 py-2.5 bg-black/20 border border-white/10 rounded-xl text-white text-sm placeholder:text-slate-500"
-              />
-              <button
-                type="submit"
-                disabled={loading !== null}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
-              >
-                {loading === "magic" ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Mail className="w-4 h-4" />
-                )}
-                Continuar com E-mail
-              </button>
-            </form>
-          )}
-
-          {showMore ? (
-            <button
-              type="button"
-              onClick={() => void handleOAuth("facebook")}
-              disabled={loading !== null}
-              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
-            >
-              {loading === "facebook" ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <FacebookIcon />
-              )}
-              Continuar com Facebook
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowMore(true)}
-              className="w-full text-xs text-slate-400 hover:text-slate-300 bg-transparent border-0 cursor-pointer py-1"
-            >
-              Mais opções
-            </button>
-          )}
-        </>
+      {magicSent ? (
+        <div className="px-4 py-3 bg-green-400/10 border border-green-400/20 rounded-xl text-sm text-green-300 text-center">
+          Link enviado! Verifique seu e-mail para entrar.
+        </div>
+      ) : (
+        <form onSubmit={(e) => void handleMagicLink(e)} className="space-y-2">
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="voce@empresa.com.br"
+            className="w-full px-4 py-2.5 bg-black/20 border border-white/10 rounded-xl text-white text-sm placeholder:text-slate-500"
+          />
+          <button
+            type="submit"
+            disabled={loading !== null}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
+          >
+            {loading === "magic" ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Mail className="w-4 h-4" />
+            )}
+            Continuar com E-mail
+          </button>
+        </form>
       )}
+
+      {/* Facebook still only produces a Supabase session — with the
+          backend cut over to Firebase (USE_FIREBASE), that session
+          wouldn't be recognized by requireTenantScope() or middleware.ts,
+          so it's hidden rather than left silently broken. Re-enable once
+          it has a Firebase-backed equivalent. */}
+      {!USE_FIREBASE &&
+        (showMore ? (
+          <button
+            type="button"
+            onClick={() => void handleOAuth("facebook")}
+            disabled={loading !== null}
+            className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition disabled:opacity-60"
+          >
+            {loading === "facebook" ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FacebookIcon />
+            )}
+            Continuar com Facebook
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowMore(true)}
+            className="w-full text-xs text-slate-400 hover:text-slate-300 bg-transparent border-0 cursor-pointer py-1"
+          >
+            Mais opções
+          </button>
+        ))}
 
       <div className="flex items-center gap-3 py-1">
         <div className="flex-1 h-px bg-white/10" />

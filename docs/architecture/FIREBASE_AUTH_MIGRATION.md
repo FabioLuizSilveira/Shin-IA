@@ -538,6 +538,42 @@ that's the login-blocking Supabase MFA gate, a separate thing from this
 step-up mechanism, and out of scope for removal until Magic Link/Email
 Link (this roadmap's next step) is settled.
 
+## Firebase Email Link ("Magic Link") — built and verified live
+
+Firebase's passwordless email-link sign-in (`sendSignInLinkToEmail`/
+`signInWithEmailLink`), replacing Supabase's `signInWithOtp` for the
+Firebase-cut-over path. Same anti-enumeration posture as before: Firebase
+has no `shouldCreateUser: false` equivalent, so a new server route checks
+first.
+
+- `apps/web/src/app/api/auth/firebase/magic-link/precheck/route.ts` —
+  `{allowed: boolean}` via `getUserByEmail`. The client only actually calls
+  `sendSignInLinkToEmail` when `allowed`; the UI shows "link enviado"
+  either way, so a failed precheck doesn't leak which emails have
+  accounts.
+- `apps/web/src/app/(public)/auth/magic-link-callback/page.tsx` — new,
+  dedicated page (not a branch inside the existing `/auth/callback`, which
+  is Supabase's own PKCE exchange — kept fully separate so neither flow's
+  query-string/fragment parsing can interfere with the other's). Handles
+  the case where the link is opened on a different device than the one
+  that requested it (email not in this browser's `localStorage` — prompts
+  to re-confirm it, Firebase's documented pattern).
+- `apps/web/src/lib/firebase-session.ts` — `establishFirebaseSession()`
+  extracted out of `AuthOptions.tsx` into a shared function, now used by
+  every Firebase entry point (Google, demo, magic link) instead of being
+  duplicated.
+- Magic Link is now shown (not hidden) in `AuthOptions.tsx` when
+  `USE_FIREBASE` — it has a real Firebase-backed implementation now.
+  Facebook stays hidden (still Supabase-only, no migration planned yet).
+
+**Verified live, real cryptographic round trip, no mocks**: precheck
+correctly returns `allowed: true` for the Owner's real email and `false`
+for a nonexistent one; generated a real sign-in link via Firebase Admin,
+completed sign-in through the same `accounts:signInWithEmailLink` REST
+call the client SDK uses, established a real session cookie, and resolved
+real tenant data through `/api/mobile/bootstrap` — the full chain, not
+just the link-generation step.
+
 ## What Phase 2 needs from the user before it can start
 
 - Apple sign-in shows as enabled in Firebase Console already, but per spec
