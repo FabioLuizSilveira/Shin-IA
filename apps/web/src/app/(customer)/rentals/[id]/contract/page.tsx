@@ -72,7 +72,7 @@ export default function RentalContractPage() {
         if (r?.status === "active") setDone(true);
         if (r?.snapshot_id) {
           const [snap, basis] = await Promise.all([
-            fetchContractSnapshot(r.snapshot_id),
+            fetchContractSnapshot(r.id),
             fetchDataProcessingLegalBasis(r.id),
           ]);
           setSnapshot(snap);

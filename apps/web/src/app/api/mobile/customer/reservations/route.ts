@@ -14,6 +14,31 @@ function paymentReturnUrl(status: "success" | "cancelled", kind: string) {
   return `${base}/mobile/payment-complete?status=${status}&kind=${kind}`;
 }
 
+// GET — lists the caller's own reservations. Part of the web customer
+// portal's RLS→API migration (rentals-portal.ts's fetchMyReservations):
+// scoped by context.customerId, never by anything client-supplied.
+export async function GET() {
+  const context = await requireMobileContext();
+  if ("error" in context) {
+    return NextResponse.json({ error: context.error }, { status: context.status });
+  }
+  if (context.userType !== "customer") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { data, error } = await context.db
+    .from("rental_reservations")
+    .select(
+      "id, tenant_id, asset_id, period_starts_at, period_ends_at, total_amount, total_currency, " +
+        "deposit_amount, balance_amount, status, assets(name)",
+    )
+    .eq("rental_customer_id", context.customerId)
+    .order("created_at", { ascending: false });
+  if (error) return internalError(error);
+
+  return NextResponse.json({ data: data ?? [] });
+}
+
 // "Se o cliente opta por outro carro" — a real booking: pick dates, pay a
 // 20% deposit now to hold the period. This route creates the reservation +
 // deposit invoice + Stripe session; the deposit only actually counts once

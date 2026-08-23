@@ -1,13 +1,15 @@
-import { createClient } from "@/lib/supabase/client";
-
-// Web mirror of apps/mobile/src/lib/rentals.ts — same tables, same RLS-only
-// authorization model (see supabase/migrations/20260055000000_rental_customers.sql):
-// a rental customer's session has no tenant_id/platform_role JWT claim at
-// all (those only ever apply to tenant staff / platform admins), so every
-// query here relies entirely on Postgres RLS scoping by auth.uid(), exactly
-// like the mobile app. This is a stopgap web portal for rental customers
-// while native app store approval is pending — same backend, same
-// authorization, just a responsive page instead of an Expo build.
+// Web customer portal data layer — was a direct-Supabase, RLS-only client
+// (same architecture as apps/mobile/src/lib/rentals.ts), migrated to go
+// through requireMobileContext()-guarded API routes instead. Reason: RLS
+// scoping trusts a live Supabase session's auth.uid(), which a Firebase
+// session doesn't have — confirmed live this session (a Firebase-
+// authenticated Customer Demo login showed an empty portal, exactly the
+// silent-failure mode the identity migration's "critical audit finding"
+// predicted). requireMobileContext() already resolves the caller's
+// identity through the active IdentityProvider (Supabase or Firebase),
+// so routing through it here closes that gap for both providers at once.
+// Every exported function below keeps its original signature — no caller
+// (apps/web/src/app/(customer)/rentals/**) needed to change.
 
 export interface RentalAsset {
   id: string;
@@ -50,78 +52,71 @@ export interface ServiceRequest {
   created_at: string;
 }
 
-const RENTAL_SELECT =
-  "id, tenant_id, type, status, value_amount, value_currency, period_starts_at, period_ends_at, " +
-  "template_id, template_version_id, snapshot_id, " +
-  "contract_assets(id, quantity, assets(id, name, category, status, metadata))";
+async function getJson<T>(path: string, fallback: T, errorMessage: string): Promise<T> {
+  const res = await fetch(path);
+  if (!res.ok) {
+    if (res.status === 404) return fallback;
+    console.error("[rentals-portal]", path, res.status);
+    throw new Error(errorMessage);
+  }
+  const json = await res.json().catch(() => ({}));
+  return (json.data ?? fallback) as T;
+}
 
-// No server-side API layer for this portal (same architectural choice as
-// apps/mobile) — talks directly to PostgREST via RLS, so raw Postgres
-// errors never reach the UI verbatim (mirrors the mobile app's BAIXO-20
-// fix): logged for debugging, replaced with a generic message.
-function toUserError(error: unknown, fallback: string): Error {
-  console.error("[rentals-portal]", error);
-  return new Error(fallback);
+async function postJson<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error ?? "Falha ao processar a solicitação.");
+  return json.data as T;
 }
 
 export async function fetchMyRentals(): Promise<Rental[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("contracts")
-    .select(RENTAL_SELECT)
-    .order("period_starts_at", { ascending: false });
-  if (error) throw toUserError(error, "Não foi possível carregar seus contratos.");
-  return (data ?? []) as unknown as Rental[];
+  return getJson("/api/mobile/customer/contracts", [], "Não foi possível carregar seus contratos.");
 }
 
 export async function fetchMyRentalCustomerId(): Promise<string> {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Sessão expirada. Faça login novamente.");
-
-  const { data, error } = await supabase
-    .from("rental_customers")
-    .select("id")
-    .eq("auth_user_id", user.id)
-    .single();
-  if (error) throw toUserError(error, "Não foi possível identificar seu cadastro.");
-  return data.id;
+  const data = await getJson<{ customerId: string } | null>(
+    "/api/mobile/customer/me",
+    null,
+    "Não foi possível identificar seu cadastro.",
+  );
+  if (!data) throw new Error("Sessão expirada. Faça login novamente.");
+  return data.customerId;
 }
 
 export async function fetchServiceRequests(contractId: string): Promise<ServiceRequest[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("rental_service_requests")
-    .select("id, type, message, status, created_at")
-    .eq("contract_id", contractId)
-    .order("created_at", { ascending: false });
-  if (error) throw toUserError(error, "Não foi possível carregar os pedidos.");
-  return data ?? [];
+  return getJson(
+    `/api/mobile/customer/contracts/${contractId}/service-requests`,
+    [],
+    "Não foi possível carregar os pedidos.",
+  );
 }
 
-export async function fetchContractSnapshot(snapshotId: string): Promise<ContractSnapshot> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("tenant_contract_snapshots")
-    .select("id, rendered_content, content_hash")
-    .eq("id", snapshotId)
-    .single();
-  if (error) throw toUserError(error, "Não foi possível carregar o contrato.");
-  return data;
+// Takes a contractId (not a snapshot id) — the route resolves the
+// snapshot via the contract, since ownership can only be verified through
+// the contract's organization_id. The one caller ([id]/contract/page.tsx)
+// was updated to pass r.id instead of r.snapshot_id accordingly.
+export async function fetchContractSnapshot(contractId: string): Promise<ContractSnapshot> {
+  const data = await getJson<{ snapshot: ContractSnapshot } | null>(
+    `/api/mobile/customer/contracts/${contractId}/snapshot`,
+    null,
+    "Não foi possível carregar o contrato.",
+  );
+  if (!data) throw new Error("Não foi possível carregar o contrato.");
+  return data.snapshot;
 }
 
 export async function fetchDataProcessingLegalBasis(contractId: string): Promise<string | null> {
-  const supabase = createClient();
-  const { data } = await supabase
-    .from("tenant_contract_requirements")
-    .select("data_processing_legal_basis")
-    .eq("contract_id", contractId)
-    .order("resolved_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return data?.data_processing_legal_basis ?? null;
+  const data = await getJson<{ dataProcessingLegalBasis: string | null } | null>(
+    `/api/mobile/customer/contracts/${contractId}/snapshot`,
+    null,
+    "",
+  ).catch(() => null);
+  return data?.dataProcessingLegalBasis ?? null;
 }
 
 export async function acceptContract(
@@ -146,15 +141,13 @@ export async function createServiceRequest(input: {
   type: "extension" | "issue";
   message: string;
 }) {
-  const supabase = createClient();
-  const { error } = await supabase.from("rental_service_requests").insert({
-    contract_id: input.tenantContractId,
-    rental_customer_id: input.rentalCustomerId,
-    tenant_id: input.tenantId,
+  // rentalCustomerId/tenantId are accepted for call-site compatibility but
+  // never sent — the server derives both fresh from the verified session,
+  // never from client input (see [id]/service-requests/route.ts).
+  await postJson(`/api/mobile/customer/contracts/${input.tenantContractId}/service-requests`, {
     type: input.type,
     message: input.message,
   });
-  if (error) throw toUserError(error, "Não foi possível enviar o pedido.");
 }
 
 export interface UpgradeOption {
@@ -164,25 +157,15 @@ export interface UpgradeOption {
   metadata: { photo_url?: string; brand?: string; model?: string; weekly_rate?: number };
 }
 
-// Same numeric-comparison fix as apps/mobile/src/lib/rentals.ts's
-// fetchUpgradeOptions — PostgREST's gte()/order() on metadata->>weekly_rate
-// compares lexicographically as text, letting cheaper cars slip through a
-// server-side filter, so the >= check and sort happen client-side instead.
 export async function fetchUpgradeOptions(
   tenantId: string,
   minWeeklyRate: number,
 ): Promise<UpgradeOption[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("assets")
-    .select("id, name, serial_number, metadata")
-    .eq("tenant_id", tenantId)
-    .eq("status", "available")
-    .eq("category", "vehicle");
-  if (error) throw toUserError(error, "Não foi possível carregar os veículos disponíveis.");
-  return ((data ?? []) as unknown as UpgradeOption[])
-    .filter((a) => Number(a.metadata?.weekly_rate ?? 0) >= minWeeklyRate)
-    .sort((a, b) => Number(a.metadata?.weekly_rate ?? 0) - Number(b.metadata?.weekly_rate ?? 0));
+  return getJson(
+    `/api/mobile/customer/upgrade-options?tenantId=${encodeURIComponent(tenantId)}&minWeeklyRate=${minWeeklyRate}`,
+    [],
+    "Não foi possível carregar os veículos disponíveis.",
+  );
 }
 
 export interface CustomerInvoice {
@@ -195,14 +178,7 @@ export interface CustomerInvoice {
 }
 
 export async function fetchMyInvoices(): Promise<CustomerInvoice[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("invoices")
-    .select("id, status, total_amount, total_currency, due_date, paid_at")
-    .order("due_date", { ascending: false })
-    .limit(10);
-  if (error) throw toUserError(error, "Não foi possível carregar suas faturas.");
-  return (data ?? []) as unknown as CustomerInvoice[];
+  return getJson("/api/mobile/customer/invoices", [], "Não foi possível carregar suas faturas.");
 }
 
 export interface Reservation {
@@ -220,33 +196,11 @@ export interface Reservation {
 }
 
 export async function fetchMyReservations(): Promise<Reservation[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("rental_reservations")
-    .select(
-      "id, tenant_id, asset_id, period_starts_at, period_ends_at, total_amount, total_currency, " +
-        "deposit_amount, balance_amount, status, assets(name)",
-    )
-    .order("created_at", { ascending: false });
-  if (error) throw toUserError(error, "Não foi possível carregar suas reservas.");
-  return (data ?? []) as unknown as Reservation[];
-}
-
-// The checkout/availability endpoints below are the same public,
-// requireMobileContext()-guarded routes the mobile app calls
-// (api/mobile/customer/*) — requireMobileContext() already falls back to
-// cookie-based getSession() when there's no Authorization: Bearer header
-// (see lib/mobile-context.ts), which is exactly what this browser client
-// sends, so no separate web-specific API layer is needed.
-async function postJson<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.error ?? "Falha ao processar a solicitação.");
-  return json.data as T;
+  return getJson(
+    "/api/mobile/customer/reservations",
+    [],
+    "Não foi possível carregar suas reservas.",
+  );
 }
 
 export async function renewalCheckout(contractId: string): Promise<{ url: string }> {

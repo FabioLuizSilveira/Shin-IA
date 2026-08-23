@@ -1,13 +1,17 @@
-import { supabase } from "./supabase";
+import { shinaia, ApiError } from "./shinaia-api";
 
-// Mobile talks directly to PostgREST (see apps/mobile architecture notes) — there is
-// no Next.js API layer to sanitize errors the way lib/api-error.ts's internalError()
-// does for apps/web and apps/mkt. Raw PostgREST/Postgres errors can include RLS-denial
-// details or internal table/column names, so they're logged for debugging but never
-// forwarded verbatim to the UI.
+// Same RLS→API migration as apps/web's rentals-portal.ts (see that file's
+// header comment for the full reasoning): a Firebase session has no
+// auth.uid() RLS can key off, so a direct-PostgREST client here silently
+// returned empty data under Firebase (confirmed live this session — the
+// Customer Demo login worked but showed no rentals). Every exported
+// function below keeps its original signature and now goes through
+// shinaia-api.ts's request()/get() helpers instead of the supabase client
+// directly, so no screen needed to change.
+
 function toUserError(error: unknown, fallback: string): Error {
   console.error("[rentals]", error);
-  return new Error(fallback);
+  return error instanceof ApiError ? error : new Error(fallback);
 }
 
 export interface RentalAsset {
@@ -36,46 +40,32 @@ export interface ServiceRequest {
   created_at: string;
 }
 
-const RENTAL_SELECT =
-  "id, tenant_id, type, status, value_amount, value_currency, period_starts_at, period_ends_at, " +
-  "contract_assets(id, quantity, assets(id, name, category, status))";
-
-// RLS (contracts_select_rental_customer / contract_assets_select_rental_customer /
-// assets_select_rental_customer, see 20260055000000_rental_customers.sql)
-// scopes this to only the contracts of organizations the signed-in customer
-// is linked to — no tenant_id filter needed client-side.
 export async function fetchMyRentals(): Promise<Rental[]> {
-  const { data, error } = await supabase
-    .from("contracts")
-    .select(RENTAL_SELECT)
-    .order("period_starts_at", { ascending: false });
-  if (error) throw toUserError(error, "Não foi possível carregar seus contratos.");
-  return (data ?? []) as unknown as Rental[];
+  try {
+    const { data } = await shinaia.customerContracts();
+    return data as Rental[];
+  } catch (err) {
+    throw toUserError(err, "Não foi possível carregar seus contratos.");
+  }
 }
 
 export async function fetchMyRentalCustomerId(): Promise<string> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not signed in");
-
-  const { data, error } = await supabase
-    .from("rental_customers")
-    .select("id")
-    .eq("auth_user_id", user.id)
-    .single();
-  if (error) throw toUserError(error, "Não foi possível identificar seu cadastro.");
-  return data.id;
+  try {
+    const { data } = await shinaia.customerMe();
+    if (!data) throw new Error("Not signed in");
+    return data.customerId;
+  } catch (err) {
+    throw toUserError(err, "Não foi possível identificar seu cadastro.");
+  }
 }
 
 export async function fetchServiceRequests(contractId: string): Promise<ServiceRequest[]> {
-  const { data, error } = await supabase
-    .from("rental_service_requests")
-    .select("id, type, message, status, created_at")
-    .eq("contract_id", contractId)
-    .order("created_at", { ascending: false });
-  if (error) throw toUserError(error, "Não foi possível carregar os pedidos.");
-  return data ?? [];
+  try {
+    const { data } = await shinaia.customerServiceRequests(contractId);
+    return data as ServiceRequest[];
+  } catch (err) {
+    throw toUserError(err, "Não foi possível carregar os pedidos.");
+  }
 }
 
 export async function createServiceRequest(input: {
@@ -85,14 +75,18 @@ export async function createServiceRequest(input: {
   type: "extension" | "issue";
   message: string;
 }) {
-  const { error } = await supabase.from("rental_service_requests").insert({
-    contract_id: input.tenantContractId,
-    rental_customer_id: input.rentalCustomerId,
-    tenant_id: input.tenantId,
-    type: input.type,
-    message: input.message,
-  });
-  if (error) throw toUserError(error, "Não foi possível enviar seu pedido.");
+  // rentalCustomerId/tenantId kept in the signature for call-site
+  // compatibility but never sent — the server derives both fresh from the
+  // verified session (see apps/web's api/mobile/customer/contracts/[id]/
+  // service-requests/route.ts, shared by web and mobile).
+  try {
+    await shinaia.customerCreateServiceRequest(input.tenantContractId, {
+      type: input.type,
+      message: input.message,
+    });
+  } catch (err) {
+    throw toUserError(err, "Não foi possível enviar seu pedido.");
+  }
 }
 
 export interface UpgradeOption {
@@ -102,29 +96,16 @@ export interface UpgradeOption {
   metadata: { photo_url?: string; brand?: string; model?: string; weekly_rate?: number };
 }
 
-// assets_select_rental_customer_catalog (20260090000000) scopes this to
-// status='available' assets within a tenant the customer already rents
-// from — never the whole fleet, and never anything currently rented out.
-// weekly_rate >= the current rental's own rate is what makes this "equal
-// or higher value" rather than a generic browse-everything list — done
-// client-side because PostgREST's gte()/order() on a jsonb->>text column
-// compares lexicographically (as a string), not numerically: "750.00"
-// sorts *above* "1000.00" that way, letting cheaper cars slip through a
-// server-side gte filter meant to exclude them.
 export async function fetchUpgradeOptions(
   tenantId: string,
   minWeeklyRate: number,
 ): Promise<UpgradeOption[]> {
-  const { data, error } = await supabase
-    .from("assets")
-    .select("id, name, serial_number, metadata")
-    .eq("tenant_id", tenantId)
-    .eq("status", "available")
-    .eq("category", "vehicle");
-  if (error) throw toUserError(error, "Não foi possível carregar os veículos disponíveis.");
-  return ((data ?? []) as unknown as UpgradeOption[])
-    .filter((a) => Number(a.metadata?.weekly_rate ?? 0) >= minWeeklyRate)
-    .sort((a, b) => Number(a.metadata?.weekly_rate ?? 0) - Number(b.metadata?.weekly_rate ?? 0));
+  try {
+    const { data } = await shinaia.customerUpgradeOptions(tenantId, minWeeklyRate);
+    return data as UpgradeOption[];
+  } catch (err) {
+    throw toUserError(err, "Não foi possível carregar os veículos disponíveis.");
+  }
 }
 
 export interface CustomerInvoice {
@@ -136,16 +117,13 @@ export interface CustomerInvoice {
   paid_at: string | null;
 }
 
-// invoices_select_rental_customer (20260090000000) — the customer's own
-// invoices only, via their billing_accounts' organization link.
 export async function fetchMyInvoices(): Promise<CustomerInvoice[]> {
-  const { data, error } = await supabase
-    .from("invoices")
-    .select("id, status, total_amount, total_currency, due_date, paid_at")
-    .order("due_date", { ascending: false })
-    .limit(10);
-  if (error) throw toUserError(error, "Não foi possível carregar suas faturas.");
-  return (data ?? []) as unknown as CustomerInvoice[];
+  try {
+    const { data } = await shinaia.customerInvoices();
+    return data as CustomerInvoice[];
+  } catch (err) {
+    throw toUserError(err, "Não foi possível carregar suas faturas.");
+  }
 }
 
 export interface Reservation {
@@ -162,17 +140,11 @@ export interface Reservation {
   assets: { name: string } | null;
 }
 
-// rental_reservations_select_rental_customer (20260091000000) — the
-// customer's own booking holds, real deposit/balance state driven entirely
-// by the Stripe webhook (see api/webhooks/stripe), never written from here.
 export async function fetchMyReservations(): Promise<Reservation[]> {
-  const { data, error } = await supabase
-    .from("rental_reservations")
-    .select(
-      "id, tenant_id, asset_id, period_starts_at, period_ends_at, total_amount, total_currency, " +
-        "deposit_amount, balance_amount, status, assets(name)",
-    )
-    .order("created_at", { ascending: false });
-  if (error) throw toUserError(error, "Não foi possível carregar suas reservas.");
-  return (data ?? []) as unknown as Reservation[];
+  try {
+    const { data } = await shinaia.customerReservations();
+    return data as Reservation[];
+  } catch (err) {
+    throw toUserError(err, "Não foi possível carregar suas reservas.");
+  }
 }

@@ -256,6 +256,31 @@ export const shinaia = {
       `/api/mobile/customer/reservations/${reservationId}/balance-checkout`,
     ),
 
+  // Same RLS→API migration as apps/web's rentals-portal.ts — a Firebase
+  // session has no auth.uid() RLS can key off, so these can no longer go
+  // straight to PostgREST the way they used to (see rentals.ts, which now
+  // just calls these instead of querying Supabase directly).
+  customerMe: () => get<{ customerId: string } | null>("/api/mobile/customer/me", null),
+  customerContracts: () => get<unknown[]>("/api/mobile/customer/contracts", []),
+  customerServiceRequests: (contractId: string) =>
+    get<unknown[]>(`/api/mobile/customer/contracts/${contractId}/service-requests`, []),
+  customerCreateServiceRequest: (
+    contractId: string,
+    input: { type: "extension" | "issue"; message: string },
+  ) =>
+    request<{ ok: true }>(
+      "POST",
+      `/api/mobile/customer/contracts/${contractId}/service-requests`,
+      input,
+    ),
+  customerUpgradeOptions: (tenantId: string, minWeeklyRate: number) =>
+    get<unknown[]>(
+      `/api/mobile/customer/upgrade-options?tenantId=${encodeURIComponent(tenantId)}&minWeeklyRate=${minWeeklyRate}`,
+      [],
+    ),
+  customerInvoices: () => get<unknown[]>("/api/mobile/customer/invoices", []),
+  customerReservations: () => get<unknown[]>("/api/mobile/customer/reservations", []),
+
   dashboard: () => get<DashboardSummary>("/api/mobile/dashboard", MOCK.dashboard),
 
   operations: (params: Record<string, string> = {}) => {

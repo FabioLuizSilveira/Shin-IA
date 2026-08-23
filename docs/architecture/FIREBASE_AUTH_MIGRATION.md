@@ -574,6 +574,58 @@ call the client SDK uses, established a real session cookie, and resolved
 real tenant data through `/api/mobile/bootstrap` — the full chain, not
 just the link-generation step.
 
+## Customer Portal → real API (the "critical audit finding" above, closed)
+
+The gap flagged at the very top of this document — `rentals-portal.ts`
+(web) and `rentals.ts` (mobile) querying Supabase directly via RLS, which
+a Firebase session can't satisfy — is now fixed for both apps, sharing
+one set of backend routes.
+
+- New routes under `apps/web/src/app/api/mobile/customer/`: `contracts`
+  (GET), `contracts/[id]/service-requests` (GET/POST),
+  `contracts/[id]/snapshot` (GET, combines the old separate snapshot +
+  data-processing-legal-basis queries), `invoices` (GET),
+  `upgrade-options` (GET), `me` (GET — trivial now, `requireMobileContext()`
+  already resolved `customerId`), and a new `GET` added to the existing
+  `reservations` route (the `POST` there already existed). All go through
+  `requireMobileContext()` — already Firebase-aware from the earlier
+  backend-gap fix — so both the web cookie session and the mobile bearer
+  token work identically; verified live against both transports, not
+  assumed.
+- Every scoping join mirrors the RLS policy it replaces exactly (read from
+  the actual migrations, not guessed): `contracts.organization_id`,
+  `invoices` via `billing_accounts.organization_id`,
+  `rental_service_requests.rental_customer_id`, all checked against
+  `context.organizations`/`context.customerId` from the verified session —
+  never from anything the client sends. A forged `tenantId` on
+  `upgrade-options` and a forged `contractId` on `service-requests` both
+  confirmed blocked live (empty result / 404), not silently trusted.
+- `apps/web/src/lib/rentals-portal.ts` and `apps/mobile/src/lib/rentals.ts`
+  keep every exported function's original signature — call these new
+  routes internally instead of Supabase directly. Only one real caller
+  change was needed: `[id]/contract/page.tsx` was passing
+  `rental.snapshot_id` to `fetchContractSnapshot()`, which the new route
+  needs to be a `contractId` instead (ownership can only be verified
+  through the contract's `organization_id`) — fixed to pass `rental.id`.
+- **Found and fixed a real, pre-existing bug in the old code**, incidental
+  to this migration: `tenant_contract_requirements` never had an RLS
+  policy granting customers `select` access at all — the old
+  `fetchDataProcessingLegalBasis()` would have always silently returned
+  `null` for customers even under Supabase. The new route uses the
+  service-role client (already identity-verified by that point), so this
+  now actually returns real data.
+
+**Verified live against the hosted database, real Firebase session, no
+mocks**: full read set (contracts, invoices, reservations, service
+requests, upgrade options) returning real data for the Customer Demo
+account — the exact scenario that showed an empty portal earlier this
+session, now fixed; a real service request created and persisted; two
+forgery attempts (cross-tenant `upgrade-options`, cross-contract
+`service-requests` POST) both correctly rejected; unauthenticated access
+correctly 401'd; the same read confirmed again over a raw bearer token
+(no cookie at all) to prove the mobile transport path specifically, not
+just the web cookie path.
+
 ## What Phase 2 needs from the user before it can start
 
 - Apple sign-in shows as enabled in Firebase Console already, but per spec
