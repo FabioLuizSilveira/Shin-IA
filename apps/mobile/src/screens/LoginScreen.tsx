@@ -13,6 +13,7 @@ import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import * as AppleAuthentication from "expo-apple-authentication";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { GoogleAuthProvider, OAuthProvider, signInWithCredential } from "firebase/auth";
 import { supabase } from "../lib/supabase";
 import { getFirebaseAuth } from "../lib/firebase";
@@ -35,23 +36,36 @@ export function LoginScreen() {
   const [appleLoading, setAppleLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState<"tenant" | "customer" | null>(null);
 
-  // Google OAuth client IDs are per-platform and separate from the
-  // Firebase project's own web client — MANUAL CONFIGURATION REQUIRED:
-  // create OAuth 2.0 Client IDs (type "iOS"/"Android"/"Web application")
-  // in the Firebase project's linked Google Cloud Console
-  // (APIs & Services -> Credentials), matching this app's bundle
-  // identifier/package name and SHA-1 fingerprint, then set
-  // EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID / EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID /
-  // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.
+  // Google OAuth client IDs — MANUAL CONFIGURATION REQUIRED, separate from
+  // the Firebase project's own web client.
+  //
+  // Confirmed live and dead-ended in Expo Go: expo-auth-session's Google
+  // provider redirects to `exp://<lan-ip>:8081` there (Expo's old
+  // auth.expo.io proxy, which used to bridge this to a registrable
+  // https:// redirect, is discontinued). Google's OAuth policy rejects any
+  // non-http(s) redirect URI for a "Web application" type client outright
+  // — confirmed live, a generic Google "400. This is an error" page, no
+  // amount of correct EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID configuration works
+  // around it. This is a structural Expo Go limitation, not something
+  // fixable from this codebase: real Google Sign-In testing needs an
+  // actual dev-client/standalone build (Android/iOS client type, verified
+  // by package name + SHA-1 / bundle ID, no redirect URI involved), which
+  // is what EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID/_IOS_CLIENT_ID are for —
+  // still unset, blocked on EAS build quota (see
+  // docs/architecture/FIREBASE_AUTH_MIGRATION.md).
   //
   // useIdTokenAuthRequest throws synchronously during render (not just a
-  // null `request`, confirmed live on a real device) when the client ID
-  // for the current platform is missing — a hook can't be called
-  // conditionally, so a placeholder string is passed instead to keep the
-  // hook itself from crashing the whole screen; isGoogleConfigured (not
-  // `!!googleRequest`) is what actually gates the button/handler.
-  const isGoogleConfigured =
-    Platform.OS === "android"
+  // null `request`, confirmed live) when the client ID it needs is
+  // missing — a hook can't be called conditionally, so a placeholder
+  // string is passed instead to keep the hook itself from crashing the
+  // whole screen; isGoogleConfigured (not `!!googleRequest`) is what
+  // actually gates the button/handler, and deliberately excludes the Expo
+  // Go case even when EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is set, since that
+  // combination is now known to 400 rather than work.
+  const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  const isGoogleConfigured = isExpoGo
+    ? false
+    : Platform.OS === "android"
       ? !!process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
       : !!process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
   const [, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({

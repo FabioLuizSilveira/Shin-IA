@@ -433,6 +433,33 @@ above, not a new bug**: `apps/mobile/src/lib/rentals.ts` queries
 on RLS + a live Supabase session's `auth.uid()`, which a Firebase-only
 session doesn't have. Confirmed live, matching the finding exactly.
 
+## Google Sign-In in Expo Go: structurally dead-ended, not a config gap
+
+Tried to close the "MANUAL CONFIGURATION REQUIRED" Google gap above using
+the Firebase project's auto-created Web OAuth client
+(`539673049609-0l7f5glfhc93qss1213m1ebcu670nluh.apps.googleusercontent.com`,
+found via Google Cloud Console → Credentials → "Web client (auto created
+by Google Service)"). Result, confirmed live on the real device: Google's
+own generic `400. This is an error` page.
+
+Root cause, confirmed by logging the actual request: `expo-auth-session`'s
+Google provider redirects to `exp://192.168.1.194:8081` inside Expo Go —
+Expo's old `auth.expo.io` proxy service, which used to bridge that to a
+registrable `https://` redirect URI, is discontinued. Google's OAuth
+policy rejects any non-`http(s)` redirect URI for a "Web application"
+type client outright, unconditionally — no amount of correct
+`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` configuration changes that. This isn't
+fixable from this codebase or from Google Cloud Console settings; it's
+current Expo Go behavior colliding with current Google OAuth policy.
+
+`isGoogleConfigured` (`LoginScreen.tsx`) now explicitly treats Expo Go as
+never-configured, even when a web client ID is present, so the button
+shows the "indisponível" alert instead of a 400 dead end. Real Google
+Sign-In testing needs an actual dev-client/standalone build — an
+Android/iOS-type OAuth client, verified by package name + SHA-1
+fingerprint / bundle ID, no redirect URI involved at all — which is
+exactly what's still blocked on EAS build quota.
+
 ## Mobile client is now real-device-verified for the tenant-staff path; production cutover is still blocked on the customer RLS gap and manual Google/Apple config
 
 `IDENTITY_PROVIDER=firebase`/`NEXT_PUBLIC_IDENTITY_PROVIDER=firebase`/
