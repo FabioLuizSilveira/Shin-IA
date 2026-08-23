@@ -6,6 +6,7 @@
 // project (see apps/mobile/src/screens/LoginScreen.tsx), just styled for a
 // browser tab instead of a native screen.
 import { useState } from "react";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Mail } from "lucide-react";
 
@@ -80,9 +81,14 @@ export default function RentalsLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4 py-8">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-shina-blue to-shina-cyan mx-auto mb-3 flex items-center justify-center">
-            <span className="text-white font-bold text-lg leading-none">S</span>
-          </div>
+          <Image
+            src="/brand/shina-icon-square.png"
+            alt="Shinã"
+            width={48}
+            height={48}
+            className="rounded-2xl mx-auto mb-3"
+            priority
+          />
           <h1 className="text-xl font-bold text-white">Portal do Cliente</h1>
           <p className="text-sm text-slate-400 mt-1">Acompanhe suas locações Veloz Rent a Car</p>
         </div>

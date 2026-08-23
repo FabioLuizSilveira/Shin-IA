@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -9,7 +10,6 @@ import { MktCommandMenu } from "@/components/layout/command-menu";
 import { MktNotificationBell } from "@/components/layout/notification-bell";
 import { useShinaTheme } from "@shina/theme";
 import {
-  Sparkles,
   LayoutDashboard,
   Library,
   Wand2,
@@ -55,9 +55,14 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
     <div className="flex h-screen overflow-hidden bg-white dark:bg-slate-950">
       <aside className="w-60 shrink-0 border-r border-slate-200 dark:border-white/5 flex flex-col">
         <div className="h-16 flex items-center gap-2.5 px-5 border-b border-slate-200 dark:border-white/5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-mkt-primary to-mkt-secondary flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
+          <Image
+            src="/brand/shina-icon-square.png"
+            alt="Shinã"
+            width={32}
+            height={32}
+            className="rounded-lg"
+            priority
+          />
           <span className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
             Marketing IA
             <span className="block text-[10px] font-medium text-slate-500">by Shinã</span>
