@@ -7,7 +7,7 @@
 **AUTHORIZATION: SHINÃ IAM / RBAC / ABAC (unchanged)**
 **CANONICAL USER ID: SHINÃ (`shina_user_id`)**
 
-Status: **Phase 1 complete. Phase 2 in progress — apps/web's real login (Google + both demo accounts) built and verified end-to-end in local dev; the mobile-API backend gap (`requireMobileContext()` bypassing the identity provider) found and fixed; apps/mobile's client-side code written and gated behind `EXPO_PUBLIC_IDENTITY_PROVIDER`, but NOT device-tested (see "apps/mobile — built, not device-verified" below). Shinã-native TOTP, Firebase Email Link, and the Customer Portal RLS→API migration all built and live-verified against the hosted DB. `IDENTITY_PROVIDER`/`NEXT_PUBLIC_IDENTITY_PROVIDER=firebase` are now set in Vercel **Preview only** (never Production) and a real Preview deployment of apps/web has been built and smoke-tested — see "Web Preview real" below. A formal Security Gate pass (forgery/negative tests) has also run clean — see "Security Gate" below. Nothing of this is active in Vercel Production or any EAS build profile — every Firebase-provider env var stays out of Production until mobile is actually confirmed working on a real device. Phase 3 not started.**
+Status: **Phase 1 complete. Phase 2 in progress — apps/web's real login (Google + both demo accounts) built and verified end-to-end in local dev; the mobile-API backend gap (`requireMobileContext()` bypassing the identity provider) found and fixed; apps/mobile's client-side code written and gated behind `EXPO_PUBLIC_IDENTITY_PROVIDER`, but NOT device-tested (see "apps/mobile — built, not device-verified" below). Shinã-native TOTP, Firebase Email Link, and the Customer Portal RLS→API migration all built and live-verified against the hosted DB. `IDENTITY_PROVIDER`/`NEXT_PUBLIC_IDENTITY_PROVIDER=firebase` are now set in Vercel **Preview only** (never Production) and a real Preview deployment of apps/web has been built and smoke-tested — see "Web Preview real" below. A formal Security Gate pass (forgery/negative tests) has also run clean — see "Security Gate" below. **apps/mkt now has the same Firebase login (Google + Magic Link) built and locally verified, including live cross-app session sharing with apps/web — see "MKT" below.** Nothing of this is active in Vercel Production or any EAS build profile — every Firebase-provider env var stays out of Production until mobile is actually confirmed working on a real device. **Remaining roadmap: Mobile build real and Cutover are both blocked on the exhausted EAS free build quota (resets 2026-09-01).** Phase 3 not started.**
 
 ## What's migrating and what isn't
 
@@ -675,6 +675,68 @@ project protection disable shin-ia-le1a --sso` — safe because it only
   added to Vercel Preview) — left unfixed by explicit user choice (declined
   adding those env vars) rather than tested further. Magic Link was not
   exercised on Preview by explicit user choice (it sends a real email).
+
+## MKT (apps/mkt)
+
+Following the roadmap's "MKT" step: `apps/mkt` had zero Firebase code
+beyond the Phase-1 SDK install — it used raw `@supabase/ssr` directly, with
+no `packages/identity` abstraction at all. Brought to parity with
+apps/web's Phase 2 (Google + Magic Link only — no demo login, no MFA, none
+of those exist in mkt today):
+
+- `apps/mkt/src/middleware.ts` now branches on
+  `resolveActiveIdentityProviderKind(process.env)`, mirroring apps/web's
+  middleware — the Firebase path verifies `__shina_firebase_session`
+  edge-side (`jose`, same as web) and resolves claims via the same
+  `resolve_shina_authorization_context` RPC; the Supabase path is
+  unchanged. Both paths feed the same existing subscription gate
+  (`hasLiveSubscription(claims.mkt_subscription_status)`).
+- `apps/mkt/src/lib/firebase-{admin,client,session,session-cookie}.ts` —
+  duplicated from apps/web's identical files (same pattern already used for
+  `lib/supabase/*.ts` — each app owns its own server-only lib/), adjusted
+  to import `SessionClaims` from `@shina/billing-platform/claims` (the
+  shared type apps/mkt's middleware already used) instead of a local
+  `jwt-claims.ts` apps/mkt doesn't have.
+- `/api/auth/firebase/session` and `/api/auth/firebase/magic-link/precheck`
+  — duplicated from apps/web's identical routes. The session route sets the
+  cookie on the shared `.${ROOT_DOMAIN}` domain, same cross-subdomain logic
+  apps/mkt's own Supabase cookie already uses (`authCookieDomain()` in
+  middleware.ts) — **this is the same Firebase project as apps/web** (spec
+  item 25), so a session minted by either app is valid on the other.
+- `apps/mkt/src/app/(public)/login/page.tsx` — added Google
+  (`signInWithPopup`) and Magic Link (precheck + `sendSignInLinkToEmail`)
+  behind `NEXT_PUBLIC_IDENTITY_PROVIDER === "firebase"`, mirroring
+  apps/web's `AuthOptions.tsx`. **Found and fixed the mkt-specific version
+  of the Facebook gap already known from apps/web**: mkt's password login
+  (`signInWithPassword`) only ever produces a Supabase session, which the
+  new Firebase-aware middleware wouldn't recognize — hidden under
+  `USE_FIREBASE` (same treatment apps/web gives Facebook) rather than left
+  silently broken. The shared `<form>`'s Enter-key submit was also
+  redirected to the magic-link handler under `USE_FIREBASE`, since hiding
+  the password button alone doesn't stop Enter from still calling
+  `handleLogin`.
+- New `apps/mkt/src/app/(public)/auth/magic-link-callback/page.tsx` —
+  duplicated from apps/web's identical page, adjusted to read a `next`
+  query param (apps/mkt's existing post-login redirect convention) instead
+  of apps/web's hardcoded `"/"`.
+- Added missing workspace deps: `@shina/identity` (was never a dependency
+  of apps/mkt) and `jose` (needed for edge-safe cookie verification,
+  already used by apps/web).
+
+**Verified**: `pnpm typecheck` and `next build` both clean for apps/mkt;
+existing test suite green (23 tests, zero regressions). Live in local dev
+with `IDENTITY_PROVIDER=firebase` set: password field correctly hidden;
+magic-link precheck correctly returns `allowed: false` for a nonexistent
+account with the same generic "link enviado" UI shown regardless (no
+enumeration leak); and — found by accident, not engineered — a leftover
+`__shina_firebase_session` cookie from earlier apps/web testing (shared
+`localhost` cookie domain) was correctly recognized by apps/mkt's new
+middleware branch and correctly redirected to `/signup?upgrade=1` (no live
+MKT subscription on that account), real proof the cross-app single-session
+design works without either app knowing about the other's code. Still
+defaults to `supabase` everywhere — `IDENTITY_PROVIDER=firebase` is set
+only in `apps/mkt/.env.local` for this local testing, never in any Vercel
+environment.
 
 ## Security Gate
 
