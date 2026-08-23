@@ -143,7 +143,7 @@ export function AuthOptions() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error ?? "Falha ao entrar em modo demonstração.");
-      const cred = await signInWithCustomToken(firebaseAuth, json.customToken);
+      const cred = await signInWithCustomToken(firebaseAuth, json.data.customToken);
       const idToken = await cred.user.getIdToken();
       await establishFirebaseSession(idToken);
     } catch (err) {

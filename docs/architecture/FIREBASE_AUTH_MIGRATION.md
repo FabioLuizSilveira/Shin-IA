@@ -376,7 +376,64 @@ oversight:
   flow was verified via curl against the real backend (see above), but
   never through the RN app's own network/storage stack.
 
-## Mobile client is written but production cutover is still blocked on real-device verification
+## Real-device verification (Expo Go, Android) — update
+
+EAS Build (both "preview" and "development" profiles) is blocked this
+month by the connected Expo account's free-tier Android build quota
+(resets 2026-09-01) — tested via Expo Go instead: Metro dev server on the
+LAN, phone on the same Wi-Fi, `EXPO_PUBLIC_SHINAIA_API_URL` pointed at the
+dev machine's LAN IP so `/api/mobile/*` calls hit the real local backend
+running `IDENTITY_PROVIDER=firebase`.
+
+**Three more real bugs found and fixed, all confirmed live on a real
+Android device:**
+
+1. **`expo-notifications` crashed the entire app in Expo Go.** Unrelated to
+   this migration — Expo Go dropped remote push support in SDK 53, and the
+   package throws at module-evaluation time when imported there, not just
+   when a push function is called. `push-registration.ts`'s top-level
+   `import * as Notifications from "expo-notifications"` crashed the app
+   before login was even reachable. Fixed: the import is now a dynamic
+   `await import("expo-notifications")` inside the function, guarded by an
+   `executionEnvironment === StoreClient` (Expo Go) check that short-
+   circuits first — a real build still gets full push functionality.
+2. **`Google.useIdTokenAuthRequest` threw during render, not just returned
+   a null request, when the platform's client ID was unset.** The original
+   code (and its own comment) assumed the hook degraded gracefully; it
+   doesn't — confirmed live, it crashes the whole `LoginScreen`. Fixed:
+   placeholder non-empty strings are passed to keep the hook from
+   throwing, and a separate `isGoogleConfigured` check (not the hook's
+   return value) gates the button/handler.
+3. **`/api/auth/firebase/demo-login` broke the mobile app's response
+   parsing.** The route returned a bare `{ customToken }`, but
+   `shinaia-api.ts`'s `request()` helper unconditionally unwraps every
+   response's `.data` field (matching `/api/mobile/demo-login`'s existing
+   envelope) — confirmed live (`Cannot read property 'customToken' of
+undefined`). Fixed by wrapping the route's response in `{ data: {
+customToken } }`, and updating apps/web's `AuthOptions.tsx` (which reads
+   the raw body directly, not through that helper) to match the same
+   shape.
+
+**A fourth backend gap found the same way**: `bootstrap.ts` — a separate
+file from `shinaia-api.ts`, with its own direct
+`supabase.auth.getSession()` call to get the bearer token for
+`/api/mobile/bootstrap` — bypassed the `EXPO_PUBLIC_IDENTITY_PROVIDER`
+branch entirely, throwing `"No active session"` immediately after a
+successful Firebase sign-in. Fixed the same way as `shinaia-api.ts`'s
+`authHeader()`.
+
+**Confirmed working, real device, real backend**: Tenant Demo
+("Ver como Equipe") — full sign-in → session → bootstrap → real tenant
+data displayed. Google — correctly shows "indisponível" (not configured,
+not crashed) per the guard above. Customer Demo ("Ver como Cliente") —
+sign-in and bootstrap succeed, but the rentals screen shows no data —
+**this is the pre-existing, already-documented "critical audit finding"
+above, not a new bug**: `apps/mobile/src/lib/rentals.ts` queries
+`rental_service_requests`/etc. directly via `supabase.from(...)`, relying
+on RLS + a live Supabase session's `auth.uid()`, which a Firebase-only
+session doesn't have. Confirmed live, matching the finding exactly.
+
+## Mobile client is now real-device-verified for the tenant-staff path; production cutover is still blocked on the customer RLS gap and manual Google/Apple config
 
 `IDENTITY_PROVIDER=firebase`/`NEXT_PUBLIC_IDENTITY_PROVIDER=firebase`/
 `EXPO_PUBLIC_IDENTITY_PROVIDER=firebase` all remain local-only — none are

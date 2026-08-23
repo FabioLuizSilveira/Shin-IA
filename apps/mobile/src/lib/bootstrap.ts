@@ -1,5 +1,8 @@
 import { supabase } from "./supabase";
+import { getFirebaseAuth } from "./firebase";
 import { perfMark, PERF_TRACE_ENABLED } from "./perf-trace";
+
+const USE_FIREBASE = process.env.EXPO_PUBLIC_IDENTITY_PROVIDER === "firebase";
 
 // M22.6 — the official source for user/userType/tenant/branding/roles/
 // permissions/entitlements/features/navigation. Never build persona from
@@ -42,8 +45,9 @@ export async function fetchBootstrap(): Promise<BootstrapResponse> {
     throw new BootstrapError("EXPO_PUBLIC_SHINAIA_API_URL is not configured");
   }
 
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  const token = USE_FIREBASE
+    ? await getFirebaseAuth().currentUser?.getIdToken()
+    : (await supabase.auth.getSession()).data.session?.access_token;
   if (!token) {
     throw new BootstrapError("No active session", 401);
   }

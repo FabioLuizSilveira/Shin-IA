@@ -22,7 +22,14 @@ export async function POST(req: NextRequest) {
   try {
     const user = await auth.getUserByEmail(email);
     const customToken = await auth.createCustomToken(user.uid);
-    return NextResponse.json({ customToken });
+    // { data: {...} } — same envelope /api/mobile/demo-login uses, which
+    // apps/mobile's shinaia-api.ts request() helper unwraps for every call
+    // unconditionally. A bare { customToken } here (the original shape)
+    // resolved to `undefined` on the mobile side — confirmed live
+    // ("Cannot read property 'customToken' of undefined") — while
+    // apps/web's AuthOptions.tsx, which reads the raw response body
+    // itself rather than going through that helper, is updated to match.
+    return NextResponse.json({ data: { customToken } });
   } catch {
     return NextResponse.json({ error: "Demo account not available" }, { status: 503 });
   }

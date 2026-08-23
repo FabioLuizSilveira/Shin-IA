@@ -1,8 +1,7 @@
 import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import * as Application from "expo-application";
-import Constants from "expo-constants";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { shinaia } from "./shinaia-api";
 
 // M23 — closes the "expo-notifications não instalado" gap from
@@ -15,9 +14,23 @@ import { shinaia } from "./shinaia-api";
 // build without a linked EAS project, registerForPushNotifications()
 // resolves to null instead of throwing, and callers simply skip
 // registration. Nothing here invents a token or a project id.
+//
+// "expo-notifications" is imported lazily (dynamic import inside the
+// function, guarded by the Expo Go check below) rather than statically at
+// module scope — Expo Go dropped remote push support in SDK 53, and the
+// package's own top-level module init throws immediately when evaluated
+// there, crashing the entire app before any function here is even called
+// (a static `import * as Notifications from "expo-notifications"` at the
+// top of this file did exactly that). A development/production build
+// still gets full push functionality; only Expo Go skips it.
 export async function registerForPushNotifications(): Promise<string | null> {
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    console.warn("[push] running in Expo Go — remote push unsupported since SDK 53, skipping");
+    return null;
+  }
   if (!Device.isDevice) return null; // push tokens don't exist on simulators
 
+  const Notifications = await import("expo-notifications");
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let status = existingStatus;
   if (status !== "granted") {

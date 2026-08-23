@@ -42,12 +42,21 @@ export function LoginScreen() {
   // (APIs & Services -> Credentials), matching this app's bundle
   // identifier/package name and SHA-1 fingerprint, then set
   // EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID / EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID /
-  // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID. Until then, useAuthRequest below
-  // returns a null `request` and the button below is disabled with an
-  // explanatory label rather than crashing.
-  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+  // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.
+  //
+  // useIdTokenAuthRequest throws synchronously during render (not just a
+  // null `request`, confirmed live on a real device) when the client ID
+  // for the current platform is missing — a hook can't be called
+  // conditionally, so a placeholder string is passed instead to keep the
+  // hook itself from crashing the whole screen; isGoogleConfigured (not
+  // `!!googleRequest`) is what actually gates the button/handler.
+  const isGoogleConfigured =
+    Platform.OS === "android"
+      ? !!process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
+      : !!process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const [, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || "not-configured",
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || "not-configured",
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
   });
 
@@ -84,6 +93,7 @@ export function LoginScreen() {
         if (error) throw error;
       }
     } catch (err) {
+      console.error("[demo-login]", err);
       Alert.alert(
         "Erro",
         err instanceof ApiError ? err.message : "Falha ao entrar em modo demonstração",
@@ -105,7 +115,7 @@ export function LoginScreen() {
   // resolveMobileContext() never trusts anything but real membership rows.
   async function handleGoogleLogin() {
     if (USE_FIREBASE) {
-      if (!googleRequest) {
+      if (!isGoogleConfigured) {
         Alert.alert(
           "Google indisponível",
           "Configuração pendente (EXPO_PUBLIC_GOOGLE_*_CLIENT_ID) — ver docs/architecture/FIREBASE_AUTH_MIGRATION.md.",
