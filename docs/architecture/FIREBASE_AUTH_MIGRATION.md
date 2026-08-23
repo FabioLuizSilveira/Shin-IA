@@ -471,6 +471,73 @@ installed, even though the backend-side bug is now fixed — the risk left
 is purely "does the untested client code actually work," not "is the
 backend ready."
 
+## Shinã-native TOTP (decision: not Supabase's or Firebase's built-in MFA)
+
+Decision (2026-08-22, user-directed): **login/signup never requires MFA
+going forward.** MFA becomes a step-up mechanism for specific sensitive
+actions, not a login gate. Two real reasons this ruled out both built-in
+options:
+
+- **Supabase's own MFA** (`supabase.auth.mfa.*`) only exists for a
+  Supabase session — meaningless once login is Firebase.
+- **Firebase's own MFA** (`TotpMultiFactorGenerator`) resolves _during_
+  sign-in via an in-memory `resolver` object thrown as part of a failed
+  sign-in attempt — there's no session yet to redirect away from and back
+  to the way Supabase's `/auth/mfa-challenge` page does. Every sign-in
+  entry point (Google, demo, future email-link) would need its own inline
+  challenge UI, and the resolver can't survive a page navigation. Ruled
+  out before writing any code, once this became clear.
+
+Built instead: a small provider-independent TOTP engine (RFC 6238), owned
+entirely by Shinã, keyed by the canonical `shina_user_id` — no
+Supabase/Firebase MFA API involved at all.
+
+- `apps/web/src/lib/auth/totp.ts` — pure Web Crypto (no new dependency,
+  same convention as `lib/auth/mfa-cookie.ts`'s HMAC). Secret generation,
+  `otpauth://` URI for QR codes, and code verification with a ±1 time-step
+  tolerance window. **Verified against the official RFC 6238 Appendix B
+  test vector** (T=59s, the shared test secret, SHA-1) — not just
+  internally consistent, actually produces the same code any real
+  authenticator app (Google Authenticator, Authy, etc.) would.
+- `apps/web/src/lib/auth/mfa-crypto.ts` — AES-256-GCM at rest for the
+  secret, same pattern as `apps/mkt/src/lib/crypto.ts`'s BYOK key
+  encryption, separate key (`SHINA_MFA_ENCRYPTION_KEY`) so the two rotate
+  independently.
+- `shina_totp_credentials` (new table,
+  `supabase/migrations/20260097000000_shina_native_totp.sql`) — one row
+  per `shina_user_id`, `pending` until a real code is confirmed, then
+  `active`. Distinct from the older `mfa_enrollments` table (Supabase
+  Auth's own factor bookkeeping), which stays untouched as historical
+  record for existing Supabase-enrolled users.
+- Three routes: `POST /api/auth/mfa/native/enroll/start` (generate +
+  store pending), `POST /api/auth/mfa/native/enroll/confirm` (verify a
+  real code, flip to active), `POST /api/auth/mfa/native/challenge`
+  (verify a code against an active credential, issue a signed, short-lived
+  — 5 minute — step-up cookie via `lib/auth/stepup-cookie.ts`, same HMAC
+  scheme as the existing `mfa_verified` cookie, separate name/secret).
+- `apps/web/src/lib/auth/require-step-up.ts` — `hasValidStepUp(shinaUserId)`,
+  the helper a future sensitive route calls to check for that cookie.
+
+**Verified live against the hosted database, real cryptography, no
+mocks**: full round trip (enroll → real computed code → confirm → active)
+using the Tenant Demo Firebase session; re-confirming an already-active
+credential correctly rejected (409, not silently accepted); step-up
+challenge with a real code issued the cookie; a wrong code on both confirm
+and challenge correctly rejected (401); no session at all correctly
+rejected (401) on every route.
+
+**Explicitly not done this round — foundation only, per direct user
+decision**: no sensitive action is gated behind `hasValidStepUp()` yet
+(candidates like impersonation start were discussed and deliberately
+deferred, not forgotten), and no enrollment/challenge UI page exists yet
+(the three API routes are ready for one, but building UI ahead of a
+concrete "which action needs this" decision risked building the wrong
+shape). `MFA_REQUIRED_ROLES` in `middleware.ts` still gates every page for
+Supabase-authenticated `tenant_owner`/`tenant_admin` sessions, unchanged —
+that's the login-blocking Supabase MFA gate, a separate thing from this
+step-up mechanism, and out of scope for removal until Magic Link/Email
+Link (this roadmap's next step) is settled.
+
 ## What Phase 2 needs from the user before it can start
 
 - Apple sign-in shows as enabled in Firebase Console already, but per spec
