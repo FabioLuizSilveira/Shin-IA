@@ -104,6 +104,15 @@ function getHostType(hostname: string): HostType {
   const bare = hostname.split(":")[0]; // strip port
   if (bare === "localhost" || bare === "127.0.0.1") return "local";
   if (bare === `app.${ROOT_DOMAIN}` || bare === "app.localhost") return "app";
+  // Vercel Preview deployments get a random *.vercel.app hostname that can
+  // never match app.${ROOT_DOMAIN} — without this, every preview URL is
+  // treated as the root marketing domain, and any non-marketing path (e.g.
+  // /login) 308-redirects straight to production's real app.shinaia.com.br,
+  // making it impossible to test the app (e.g. a different
+  // IDENTITY_PROVIDER) on a preview deployment. Scoped to VERCEL_ENV ===
+  // "preview" only, which Vercel sets server-side and is never "preview" in
+  // Production — this can never change production routing.
+  if (process.env.VERCEL_ENV === "preview" && bare.endsWith(".vercel.app")) return "app";
   return "root"; // shinaia.com.br, www.shinaia.com.br, etc.
 }
 
