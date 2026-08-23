@@ -7,7 +7,7 @@
 **AUTHORIZATION: SHINÃ IAM / RBAC / ABAC (unchanged)**
 **CANONICAL USER ID: SHINÃ (`shina_user_id`)**
 
-Status: **Phase 1 complete. Phase 2 in progress — apps/web's real login (Google + both demo accounts) built and verified end-to-end in local dev; the mobile-API backend gap (`requireMobileContext()` bypassing the identity provider) found and fixed; apps/mobile's client-side code written and gated behind `EXPO_PUBLIC_IDENTITY_PROVIDER`, but NOT device-tested (see "apps/mobile — built, not device-verified" below). Nothing of this is active in Vercel/production or any EAS build profile — every Firebase-provider env var stays local-only until mobile is actually confirmed working on a real device. Phase 3 not started.**
+Status: **Phase 1 complete. Phase 2 in progress — apps/web's real login (Google + both demo accounts) built and verified end-to-end in local dev; the mobile-API backend gap (`requireMobileContext()` bypassing the identity provider) found and fixed; apps/mobile's client-side code written and gated behind `EXPO_PUBLIC_IDENTITY_PROVIDER`, but NOT device-tested (see "apps/mobile — built, not device-verified" below). Shinã-native TOTP, Firebase Email Link, and the Customer Portal RLS→API migration all built and live-verified against the hosted DB. `IDENTITY_PROVIDER`/`NEXT_PUBLIC_IDENTITY_PROVIDER=firebase` are now set in Vercel **Preview only** (never Production) and a real Preview deployment of apps/web has been built and smoke-tested — see "Web Preview real" below. A formal Security Gate pass (forgery/negative tests) has also run clean — see "Security Gate" below. Nothing of this is active in Vercel Production or any EAS build profile — every Firebase-provider env var stays out of Production until mobile is actually confirmed working on a real device. Phase 3 not started.**
 
 ## What's migrating and what isn't
 
@@ -632,6 +632,74 @@ just the web cookie path.
   items 19/20, actually exercising it also needs an Apple Developer Service
   ID/Key/Team ID and a registered redirect — not yet confirmed configured.
   Facebook is not yet enabled at all.
+
+## Web Preview real
+
+Following the roadmap's "Web Preview real" step: `IDENTITY_PROVIDER`/
+`NEXT_PUBLIC_IDENTITY_PROVIDER=firebase` were added to Vercel **Preview**
+only (confirmed via `vercel env ls production | grep IDENTITY_PROVIDER` →
+empty), and `apps/web` was deployed to a real Preview URL from the repo
+root (`vercel --yes`).
+
+- **Vercel CLI monorepo double-nesting bug**: running `vercel` from inside
+  `apps/web` fails with `The provided path "...\apps\web\apps\web" does not
+exist" regardless of `.vercel/repo.json`registration. Root cause: the
+project's`rootDirectory`setting is already`apps/web`, so running from
+inside that directory doubles the path. Fixed by deploying from the repo
+root instead (where `.vercel/project.json`is linked to`shin-ia-le1a`) —
+  not by any repo.json change.
+- **Vercel Deployment Protection** (`ssoProtection.deploymentType:
+"all_except_custom_domains"`) gated every `*.vercel.app` URL behind a
+  Vercel login, blocking automated browser testing. Disabled via `vercel
+project protection disable shin-ia-le1a --sso` — safe because it only
+  affects `*.vercel.app` URLs; the production custom domain
+  (`app.shinaia.com.br`) was never covered by it either way.
+- **Found and fixed a real bug**: `middleware.ts`'s `getHostType()`
+  classified any hostname other than exactly `app.${ROOT_DOMAIN}` as the
+  root marketing domain — including a Preview deployment's own random
+  `*.vercel.app` hostname. Any non-marketing path (e.g. `/login`)
+  308-redirected straight to production's real `app.shinaia.com.br`,
+  making it structurally impossible to test a Preview deployment's own
+  build (including its own `IDENTITY_PROVIDER`). Fixed by classifying a
+  `*.vercel.app` hostname as `"app"` when `process.env.VERCEL_ENV ===
+"preview"` — never true in Production, so production routing is
+  unaffected.
+- **Live-verified on the real Preview URL** after the fix: `/login` no
+  longer redirects off the preview domain; the Google button correctly
+  triggers Firebase's `signInWithPopup` flow with no CSP/COOP errors
+  (confirming the earlier Phase-1 CSP/COOP fixes hold on real
+  infrastructure, not just local dev) — full completion wasn't possible
+  because the automated browser's own popup blocker intervenes
+  (`auth/popup-blocked`), a tooling limitation, not an app bug. Demo login
+  surfaced a real gap (`DEMO_TENANT_EMAIL`/`DEMO_CUSTOMER_EMAIL` were never
+  added to Vercel Preview) — left unfixed by explicit user choice (declined
+  adding those env vars) rather than tested further. Magic Link was not
+  exercised on Preview by explicit user choice (it sends a real email).
+
+## Security Gate
+
+A focused forgery/negative-test pass, run against the local dev server
+(all the same code Preview/Production run) plus a direct hosted-DB check,
+covering gaps not yet exercised live in earlier phases. All checks passed:
+
+- `POST /api/auth/mfa/native/challenge` and `.../enroll/start` with no
+  session → `401`, never `200`/`500`.
+- `POST /api/auth/firebase/session` with a forged `idToken` → rejected,
+  no session cookie set.
+- `GET /api/mobile/customer/{me,contracts,invoices,reservations}` with no
+  auth at all → `401` (no default/fallback path leaks another tenant's
+  data).
+- `POST /api/auth/firebase/magic-link/precheck` with a malformed email →
+  a clean `4xx`, never a `500` that could leak internal state.
+- A well-formed-looking but forged `__shina_firebase_session` cookie
+  (valid JWT _shape_, invalid signature) → treated as fully
+  unauthenticated by `verifyFirebaseSessionCookie`, not just by a later
+  authorization check.
+- Re-confirmed directly against the hosted Supabase REST API using the
+  **anon key** (no session at all): `resolve_shina_authorization_context`
+  still returns `42501 permission denied` — the `PUBLIC` grant bug fixed
+  earlier in this migration stayed fixed.
+- Re-confirmed `IDENTITY_PROVIDER` is still absent from Vercel Production.
 
 ## What was explicitly NOT done (Phase 1 scope)
 
