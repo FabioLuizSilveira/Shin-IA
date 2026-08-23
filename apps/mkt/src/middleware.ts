@@ -1,6 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { decodeSessionClaims, hasLiveSubscription } from "@shina/billing-platform/claims";
+import {
+  decodeSessionClaims,
+  hasLiveSubscription,
+  type SessionClaims,
+} from "@shina/billing-platform/claims";
+import { resolveActiveIdentityProviderKind } from "@shina/identity";
+import {
+  FIREBASE_SESSION_COOKIE,
+  verifyFirebaseSessionCookie,
+  resolveFirebaseSessionClaims,
+} from "@/lib/firebase-session-cookie";
 
 // Public routes: landing, pricing, signup, login and auth callbacks.
 // /api/mcp authenticates via Authorization bearer header, not cookies.
@@ -59,31 +69,60 @@ export async function middleware(request: NextRequest) {
 
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      global: { fetch: fetchWithTimeout },
-      cookieOptions: { domain: authCookieDomain(request.headers.get("host") ?? "") },
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
+  const identityProviderKind = resolveActiveIdentityProviderKind(process.env);
+
+  let user: { id: string } | null = null;
+  // Set by whichever branch below runs — used by both the unauthenticated
+  // gate and the subscription gate, so neither has to know which provider
+  // is active.
+  let claims: SessionClaims | null = null;
+
+  if (identityProviderKind === "firebase") {
+    // Edge-safe verification (jose, not firebase-admin — see
+    // lib/firebase-session-cookie.ts) mirroring apps/web's middleware.
+    const cookieValue = request.cookies.get(FIREBASE_SESSION_COOKIE)?.value;
+    const verified = cookieValue ? await verifyFirebaseSessionCookie(cookieValue) : null;
+    const resolved = verified ? await resolveFirebaseSessionClaims(verified.uid) : null;
+    if (resolved) {
+      user = { id: resolved.userId };
+      claims = resolved.claims;
+    }
+  } else {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: { fetch: fetchWithTimeout },
+        cookieOptions: { domain: authCookieDomain(request.headers.get("host") ?? "") },
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+            supabaseResponse = NextResponse.next({ request });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              supabaseResponse.cookies.set(name, value, options),
+            );
+          },
         },
       },
-    },
-  );
+    );
 
-  const user = await supabase.auth
-    .getUser()
-    .then(({ data }) => data.user)
-    .catch(() => null);
+    user = await supabase.auth
+      .getUser()
+      .then(({ data }) => data.user)
+      .catch(() => null);
+
+    // Stash for the subscription gate below, so it doesn't need a second
+    // getSession() round trip keyed off which provider is active.
+    if (user) {
+      claims = await supabase.auth
+        .getSession()
+        .then(({ data }) => (data.session ? decodeSessionClaims(data.session.access_token) : {}))
+        .catch(() => ({}) as SessionClaims);
+    }
+  }
 
   if (!user && !isPublic) {
     if (isApiRoute) {
@@ -109,11 +148,7 @@ export async function middleware(request: NextRequest) {
   // user straight off the success page without a processed webhook still
   // lands back on /signup. API routes keep their own route-level auth.
   if (user && !isPublic && !isApiRoute) {
-    const claims = await supabase.auth
-      .getSession()
-      .then(({ data }) => (data.session ? decodeSessionClaims(data.session.access_token) : {}))
-      .catch(() => ({}) as ReturnType<typeof decodeSessionClaims>);
-    if (!hasLiveSubscription(claims.mkt_subscription_status)) {
+    if (!hasLiveSubscription(claims?.mkt_subscription_status)) {
       const url = request.nextUrl.clone();
       url.pathname = "/signup";
       url.searchParams.set("upgrade", "1");

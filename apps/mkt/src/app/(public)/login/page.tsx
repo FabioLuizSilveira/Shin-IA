@@ -3,10 +3,21 @@
 export const dynamic = "force-dynamic";
 
 import { useState, Suspense } from "react";
+import { GoogleAuthProvider, sendSignInLinkToEmail, signInWithPopup } from "firebase/auth";
 import { createClient } from "@/lib/supabase/client";
+import { firebaseAuth } from "@/lib/firebase-client";
+import { establishFirebaseSession } from "@/lib/firebase-session";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Mail, Eye, EyeOff } from "lucide-react";
+
+const MAGIC_LINK_EMAIL_STORAGE_KEY = "shina_magic_link_email";
+
+// Client-side mirror of IDENTITY_PROVIDER — see apps/web's identical flag
+// for why this must never be set in Vercel until apps/mobile is migrated
+// too. Only "firebase" changes behavior; anything else (including unset)
+// keeps today's Supabase-only flow untouched.
+const USE_FIREBASE = process.env.NEXT_PUBLIC_IDENTITY_PROVIDER === "firebase";
 
 // Mesmo design system de /signup (liquid-glass, Instrument Serif itálico —
 // herdado do layout do grupo (public), ver (public)/layout.tsx). Esta
@@ -54,6 +65,11 @@ function LoginForm() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    // The password field/button are hidden under USE_FIREBASE (see the
+    // form below), but pressing Enter in the email input still submits
+    // this form — route that to magic link instead of a silent Supabase
+    // password attempt with an empty password.
+    if (USE_FIREBASE) return handleFirebaseMagicLink();
     setLoading("password");
     setError(null);
     setNoAccount(false);
@@ -81,7 +97,22 @@ function LoginForm() {
   // sem como entrar aqui. Reaproveita o /api/auth/callback já existente
   // (usado hoje só pelo signup), passando `next` para diferenciar os dois
   // fluxos — ver comentário na rota.
+  async function handleFirebaseGoogle() {
+    setLoading("google");
+    setError(null);
+    try {
+      const cred = await signInWithPopup(firebaseAuth, new GoogleAuthProvider());
+      const idToken = await cred.user.getIdToken();
+      await establishFirebaseSession(idToken, next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao iniciar login.");
+      setLoading(null);
+    }
+  }
+
   async function handleGoogleLogin() {
+    if (USE_FIREBASE) return handleFirebaseGoogle();
+
     setLoading("google");
     setError(null);
     const supabase = createClient();
@@ -97,9 +128,42 @@ function LoginForm() {
     }
   }
 
+  // Firebase's sendSignInLinkToEmail() has no shouldCreateUser:false
+  // equivalent — /api/auth/firebase/magic-link/precheck (server-side)
+  // decides whether an account actually exists first; the UI always shows
+  // "link enviado" regardless, so a failed precheck doesn't leak which
+  // emails have accounts (same anti-enumeration posture the Supabase flow
+  // already had). Mirrors apps/web's identical handler.
+  async function handleFirebaseMagicLink() {
+    if (!email.trim()) return;
+    setLoading("magic");
+    setError(null);
+    try {
+      const precheckRes = await fetch("/api/auth/firebase/magic-link/precheck", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const precheckJson = await precheckRes.json();
+      if (precheckJson?.data?.allowed) {
+        window.localStorage.setItem(MAGIC_LINK_EMAIL_STORAGE_KEY, email.trim());
+        await sendSignInLinkToEmail(firebaseAuth, email.trim(), {
+          url: `${window.location.origin}/auth/magic-link-callback?next=${encodeURIComponent(next)}`,
+          handleCodeInApp: true,
+        });
+      }
+      setMagicSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao enviar o link.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
   // shouldCreateUser: false — login nunca cria conta nova em silêncio
   // (mesma regra já usada no magic-link do app mobile).
   async function handleMagicLink() {
+    if (USE_FIREBASE) return handleFirebaseMagicLink();
     if (!email.trim()) return;
     setLoading("magic");
     setError(null);
@@ -163,29 +227,38 @@ function LoginForm() {
             />
           </div>
 
-          <div>
-            <label htmlFor="password" className="block font-body text-sm text-white/70 mb-1.5">
-              Senha
-            </label>
-            <div className="relative">
-              <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                className="w-full px-4 py-3 pr-11 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 font-body text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors bg-transparent border-0 cursor-pointer"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+          {/* Login por senha ainda produz só uma sessão Supabase — com o
+              backend em Firebase (USE_FIREBASE), essa sessão não seria
+              reconhecida pelo middleware nem por requireTenantScope() no
+              app.$ROOT_DOMAIN, então fica oculto em vez de quebrado em
+              silêncio (mesmo tratamento já dado ao Facebook em apps/web).
+              O restante da plataforma já é password-less (Google/magic
+              link), então nenhuma conta nova depende de senha. */}
+          {!USE_FIREBASE && (
+            <div>
+              <label htmlFor="password" className="block font-body text-sm text-white/70 mb-1.5">
+                Senha
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  className="w-full px-4 py-3 pr-11 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 font-body text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors bg-transparent border-0 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {noAccount && (
             <div className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 font-body text-sm">
@@ -204,13 +277,15 @@ function LoginForm() {
 
           {error && <p className="font-body text-sm text-red-400 text-center">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={loading !== null}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white text-black rounded-full font-body font-semibold text-sm hover:bg-white/90 transition-colors disabled:opacity-50"
-          >
-            {loading === "password" ? "Entrando…" : "Entrar"}
-          </button>
+          {!USE_FIREBASE && (
+            <button
+              type="submit"
+              disabled={loading !== null}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white text-black rounded-full font-body font-semibold text-sm hover:bg-white/90 transition-colors disabled:opacity-50"
+            >
+              {loading === "password" ? "Entrando…" : "Entrar"}
+            </button>
+          )}
         </form>
 
         {magicSent ? (

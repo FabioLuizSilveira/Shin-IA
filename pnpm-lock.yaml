@@ -90,6 +90,9 @@ importers:
       '@shina/icons':
         specifier: workspace:*
         version: link:../../packages/icons
+      '@shina/identity':
+        specifier: workspace:*
+        version: link:../../packages/identity
       '@shina/landing':
         specifier: workspace:*
         version: link:../../packages/landing
@@ -117,6 +120,9 @@ importers:
       framer-motion:
         specifier: ^11.11.0
         version: 11.18.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      jose:
+        specifier: ^5.9.6
+        version: 5.10.0
       lucide-react:
         specifier: ^1.21.0
         version: 1.21.0(react@18.3.1)
@@ -10572,7 +10578,7 @@ snapshots:
       std-env: 3.10.0
       strip-literal: 2.1.1
       test-exclude: 6.0.0
-      vitest: 1.6.1(@types/node@20.19.43)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
+      vitest: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
     transitivePeerDependencies:
       - supports-color
 
