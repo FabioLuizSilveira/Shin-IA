@@ -41,10 +41,10 @@ export function MetricCard({
           to the fixed-width icon overflows past the card's edge instead of
           wrapping/truncating (confirmed live on a 2-column mobile grid). */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">
+        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
           {title}
         </p>
-        <p className="mt-2 text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-50 font-display break-words">
+        <p className="mt-2 text-lg font-bold text-slate-900 dark:text-slate-50 font-display truncate">
           {value}
         </p>
         {(change !== undefined || changeLabel) && (
