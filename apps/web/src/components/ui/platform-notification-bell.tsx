@@ -68,7 +68,10 @@ export function PlatformNotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 overflow-hidden">
+        // Fixed + inset-x on mobile, same fix as notification-dropdown.tsx —
+        // `right-0` alone isn't enough since the bell isn't the rightmost
+        // header element, so the panel hung off the left edge of the screen.
+        <div className="fixed inset-x-4 top-16 sm:absolute sm:inset-x-auto sm:top-full sm:right-0 sm:mt-2 sm:w-96 bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-100">
             <h3 className="text-sm font-semibold text-slate-900">Mensagens de tenants</h3>
             {unreadCount > 0 && (

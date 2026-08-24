@@ -97,7 +97,10 @@ export function MktNotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl z-50 overflow-hidden">
+        // Fixed + inset-x on mobile, same fix as apps/web's notification
+        // dropdowns — `right-0` alone isn't enough since the bell isn't the
+        // rightmost header element, so the panel hung off the screen edge.
+        <div className="fixed inset-x-4 top-20 sm:absolute sm:inset-x-auto sm:top-full sm:right-0 sm:mt-2 sm:w-80 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-white/5">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
               Aprovações pendentes

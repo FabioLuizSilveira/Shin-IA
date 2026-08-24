@@ -70,7 +70,7 @@ export default function TenantDashboardPage() {
         description="Resumo das operações, ativos, contratos e faturas do seu tenant."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <MetricCard
           title="Operações Ativas"
           value={loading ? "..." : String(metrics?.activeOperations ?? 0)}

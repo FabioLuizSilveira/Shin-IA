@@ -59,7 +59,14 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 overflow-hidden">
+        // Fixed + inset-x on mobile so the panel is pinned to the actual
+        // viewport edges instead of the bell's own position — the bell
+        // isn't the rightmost header element (workspace switcher/avatar
+        // sit further right), so `right-0` relative to it left the panel
+        // hanging off the left edge of the screen (confirmed live: left
+        // edge landed at -36px on a 375px viewport). sm:absolute reverts to
+        // the original bell-anchored behavior once there's enough room.
+        <div className="fixed inset-x-4 top-16 sm:absolute sm:inset-x-auto sm:top-full sm:right-0 sm:mt-2 sm:w-96 bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <div>
