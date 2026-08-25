@@ -272,11 +272,11 @@ que pelo menos 1 foto já foi enviada pra ele) e coberto por dois testes de regr
   verificação foi via chamada direta ao repositório/domínio contra o banco real (mesmo código,
   sem a camada HTTP). Teste via requisição HTTP real fica pra Fase G (hardening).
 
-## Fase D — UX (Tenant Web concluído; Mobile pendente)
+## Fase D — UX (Tenant Web + Mobile concluídos)
 
-**Status: Tenant Web completo e verificado ao vivo, incluindo a criação e o preenchimento de uma
-vistoria real pela UI (não só via chamada direta ao domínio, como na Fase C). Mobile (captura
-guiada) ainda não iniciado — próximo passo.**
+**Status: concluída. Tenant Web verificado ao vivo pela UI real (banco hospedado). Mobile
+verificado por bundle estático completo (Metro/Hermes, 1516 módulos, zero erros) — sem device
+real disponível (cota EAS esgotada até 2026-09-01), limite documentado, não escondido.**
 
 ### Arquivos criados
 
@@ -323,19 +323,45 @@ realmente conectado, não só testado isoladamente. Builder testado abrindo o te
 `vehicle_standard_v1` e confirmando que as 4 seções/21 itens reais aparecem com tipo de campo e
 obrigatoriedade corretos. Dados de teste limpos do banco ao final.
 
+### Mobile — captura guiada
+
+**Arquivos:** `apps/mobile/src/screens/InspectionCaptureScreen.tsx` (fluxo guiado item-a-item —
+contador de progresso, instrução, captura de foto inline via `CameraView`, controle real por
+`field_type` para texto/número/boolean/select/condition, salvamento imediato de cada resposta no
+servidor — nada fica só em memória local, então o app matado/reaberto recupera o progresso real
+via nova busca, não um cache local), `InspectionsScreen.tsx` (lista, no menu), botões "Vistoria
+de Check-in"/"Check-out" no `AssetDetailScreen`. `apps/mobile/src/lib/shinaia-api.ts` ganhou os
+tipos e métodos de Inspection, incluindo `uploadInspectionMedia()` — a única chamada multipart do
+cliente, construída do zero (o helper `request()`/`mutate()` só faz JSON).
+
+**Dependências novas** (maior lacuna do módulo, `apps/mobile` não tinha nenhuma antes):
+`expo-camera`, `expo-file-system`, `expo-location`, instaladas via `npx expo install` (versões
+corretas pro SDK 56). Por causa do aviso em `apps/mobile/AGENTS.md` ("Expo HAS CHANGED — leia a
+doc versionada antes de escrever código"), consultei a documentação real da v56 antes de escrever
+qualquer linha — `CameraView`/`useCameraPermissions()`/`takePictureAsync()` e o novo padrão de
+upload via `File` (implementa `Blob`) vêm de lá, não de suposição.
+
+**Verificação**: sem device real disponível (mesmo bloqueio de cota EAS já documentado no módulo
+Firebase, até 2026-09-01). Fiz a verificação estática mais forte possível sem device:
+`npx expo export --platform android` — bundle completo via Metro/Hermes, 1516 módulos, zero
+erros de resolução. Isso prova que toda importação e módulo nativo referenciado (câmera,
+localização, sistema de arquivos) linka corretamente; não prova comportamento em runtime real
+(permissões do SO, câmera física). Limite documentado, não escondido.
+
 ### Pendências desta fase
 
-- Mobile (captura guiada) — não iniciado. Maior lacuna de dependências novas (sem
-  `expo-camera`/`expo-image-picker`/`expo-file-system`/`expo-location` hoje) e sem possibilidade
-  de teste em device real (cota EAS esgotada até 2026-09-01, mesmo bloqueio já documentado no
-  módulo Firebase).
-- Nenhum teste automatizado novo nesta fase (componentes React sem suíte de testes no padrão do
-  projeto — as demais páginas `tenant/*` também não têm). Verificação foi ao vivo, via navegador,
-  contra o banco hospedado real.
+- Verificação em device real (câmera de verdade, permissões do SO) — bloqueada pela cota EAS.
+- Nenhum teste automatizado novo (componentes React sem suíte de testes no padrão do projeto —
+  as demais telas `tenant/*`/mobile também não têm). Verificação foi ao vivo (web) e por bundle
+  estático (mobile).
+- Fluxo de captura guiada não foi conectado à persona "operator" (`OperatorHomeScreen` é uma tela
+  única sem stack próprio hoje) — só `tenant_user` (fleet_manager/operations_manager/owner/admin)
+  tem acesso pelo app mobile nesta rodada. Decisão de escopo, documentada.
 
 ### Próximo passo
 
-Continuar a Fase D com Mobile (captura guiada) — adicionar as dependências de câmera ao
-`apps/mobile`, construir as telas de vistoria (lista, checklist com captura foto-a-foto guiada),
-conectar às rotas de API já existentes. Testável via Expo Go (câmera funciona lá, ao contrário do
-Google Sign-In); verificação em device real de produção fica pendente pelo bloqueio de EAS.
+Fase E — Comparação: interface `InspectionMediaComparisonProvider` já existe (Fase C), falta um
+provider real (Anthropic Vision ou equivalente — decisão de produto pendente, sem credenciais
+configuradas) e a UI de revisão humana para constatações sugeridas por IA (a revisão manual via
+`inspection_findings` já funciona de ponta a ponta desde a Fase D, só falta a origem "IA" agora
+inerte).
