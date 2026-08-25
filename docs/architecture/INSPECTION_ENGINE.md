@@ -154,4 +154,69 @@ do cliente (espelhando `customer.contracts.accept`).
 
 ## Fase B — Domain + Database
 
-_Em andamento — atualizado ao final da fase._
+**Status: schema, RLS e permissions concluídos e verificados ao vivo contra o banco hospedado.
+Repositórios/domain package ficam para o início da Fase C (ver "Próximo passo" abaixo).**
+
+### Migrations
+
+- `supabase/migrations/20260098000000_inspection_engine.sql` — 9 enums novos
+  (`inspection_type`, `inspection_status`, `inspection_template_status`,
+  `inspection_field_type`, `inspection_purpose`, `inspection_media_type`,
+  `inspection_finding_severity`, `inspection_finding_status`, `inspection_signer_type`), 11
+  tabelas (`inspection_templates`, `inspection_template_sections`,
+  `inspection_template_items`, `blueprint_inspection_mappings`, `inspections`,
+  `inspection_responses`, `inspection_media`, `inspection_findings`,
+  `inspection_comparisons`, `inspection_reports`, `inspection_signatures`), RLS em todas
+  (select-only staff via `auth.jwt()->>'tenant_id'`, catálogo global+overlay nas tabelas de
+  template), 9 permissions novas + grant a `tenant_owner`/`tenant_admin`.
+- `supabase/migrations/20260099000000_inspection_engine_seed.sql` — bucket privado
+  `inspection-media` (15 MiB, png/jpeg/webp/mp4/mov/pdf), dois templates globais
+  (`vehicle_standard_v1` — 4 seções/21 itens, espelhando o exemplo de veículo do spec;
+  `equipment_standard_v1` — 3 seções/13 itens, espelhando o exemplo de empilhadeira),
+  `blueprint_inspection_mappings` para os 10 blueprints built-in reais × 2 propósitos
+  (check_in/check_out) = 20 linhas.
+
+### Verificação ao vivo (banco hospedado, não mockado)
+
+- As 11 tabelas + 2 templates + 7 seções + 34 itens + 20 mapeamentos + bucket existem e têm os
+  valores esperados (conferido via `service_role` diretamente).
+- RLS: a `anon key` recebe lista vazia em `select` (nunca erro, nunca dado) e é bloqueada com
+  `new row violates row-level security policy` em `insert` — confirmado nas duas pontas, não só
+  assumido pela presença da policy.
+- Nenhum teste automatizado (`vitest`) ainda — este é só schema; os testes de domínio entram na
+  Fase C junto com `packages/inspection-engine`.
+
+### Decisões desta fase (ver corpo da Fase A para o raciocínio completo)
+
+1. Sem tabela de audit events própria — `tenant_activity_log`/`logActivity()` cobre o rastro
+   operacional; `inspection_signatures` cobre a evidência jurídica (mesma forma de
+   `tenant_contract_acceptances`).
+2. Templates sem versionamento imutável completo (só `status`/`version int` na própria linha) —
+   trade-off de escopo assumido, documentado na Fase A como algo a promover se virar requisito
+   real.
+3. RLS só idioma 2 (select-only staff) e idioma 5 (catálogo global+tenant) — nenhuma policy
+   `auth.uid()` para cliente/operador, porque o acesso deles é sempre via rota de API com
+   `requireMobileContext()`, consistente com a migração Customer Portal RLS→API desta mesma
+   sessão (uma sessão Firebase não tem `auth.uid()` do Supabase).
+4. `inspections.operation_id` é nullable — a vistoria pode existir sem uma operação de
+   agenda/recurso amarrada.
+
+### Pendências
+
+- `packages/inspection-engine` (domínio puro + interfaces de repositório) — Fase C.
+- `apps/web/src/lib/inspection-transitions.ts` (mapa de transição, mesmo padrão de
+  `operation-transitions.ts`) — Fase C.
+- `BlueprintCapabilities.inspection` (flag nova no pacote `blueprint-runtime`) — Fase C.
+- Rotas de API (`app/api/inspections/*`) — Fase C.
+- UI Tenant Web, Inspection Builder, captura guiada mobile — Fase D.
+- Comparação BEFORE×AFTER, findings, revisão humana, `InspectionMediaComparisonProvider` —
+  Fase E.
+- Laudo, assinatura, hooks de Workflow/Notification/Billing/Tracking — Fase F.
+- Testes de domínio/RLS/isolamento entre tenants, hardening — Fase G.
+
+### Próximo passo
+
+Fase C — Inspection Runtime: `packages/inspection-engine` com a lógica pura (resolver de
+template por blueprint, motor de preenchimento, validação de item obrigatório/`approval_gate`,
+transição de status), repositórios injetados (mesmo padrão de `packages/tracking-engine`), e as
+rotas de API que os conectam ao banco via `requireTenantScope()`/`scopedInsert`/`scopedSelect`.
