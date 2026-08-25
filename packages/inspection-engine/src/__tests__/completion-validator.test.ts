@@ -120,6 +120,77 @@ describe("checkTemplateCompletion", () => {
     expect(result.missingRequiredItems.map((m) => m.itemKey)).toContain("plate");
   });
 
+  it("does not flag an OPTIONAL photo item with minPhotos set when zero photos were captured", () => {
+    // Regression test — caught live against real seed data
+    // (vehicle_standard_v1's optional "roof"/"dashboard"/"trunk" items
+    // all have minPhotos set but required=false).
+    const template = makeTemplate();
+    template.sections[0].items.push({
+      id: "item-roof",
+      sectionId: "sec-1",
+      templateId: "tmpl-1",
+      key: "roof",
+      label: "Roof",
+      fieldType: "photo",
+      required: false,
+      instructions: null,
+      referenceImageUrl: null,
+      minPhotos: 1,
+      maxPhotos: 2,
+      selectOptions: null,
+      condition: null,
+      approvalGate: false,
+      sortOrder: 6,
+    });
+    const result = checkTemplateCompletion({
+      template,
+      responses: [
+        response("item-plate", { valueText: "ABC-1234" }),
+        response("item-safety", { valueBoolean: true }),
+      ],
+      mediaCountByItemId: new Map([["item-front-photo", 2]]), // roof never touched
+    });
+    expect(result.photoCountViolations.some((v) => v.itemKey === "roof")).toBe(false);
+  });
+
+  it("DOES enforce minPhotos on an optional item once at least one photo was uploaded for it", () => {
+    const template = makeTemplate();
+    template.sections[0].items.push({
+      id: "item-roof",
+      sectionId: "sec-1",
+      templateId: "tmpl-1",
+      key: "roof",
+      label: "Roof",
+      fieldType: "photo",
+      required: false,
+      instructions: null,
+      referenceImageUrl: null,
+      minPhotos: 2,
+      maxPhotos: 3,
+      selectOptions: null,
+      condition: null,
+      approvalGate: false,
+      sortOrder: 6,
+    });
+    const result = checkTemplateCompletion({
+      template,
+      responses: [
+        response("item-plate", { valueText: "ABC-1234" }),
+        response("item-safety", { valueBoolean: true }),
+      ],
+      mediaCountByItemId: new Map([
+        ["item-front-photo", 2],
+        ["item-roof", 1], // started but below the item's own minPhotos
+      ]),
+    });
+    expect(result.photoCountViolations).toContainEqual({
+      itemId: "item-roof",
+      itemKey: "roof",
+      required: 2,
+      actual: 1,
+    });
+  });
+
   it("reports a photo item below minPhotos as a violation, not a missing item", () => {
     const result = checkTemplateCompletion({
       template: makeTemplate(),

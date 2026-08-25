@@ -1,6 +1,11 @@
 export * from "./types.js";
 export { evaluateCondition } from "./evaluate-condition.js";
-export { ALLOWED_TRANSITIONS, canTransition } from "./transitions.js";
+export {
+  ALLOWED_TRANSITIONS,
+  canTransition,
+  FINDING_ALLOWED_TRANSITIONS,
+  canTransitionFinding,
+} from "./transitions.js";
 export {
   checkTemplateCompletion,
   type CompletionCheckInput,

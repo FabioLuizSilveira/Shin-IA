@@ -82,7 +82,15 @@ export function checkTemplateCompletion(input: CompletionCheckInput): Completion
 
       if (isPhotoType(item.fieldType)) {
         const count = mediaCountByItemId.get(item.id) ?? 0;
-        const min = item.minPhotos ?? (item.required ? 1 : 0);
+        // minPhotos on an OPTIONAL item only kicks in once the user has
+        // started uploading for it (partial-capture validation, e.g.
+        // "you added 1 photo of the trunk but the template wants 2") —
+        // zero photos on an optional item is just "skipped it", not a
+        // violation. A required item always enforces its floor (default
+        // 1) even with zero photos. Caught live against real seed data:
+        // "roof"/"dashboard"/"trunk" are optional but have minPhotos set,
+        // and were being flagged as missing even when never touched.
+        const min = item.required ? (item.minPhotos ?? 1) : count > 0 ? (item.minPhotos ?? 1) : 0;
         if (count < min) {
           photoCountViolations.push({
             itemId: item.id,
