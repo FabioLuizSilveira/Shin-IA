@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { internalError } from "@/lib/api-error";
 import { requireMobileContext } from "@/lib/mobile-context";
+import { resolveInspectionVisibility } from "@/lib/mobile-inspections-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +23,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const visibility = resolveInspectionVisibility(context);
+  if (visibility?.kind !== "customer") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const status = req.nextUrl.searchParams.get("status");
   const contractId = req.nextUrl.searchParams.get("contractId");
-  let query = context.db.from("inspections").select(SELECT).eq("customer_id", context.customerId);
+  let query = context.db
+    .from("inspections")
+    .select(SELECT)
+    .eq("customer_id", visibility.customerId);
   if (status) query = query.eq("status", status);
   if (contractId) query = query.eq("contract_id", contractId);
 

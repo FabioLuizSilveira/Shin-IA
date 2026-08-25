@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { internalError } from "@/lib/api-error";
 import { requireMobileContext } from "@/lib/mobile-context";
+import { resolveInspectionVisibility } from "@/lib/mobile-inspections-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +21,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const visibility = resolveInspectionVisibility(context);
+  if (visibility?.kind !== "operator") {
+    // Structurally unreachable given the userType check above, but kept
+    // explicit rather than assumed — a future refactor of the userType
+    // check must not silently widen this route's visibility.
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const status = req.nextUrl.searchParams.get("status");
   let query = context.db
     .from("inspections")
     .select(SELECT)
-    .eq("tenant_id", context.tenantId)
-    .eq("operator_id", context.operatorId);
+    .eq("tenant_id", visibility.tenantId)
+    .eq("operator_id", visibility.operatorId);
   if (status) query = query.eq("status", status);
 
   const { data, error } = await query.order("created_at", { ascending: false });
