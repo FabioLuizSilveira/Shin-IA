@@ -70,6 +70,16 @@ const APP_PUBLIC_PATHS = [
   // renewal/reservation flow — no session exists when the customer's
   // in-app browser lands here after paying (or cancelling).
   "/mobile/payment-complete",
+  // Inspection report public verification (item 8 of the Inspection
+  // Engine V1 spec) — the whole point of the QR code on a printed laudo
+  // is that anyone who scans it, logged in or not, gets a
+  // valid/invalid confirmation. Redirecting to /login here would defeat
+  // it entirely. /api/verify backs the page; /api/share is the separate
+  // secure-share-link PDF download, also unauthenticated by design (the
+  // token itself is the credential, checked inside the route).
+  "/verify/inspection-report",
+  "/api/verify",
+  "/api/share",
 ];
 
 // Roles that require MFA enrollment before accessing the platform.
