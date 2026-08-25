@@ -1,7 +1,9 @@
 # Shinã Inspection Engine — Vistoria Digital
 
-**Status: Fases A–G concluídas. Ver "Relatório Final" no fim deste documento para o resumo
-consolidado, pendências assumidas e definition-of-done.**
+**Status: Fases A–G concluídas (V0). Production Completion (V1 comercial, P0.1–P1.2) concluída
+2026-08-25 — ver seção "Production Completion" no fim deste documento. P1.3–P1.5 (offline
+hardening real, suíte HTTP permanente, overlay mobile, teste em device real) seguem pendentes,
+documentados explicitamente, não escondidos.**
 
 Log corrido do módulo, no mesmo padrão de `docs/architecture/FIREBASE_AUTH_MIGRATION.md` — cada
 fase atualiza este arquivo com o que foi entregue, decisões tomadas e pendências.
@@ -513,3 +515,143 @@ reaproveita `operations`; bucket de mídia privado, nunca público; IA isolada e
 permission segue o padrão `tenant.recurso.acao` mais recente; nenhuma policy de RLS dá acesso
 direto a cliente/operador via `auth.uid()` — acesso deles é sempre via API route, consistente com
 a migração Customer Portal RLS→API desta mesma sessão.
+
+---
+
+## Production Completion (V1 Comercial) — 2026-08-25
+
+Ver `INSPECTION_PRODUCTION_COMPLETION_PLAN.md` (raiz do repo) para a auditoria completa (código +
+banco) que precedeu esta rodada e as decisões arquiteturais tomadas. Execução autônoma por fases
+(P0.1→P0.5, depois P1.1/P1.2), commits reais a cada fase, typecheck/build limpos após cada uma.
+Regra fundamental respeitada: `InspectionMediaComparisonProvider` permanece só com
+`NullMediaComparisonProvider` — nenhum provider de IA visual foi conectado nesta rodada.
+
+### Implementado
+
+**P0.1 — Acesso do operador (mobile)**: a persona `operator` já existia de verdade
+(`operators` + RLS + `requireMobileContext()` já resolvia o tipo) — o gap real era só a
+integração com o Inspection Engine. Novas rotas `/api/mobile/operator-inspections/*` (list,
+detail, transição de status restrita a `in_progress`/`pending_review`/`abandoned` — nunca
+`completed`/`rejected`, que continuam exclusivas de revisão de staff —, upload de mídia
+idempotente por checksum, assinatura do checklist). `inspection_signatures.report_id` virou
+nullable (migration `20260102000000`) porque o operador assina o checklist antes de existir um
+laudo formal. Telas `Inspections`/`InspectionCapture` do mobile passaram a ser compartilhadas
+entre `tenant_user` e `operator` via parâmetro `scope`, sem duplicar UI. `OperatorHomeScreen`
+ganhou o atalho "Minhas Vistorias".
+
+**P0.2/P0.3 — Self-service do cliente + aceite/contestação**: vínculo real
+`customer.customerId → inspections.customer_id` (nunca um id vindo do client) em
+`/api/mobile/customer/inspections/*`, novas telas em `(customer)/rentals/[id]/inspections` e
+`.../inspections/[inspectionId]`. "CONCORDO" grava em `inspection_signatures`
+(`signer_type=customer`, IP/UA/timestamp sempre carimbados no backend). "REGISTRAR DIVERGÊNCIA"
+usa uma entidade nova e pequena, `inspection_disputes` (`open → under_review → accepted/rejected
+→ resolved`), deliberadamente **não** um `Finding` — ver decisão 2 do plano de produção. Staff
+revisa disputas em `PATCH /api/inspections/:id/disputes/:disputeId`.
+
+**P0.4 — Laudo profissional em PDF**: `@react-pdf/renderer` novo (avaliado contra Puppeteer —
+rejeitado por exigir Chromium headless incompatível com o runtime serverless atual), renderiza
+sempre a partir do snapshot imutável de `inspection_reports`, nunca de dado mutável ao vivo.
+White-label real via o `branding` studio config já existente (`companyName`/`logoUrl`), sem
+Shinã hardcoded. Seções: cabeçalho, ativo, contrato, checklist por seção, evidências (fotos via
+signed URL), comparação check-in×check-out, avarias, aceites, rodapé com hash SHA-256 + QR code
+de verificação. Rota staff (`/api/inspections/:id/report/pdf`) e cliente
+(`/api/mobile/customer/inspections/:id/report/pdf`), ambas ownership-checked.
+
+**P0.5 — Compartilhamento seguro + verificação pública**: dois mecanismos deliberadamente
+distintos (mesma separação do spec). `inspection_report_shares` — token de alta entropia, só o
+**hash** do token é persistido (nunca o valor em claro), TTL configurável (padrão 7 dias),
+revogação (`revoked_at`), `access_count`/`last_accessed_at` como audit trail; única rota pública
+que retorna o PDF completo é `/api/share/inspection-report/[token]`.
+`inspection_reports.verification_token` (coluna nova, gerada por versão de laudo) alimenta
+`/verify/inspection-report/[token]` — página pública que confirma só `Documento válido`/`Documento
+não validado` + número/data/hash/status, nunca mídia ou dado pessoal, exatamente como o exemplo
+do spec. Nenhum ID sequencial é usado como mecanismo de segurança em nenhum dos dois.
+
+**P1.1 — Overlay de avaria (web)**: `InspectionOverlayPicker` — arrastar retângulo sobre a foto,
+coordenadas normalizadas 0..1 (`{type:"rectangle", x, y, width, height}`), gravadas em
+`inspection_findings.overlay_region` (já existia no schema). Decisão arquitetural: a marcação
+vive no _finding_, não numa coluna nova em `inspection_media` — a foto "dona" da marcação é a que
+tem `finding_id` apontando pro finding (nova rota `PATCH /api/inspections/:id/media/:mediaId` faz
+esse vínculo). Evita ambiguidade sem exigir migration na tabela de mídia.
+
+**P1.2 — Viewer BEFORE×AFTER (web)**: componente `InspectionComparisonViewer` reutilizável, modos
+lado-a-lado e slider (`clip-path`, sem re-crop), pareamento sempre por `template_item_id` (nunca
+ordem de upload), integrado à gaveta de detalhe existente.
+
+**Migrations desta rodada**: `20260102000000_inspection_v1_completion.sql` —
+`inspection_signatures.report_id` nullable, `inspection_findings.preexisting_finding_id`
+(self-FK, ainda não usado por nenhuma rota — ver Pendências), `inspection_disputes` (tabela +
+RLS select-only), `inspection_reports.verification_token`, `inspection_report_shares` (tabela +
+RLS select-only), permissions `tenant.inspections.share` / `customer.inspections.dispute` (as
+duas `customer.inspections.*` restantes já existiam desde a Fase B).
+
+### Testado
+
+- **Typecheck**: `@shina/web`/`@shina/mobile`/`@shina/inspection-engine` limpos após cada fase
+  (comando real, não assumido).
+- **Build de produção**: `pnpm build` de `apps/web` limpo após P0.4 e novamente após P1.1/P1.2
+  (pega problemas de bundling do `@react-pdf/renderer` que o typecheck sozinho não pegaria).
+- **Runtime smoke do `@react-pdf/renderer`**: renderização real de um PDF mínimo confirmada fora
+  do Next.js (Node puro) antes de confiar na lib no build.
+- **Isolamento de dados (script real contra o banco hospedado, fixtures criadas e limpas na
+  mesma execução)**: operador A não enxerga inspeção de operador B (e enxerga a própria);
+  cliente A não enxerga inspeção/assinatura/disputa de cliente B (e enxerga a própria); hash de
+  token de compartilhamento nunca colide entre tokens distintos. Script não ficou como suíte
+  permanente — ver Pendências.
+- **Migration**: aplicada e verificada no banco hospedado real via `supabase db push --linked`.
+
+### Não testado
+
+- **Nenhuma verificação em device móvel real** (Android/iOS) — cota EAS segue esgotada até
+  2026-09-01, mesma limitação já registrada na rodada anterior. As mudanças mobile desta rodada
+  (rotas `scope`-aware, tela de assinatura do operador) só passaram por typecheck +
+  `expo export` estático, não por um dispositivo real.
+- **Teste HTTP end-to-end via servidor rodando** (preview/dev server) das novas rotas — a
+  verificação de isolamento foi feita direto contra o banco com os mesmos filtros que as rotas
+  usam (prova a garantia real de segurança), não via requisição HTTP completa passando por
+  `requireMobileContext()`/`requireTenantScope()`. Mais forte que um script manual solto, mas
+  ainda não é a suíte HTTP permanente pedida no item 24 do spec.
+- **UI do overlay/slider não navegada no browser** — só typecheck + build; não houve dado real de
+  avaria com foto para navegar visualmente nesta rodada (mesma ressalva já registrada na Fase A
+  sobre overlay).
+
+### Pendências (não escondidas)
+
+- **P1.3 — Offline real no mobile**: continua não implementado. O mobile ainda envia cada
+  resposta/foto direto ao servidor (sem fila local/AsyncStorage/idempotency key do lado do
+  device, sem indicador visual de sincronização pendente). O upload de mídia do lado do servidor
+  já é idempotente por checksum (novidade desta rodada), mas isso não substitui uma fila de
+  escrita local — se o dispositivo perder conexão no meio de uma captura, a tentativa atual ainda
+  falha visivelmente em vez de enfileirar e sincronizar depois.
+- **P1.4 — Suíte de testes HTTP/segurança permanente**: não criada como testes automatizados
+  (vitest/CI) nesta rodada — a verificação de isolamento (ver "Testado") foi um script real, não
+  reutilizável em CI. Fica como pendência explícita, igual ao gap já reconhecido na rodada
+  anterior.
+- **Overlay no mobile** (item 12 do spec): não implementado — só a versão web existe. O fluxo de
+  "2-3 interações" no celular (tocar/arrastar sobre a foto recém-capturada) fica para uma próxima
+  rodada.
+- **`preexisting_finding_id`**: coluna existe (migration desta rodada), mas nenhuma rota
+  preenche esse campo automaticamente ao criar um finding de check-out — hoje é só uma FK
+  disponível para uso manual/futuro, não uma automação real de "vincular ao finding do check-in
+  anterior".
+- **Conflitos de sincronização** (item 21 do spec): sem estratégia implementada além do que já
+  existia (upsert por `inspection_id+item_id` nas respostas, idempotência por checksum nas
+  fotos) — não há detecção explícita de `version`/`updated_at` divergente entre device e servidor.
+- **Compressão/thumbnails de mídia** (item 26 do spec): não implementado — uploads continuam indo
+  na resolução capturada pela câmera (já limitados a `quality: 0.7` do lado do Expo, mas sem
+  resize/thumbnail dedicado).
+- IA visual real, cobrança automática por IA, OCR, reconhecimento de placa — como o spec exige,
+  **nenhum foi implementado** (regra fundamental desta rodada).
+
+### Métricas
+
+- Migrations novas: 1 (`20260102000000`), aplicada no banco hospedado real.
+- Endpoints novos: 15 (`operator-inspections` ×5, `customer/inspections` ×4 + PDF, `disputes`,
+  `report/pdf` staff, `report/shares` ×2, `share/inspection-report`, `verify/inspection-report`,
+  `media/:mediaId` ×2 incluindo o novo signed-URL de leitura).
+- Páginas novas: 4 web (`rentals/.../inspections`, `.../inspections/[id]`,
+  `verify/inspection-report/[token]`, mais a página de laudo compartilhado é a própria rota de
+  API que serve o binário).
+- Componentes novos: 3 (`InspectionComparisonViewer`, `InspectionOverlayPicker`, mais a
+  integração ampliada de `InspectionDetail`).
+- Dependência nova: `@react-pdf/renderer` + `qrcode` (produção), `@types/qrcode` (dev).
