@@ -214,9 +214,65 @@ Repositórios/domain package ficam para o início da Fase C (ver "Próximo passo
 - Laudo, assinatura, hooks de Workflow/Notification/Billing/Tracking — Fase F.
 - Testes de domínio/RLS/isolamento entre tenants, hardening — Fase G.
 
+## Fase C — Inspection Runtime
+
+**Status: pacote de domínio + rotas de API principais concluídos e verificados ao vivo contra o
+banco hospedado, com dados reais (não mockados). Falta a flag `inspection` no
+`BlueprintCapabilities` do `blueprint-runtime` — pendência explícita, ver abaixo.**
+
+### Arquivos criados
+
+- `packages/inspection-engine/` — pacote novo completo: `types.ts`, `transitions.ts`
+  (`ALLOWED_TRANSITIONS`/`canTransition` para `Inspection`, `FINDING_ALLOWED_TRANSITIONS`/
+  `canTransitionFinding` para `InspectionFinding`), `evaluate-condition.ts`,
+  `completion-validator.ts`, `comparison.ts`, `media-comparison-provider.ts`,
+  `template-resolver.ts`, `hash.ts`, `repositories.ts`, `index.ts`, mais 7 arquivos de teste (32
+  testes, 99%/87,5% de cobertura statements/branch).
+- `apps/web/src/lib/inspection-repository.ts` — implementação real do
+  `InspectionTemplateRepository` contra o Supabase, mesmo split de `blueprint-runtime-factory.ts`
+  (mapeamento linha↔domínio só existe aqui).
+- `apps/web/src/app/api/inspections/route.ts` (GET lista / POST cria — resolve blueprint→template
+  via `resolveInspectionTemplate`, nunca cai num template genérico por omissão).
+- `apps/web/src/app/api/inspections/[id]/route.ts` (GET detalhe hidratado / PATCH transição de
+  status — `pending_review` exige `checkTemplateCompletion().canComplete`, gate falho não
+  bloqueia envio mas fica registrado em `tenant_activity_log`).
+- `apps/web/src/app/api/inspections/[id]/items/[itemId]/route.ts` (PATCH — upsert de resposta,
+  idempotente, ownership do item verificada contra o template da inspeção).
+- `apps/web/src/app/api/inspections/[id]/media/route.ts` (POST — upload multipart pro bucket
+  `inspection-media`, checksum SHA-256 real calculado no servidor, path novo por arquivo, nunca
+  upsert de path fixo, rollback do storage se o insert falhar).
+- `apps/web/src/app/api/inspections/[id]/compare/route.ts` (POST — computa e persiste
+  `inspection_comparisons` entre a inspeção e sua `linked_inspection_id`).
+- `apps/web/src/app/api/findings/route.ts` + `[id]/route.ts` (POST cria / PATCH revisão —
+  `DETECTED → UNDER_REVIEW → CONFIRMED/REJECTED → CHARGEABLE/WAIVED → RESOLVED`).
+
+### Teste real ponta a ponta (não simulado)
+
+Script executado contra o banco hospedado, usando um ativo real do tenant demo (Chevrolet Onix,
+Acme Logística): criou inspeção de check-in real, preencheu itens obrigatórios, confirmou que
+`checkTemplateCompletion` bloqueia sem fotos obrigatórias e libera quando presentes, validou as
+transições de status (inclusive que pular direto pra `completed` é rejeitado), criou o check-out
+vinculado com valores diferentes (odômetro, combustível, condição do pneu), computou e persistiu
+a comparação BEFORE×AFTER (23 linhas, diffs corretos), criou um Finding e o levou por
+`detected → under_review → confirmed` com custo estimado, e confirmou isolamento entre tenants
+numa leitura fabricada. Todas as linhas de teste foram limpas ao final.
+
+**Bug real encontrado e corrigido por esse teste**: itens de foto opcionais com `min_photos`
+definido (`roof`/`dashboard`/`trunk` no seed) estavam sendo bloqueados como se fossem
+obrigatórios — corrigido em `completion-validator.ts` (min só se aplica a item opcional depois
+que pelo menos 1 foto já foi enviada pra ele) e coberto por dois testes de regressão novos.
+
+### Pendências desta fase
+
+- Flag `inspection: boolean` em `BlueprintCapabilities`
+  (`packages/blueprint-runtime/src/types.ts`) e nos 10 `BASE_CAPABILITIES` dos built-ins —
+  mudança pequena, aditiva, ainda não feita.
+- `GET /api/inspections/[id]/report` (laudo) e rota de assinatura ficam pra Fase F.
+- Nenhuma rota de API foi exercitada via HTTP real com sessão de usuário nesta fase — a
+  verificação foi via chamada direta ao repositório/domínio contra o banco real (mesmo código,
+  sem a camada HTTP). Teste via requisição HTTP real fica pra Fase G (hardening).
+
 ### Próximo passo
 
-Fase C — Inspection Runtime: `packages/inspection-engine` com a lógica pura (resolver de
-template por blueprint, motor de preenchimento, validação de item obrigatório/`approval_gate`,
-transição de status), repositórios injetados (mesmo padrão de `packages/tracking-engine`), e as
-rotas de API que os conectam ao banco via `requireTenantScope()`/`scopedInsert`/`scopedSelect`.
+Fase D — UX: Tenant Web (lista de vistorias, detalhe com timeline, Inspection Builder) e Mobile
+(captura guiada — maior lacuna de dependências novas do módulo, ver Fase A §5).

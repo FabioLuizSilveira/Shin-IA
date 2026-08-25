@@ -19,6 +19,14 @@ export interface BlueprintCapabilities {
   reporting: boolean;
   workflow: boolean;
   integration: boolean;
+  // Added for the Inspection Engine (docs/architecture/
+  // INSPECTION_ENGINE.md) — whether this blueprint has digital-inspection
+  // support (check-in/check-out checklists, resolved separately via
+  // blueprint_inspection_mappings). All 10 built-ins default this true;
+  // it exists so a future non-inspectable blueprint (e.g. a pure
+  // software/virtual asset type) can opt out without special-casing it in
+  // application code.
+  inspection: boolean;
 }
 
 export interface BlueprintFieldSchema {

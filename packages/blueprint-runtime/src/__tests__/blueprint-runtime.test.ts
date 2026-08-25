@@ -47,6 +47,7 @@ const customManifest: BlueprintManifest = {
     reporting: false,
     workflow: false,
     integration: false,
+    inspection: false,
   },
   customFields: [
     { key: "fleetSize", label: "Fleet Size", type: "number", required: true },

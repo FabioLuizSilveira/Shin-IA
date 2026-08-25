@@ -8,6 +8,7 @@ const BASE_CAPABILITIES = {
   reporting: true,
   workflow: true,
   integration: false,
+  inspection: true,
 };
 
 function makeManifest(
