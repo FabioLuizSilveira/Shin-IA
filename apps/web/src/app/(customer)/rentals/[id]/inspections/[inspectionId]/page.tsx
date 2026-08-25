@@ -47,6 +47,7 @@ interface InspectionDetailData {
   media: MediaItem[];
   findings: FindingItem[];
   disputes: DisputeItem[];
+  report: { id: string; version: number } | null;
   acceptance: { id: string; signed_at: string } | null;
   canReview: boolean;
 }
@@ -256,6 +257,17 @@ export default function RentalInspectionDetailPage() {
               </button>
             </div>
           </div>
+        )}
+
+        {data.canReview && data.report && (
+          <a
+            href={`/api/mobile/customer/inspections/${inspectionId}/report/pdf`}
+            target="_blank"
+            rel="noreferrer"
+            className="block text-center px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold rounded-xl no-underline"
+          >
+            Baixar laudo (PDF)
+          </a>
         )}
 
         {data.canReview && (

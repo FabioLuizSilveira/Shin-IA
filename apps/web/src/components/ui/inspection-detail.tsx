@@ -106,6 +106,8 @@ export function InspectionDetail({
     null,
   );
   const [signed, setSigned] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   const [showFindingForm, setShowFindingForm] = useState(false);
   const [findingDescription, setFindingDescription] = useState("");
   const [findingSeverity, setFindingSeverity] = useState<string>("medium");
@@ -136,12 +138,30 @@ export function InspectionDetail({
           : null,
       );
       setSigned(false);
+      setShareUrl(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
     } finally {
       setLoading(false);
     }
   }, [inspectionId]);
+
+  async function createShareLink() {
+    if (!inspectionId) return;
+    setSharing(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/inspections/${inspectionId}/report/shares`, { method: "POST" });
+      const json = (await res.json()) as { data?: { url: string }; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Falha ao gerar link.");
+      setShareUrl(json.data?.url ?? null);
+      if (json.data?.url) await navigator.clipboard.writeText(json.data.url).catch(() => {});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setSharing(false);
+    }
+  }
 
   async function generateReport() {
     if (!inspectionId) return;
@@ -404,12 +424,43 @@ export function InspectionDetail({
               </div>
 
               {report && (
-                <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-4 text-xs text-slate-500 space-y-1">
+                <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-4 text-xs text-slate-500 space-y-2">
                   <p>
                     Laudo v{report.version} —{" "}
                     <span className="font-mono">{report.contentHash.slice(0, 16)}…</span>
                   </p>
                   {signed && <p className="text-emerald-600 font-medium">Assinado pela equipe ✓</p>}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <a
+                      href={`/api/inspections/${inspectionId}/report/pdf`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg font-semibold text-slate-700 dark:text-slate-200 no-underline"
+                    >
+                      Visualizar laudo
+                    </a>
+                    <a
+                      href={`/api/inspections/${inspectionId}/report/pdf`}
+                      download
+                      className="px-3 py-1.5 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg font-semibold text-slate-700 dark:text-slate-200 no-underline"
+                    >
+                      Baixar PDF
+                    </a>
+                    <button
+                      type="button"
+                      disabled={sharing}
+                      onClick={() => void createShareLink()}
+                      className="px-3 py-1.5 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg font-semibold text-slate-700 dark:text-slate-200 cursor-pointer disabled:opacity-60"
+                    >
+                      {sharing ? "Gerando…" : "Compartilhar"}
+                    </button>
+                  </div>
+                  {shareUrl && (
+                    <p className="text-slate-500">
+                      Link copiado: <span className="font-mono break-all">{shareUrl}</span> (expira
+                      em 7 dias, revogável)
+                    </p>
+                  )}
                 </div>
               )}
 
