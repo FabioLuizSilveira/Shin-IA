@@ -100,6 +100,24 @@ export async function hasTenantPermission(scope: TenantScope, key: string): Prom
   if (scope.isImpersonating) return scope.accessMode === "full";
   if (scope.tenantRole && TENANT_ADMIN_ROLES.has(scope.tenantRole)) return true;
 
+  // Bug found and fixed live while wiring up the Inspection Engine's
+  // permissions (docs/architecture/INSPECTION_ENGINE.md Fase D):
+  // tenant_user_roles.user_id references user_profiles.id, NOT
+  // scope.userId (the canonical auth uid) — same resolution
+  // custom_access_token_hook does (`select id from user_profiles where
+  // auth_user_id = v_user_id`). Querying tenant_user_roles with the raw
+  // auth uid always matched zero rows for any role other than tenant_
+  // owner/tenant_admin (which short-circuit above and never reach this
+  // query) — confirmed live: a real fleet_manager account, which already
+  // holds operations:write, got Forbidden creating an inspection despite
+  // the grant existing in tenant_role_permissions.
+  const { data: profile } = await scope.db
+    .from("user_profiles")
+    .select("id")
+    .eq("auth_user_id", scope.userId)
+    .maybeSingle();
+  if (!profile) return false;
+
   // Two queries, not one PostgREST embed: tenant_user_roles and
   // tenant_role_permissions share a `role_id` column but there's no direct
   // FK between the two tables (both separately reference tenant_roles), so
@@ -109,7 +127,7 @@ export async function hasTenantPermission(scope: TenantScope, key: string): Prom
     .from("tenant_user_roles")
     .select("role_id")
     .eq("tenant_id", scope.tenantId)
-    .eq("user_id", scope.userId)
+    .eq("user_id", profile.id)
     .is("deleted_at", null);
   const roleIds = (userRoles ?? []).map((r) => r.role_id);
   if (roleIds.length === 0) return false;
@@ -138,11 +156,18 @@ export async function getEffectiveTenantPermissions(scope: TenantScope): Promise
     return (data ?? []).map((p) => p.key);
   }
 
+  const { data: profile } = await scope.db
+    .from("user_profiles")
+    .select("id")
+    .eq("auth_user_id", scope.userId)
+    .maybeSingle();
+  if (!profile) return [];
+
   const { data: userRoles } = await scope.db
     .from("tenant_user_roles")
     .select("role_id")
     .eq("tenant_id", scope.tenantId)
-    .eq("user_id", scope.userId)
+    .eq("user_id", profile.id)
     .is("deleted_at", null);
   const roleIds = (userRoles ?? []).map((r) => r.role_id);
   if (roleIds.length === 0) return [];
