@@ -182,6 +182,7 @@ export function GradientButton({
   colors,
   style,
   loading,
+  disabled,
 }: {
   label: string;
   onPress: () => void;
@@ -190,13 +191,18 @@ export function GradientButton({
   colors?: readonly [string, string, ...string[]];
   style?: ViewStyle;
   loading?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       testID={testID}
       onPress={onPress}
-      disabled={loading}
-      style={[{ borderRadius: theme.radius.pill, overflow: "hidden" }, style]}
+      disabled={loading || disabled}
+      style={[
+        { borderRadius: theme.radius.pill, overflow: "hidden" },
+        (loading || disabled) && { opacity: 0.5 },
+        style,
+      ]}
     >
       <LinearGradient
         colors={colors || theme.gradients.neural}

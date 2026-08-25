@@ -572,6 +572,39 @@ export const shinaia = {
     return mutate<{ id: string; documentHash: string }>("POST", `${base}/${id}/sign`, undefined);
   },
 
+  // Damage overlay (item 12 of the spec) — operator-only on mobile (staff
+  // review of the same data happens on Tenant Web, via its own routes —
+  // /api/findings is a flat route there, not nested under
+  // /api/inspections/:id, so these three don't take a "staff" scope
+  // variant the way the other inspection methods do). Signed URL to
+  // review a captured photo, create the finding with its overlay_region,
+  // then link the specific photo to it.
+  inspectionMediaUrl: (inspectionId: string, mediaId: string) =>
+    request<{ url: string }>(
+      "GET",
+      `/api/mobile/operator-inspections/${inspectionId}/media/${mediaId}/url`,
+    ),
+  createFinding: (
+    inspectionId: string,
+    input: {
+      itemId?: string;
+      description: string;
+      severity: "low" | "medium" | "high" | "critical";
+      overlayRegion?: { type: "rectangle"; x: number; y: number; width: number; height: number };
+    },
+  ) =>
+    mutate<{ id: string; status: string }>(
+      "POST",
+      `/api/mobile/operator-inspections/${inspectionId}/findings`,
+      input,
+    ),
+  linkMediaToFinding: (inspectionId: string, mediaId: string, findingId: string | null) =>
+    mutate<{ ok: true }>(
+      "PATCH",
+      `/api/mobile/operator-inspections/${inspectionId}/media/${mediaId}`,
+      { findingId },
+    ),
+
   // Multipart upload — the only endpoint that isn't JSON, so it bypasses
   // request()/mutate() entirely and builds its own fetch call, reusing
   // authHeader() for the same Firebase/Supabase branching every other call
