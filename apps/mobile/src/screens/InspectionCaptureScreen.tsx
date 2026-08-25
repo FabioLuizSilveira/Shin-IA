@@ -15,6 +15,7 @@ import { theme } from "../theme";
 import { BackHeader, Card, GradientButton, T, Loader } from "../components/ui";
 import { useAsyncData } from "../lib/use-async-data";
 import { shinaia, type InspectionDetail, type InspectionTemplateItem } from "../lib/shinaia-api";
+import { usePersona } from "../lib/persona-context";
 import type { RootStackParamList } from "../navigation";
 
 // Fase D (docs/architecture/INSPECTION_ENGINE.md) — the guided capture flow
@@ -34,13 +35,20 @@ function isPhotoType(fieldType: string): boolean {
 export function InspectionCaptureScreen() {
   const route = useRoute<RouteProp<RootStackParamList, "InspectionCapture">>();
   const { inspectionId } = route.params;
+  const { bootstrap } = usePersona();
+  const scope = bootstrap?.user.userType === "operator" ? "operator" : "staff";
 
-  const fetcher = useCallback(() => shinaia.inspectionDetail(inspectionId), [inspectionId]);
+  const fetcher = useCallback(
+    () => shinaia.inspectionDetail(inspectionId, scope),
+    [inspectionId, scope],
+  );
   const { state, reload } = useAsyncData(fetcher, () => false);
   const [index, setIndex] = useState(0);
   const [started, setStarted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [signing, setSigning] = useState(false);
+  const [signed, setSigned] = useState(false);
 
   const items = useMemo(() => {
     if (state.status !== "ready") return [];
@@ -53,7 +61,7 @@ export function InspectionCaptureScreen() {
   const inspectionStatus = state.status === "ready" ? state.data.inspection.status : null;
   if (inspectionStatus === "draft" && !started) {
     setStarted(true);
-    void shinaia.transitionInspection(inspectionId, "in_progress").then(() => reload(true));
+    void shinaia.transitionInspection(inspectionId, "in_progress", scope).then(() => reload(true));
   }
 
   if (state.status === "loading") {
@@ -81,7 +89,7 @@ export function InspectionCaptureScreen() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await shinaia.transitionInspection(inspectionId, "pending_review");
+      await shinaia.transitionInspection(inspectionId, "pending_review", scope);
       Alert.alert("Vistoria enviada", "Enviada para revisão com sucesso.");
       await reload(true);
     } catch (err) {
@@ -111,7 +119,28 @@ export function InspectionCaptureScreen() {
   }
 
   if (!item) {
-    // Every item answered — final screen.
+    // Every item answered — final screen. Once the operator has actually
+    // submitted (status left draft/in_progress), the action shifts from
+    // "send for review" to "sign off" (item 15 of the spec: operator
+    // signs right after finishing, before anyone else is presented with
+    // the checklist) — never both buttons at once, since re-submitting an
+    // already-submitted checklist isn't a valid transition anyway.
+    const alreadySubmitted =
+      detail.inspection.status !== "draft" && detail.inspection.status !== "in_progress";
+
+    async function handleSign() {
+      setSigning(true);
+      try {
+        await shinaia.signInspection(inspectionId, scope);
+        setSigned(true);
+        Alert.alert("Vistoria assinada", "Sua assinatura foi registrada.");
+      } catch {
+        Alert.alert("Erro", "Não foi possível registrar a assinatura. Tente novamente.");
+      } finally {
+        setSigning(false);
+      }
+    }
+
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.surface }}>
         <BackHeader title="Vistoria" />
@@ -123,23 +152,41 @@ export function InspectionCaptureScreen() {
             gap: theme.spacing.lg,
           }}
         >
-          <Text style={T.display(theme.font.xxl)}>Checklist completo</Text>
+          <Text style={T.display(theme.font.xxl)}>
+            {alreadySubmitted ? "Checklist enviado" : "Checklist completo"}
+          </Text>
           <Text style={T.text()}>
-            Todos os itens foram respondidos. Revise e envie para aprovação.
+            {alreadySubmitted
+              ? scope === "operator"
+                ? "Confirme sua assinatura para concluir sua parte da vistoria."
+                : "Vistoria aguardando revisão."
+              : "Todos os itens foram respondidos. Revise e envie para aprovação."}
           </Text>
           {submitError && (
             <Text style={T.text(theme.font.sm, theme.colors.error)}>{submitError}</Text>
           )}
-          <GradientButton
-            label="Enviar para revisão"
-            onPress={() => void handleSubmitForReview()}
-            loading={submitting}
-          />
-          <Pressable onPress={() => setIndex(items.length - 1)}>
-            <Text style={T.text(theme.font.sm, theme.colors.brandSecondary)}>
-              Voltar ao último item
-            </Text>
-          </Pressable>
+          {!alreadySubmitted && (
+            <GradientButton
+              label="Enviar para revisão"
+              onPress={() => void handleSubmitForReview()}
+              loading={submitting}
+            />
+          )}
+          {alreadySubmitted && scope === "operator" && !signed && (
+            <GradientButton
+              label={signing ? "Assinando..." : "Assinar"}
+              onPress={() => void handleSign()}
+              loading={signing}
+            />
+          )}
+          {signed && <Text style={T.text(theme.font.sm, theme.colors.success)}>✓ Assinado</Text>}
+          {!alreadySubmitted && (
+            <Pressable onPress={() => setIndex(items.length - 1)}>
+              <Text style={T.text(theme.font.sm, theme.colors.brandSecondary)}>
+                Voltar ao último item
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
     );
@@ -156,6 +203,7 @@ export function InspectionCaptureScreen() {
         index={index}
         total={items.length}
         inspectionId={inspectionId}
+        scope={scope}
         onSaved={() => void reload(true)}
         onNext={() => setIndex((i) => Math.min(i + 1, items.length))}
         onPrev={() => setIndex((i) => Math.max(i - 1, 0))}
@@ -171,6 +219,7 @@ function ChecklistItemStep({
   index,
   total,
   inspectionId,
+  scope,
   onSaved,
   onNext,
   onPrev,
@@ -186,6 +235,7 @@ function ChecklistItemStep({
   index: number;
   total: number;
   inspectionId: string;
+  scope: "staff" | "operator";
   onSaved: () => void;
   onNext: () => void;
   onPrev: () => void;
@@ -205,7 +255,7 @@ function ChecklistItemStep({
   }) {
     setSaving(true);
     try {
-      await shinaia.saveInspectionResponse(inspectionId, item.id, value);
+      await shinaia.saveInspectionResponse(inspectionId, item.id, value, scope);
       onSaved();
     } catch {
       Alert.alert("Erro", "Não foi possível salvar a resposta. Tente novamente.");
@@ -250,6 +300,7 @@ function ChecklistItemStep({
                     itemId: item.id,
                     latitude,
                     longitude,
+                    scope,
                   });
                   onSaved();
                 } catch {

@@ -1,11 +1,13 @@
 import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "../theme";
 import { Card, ScreenHeader, Loader, T, GradientButton, EmptyState } from "../components/ui";
 import { useAuth } from "../lib/auth-context";
 import { shinaia } from "../lib/shinaia-api";
+import type { RootStackParamList } from "../navigation";
 
 // M22.10 — operator home. Same GET /api/mobile/dashboard endpoint as
 // tenant_user (it already branches by userType server-side, Wave 2 Phase A)
@@ -24,6 +26,7 @@ interface OperatorDashboardData {
 
 export function OperatorHomeScreen() {
   const { signOut } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [data, setData] = useState<OperatorDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -92,6 +95,11 @@ export function OperatorHomeScreen() {
             />
           )}
 
+          <GradientButton
+            label="Minhas Vistorias"
+            icon="clipboard-outline"
+            onPress={() => navigation.navigate("Inspections")}
+          />
           <GradientButton label="Sair" onPress={() => void signOut()} />
         </View>
       )}

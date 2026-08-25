@@ -7,6 +7,7 @@ import { Card, ScreenHeader, Chip, T } from "../components/ui";
 import { AsyncScreen } from "../components/async-screen";
 import { useAsyncData } from "../lib/use-async-data";
 import { shinaia, type InspectionListItem } from "../lib/shinaia-api";
+import { usePersona } from "../lib/persona-context";
 import type { RootStackParamList } from "../navigation";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -46,7 +47,9 @@ const STATUS_LABEL: Record<string, string> = {
 // ativo").
 export function InspectionsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const fetcher = useCallback(() => shinaia.inspections(), []);
+  const { bootstrap } = usePersona();
+  const scope = bootstrap?.user.userType === "operator" ? "operator" : "staff";
+  const fetcher = useCallback(() => shinaia.inspections({ scope }), [scope]);
   const { state, refreshing, reload } = useAsyncData(fetcher);
 
   return (

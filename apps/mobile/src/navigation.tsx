@@ -215,7 +215,19 @@ export function RootNavigator() {
           </>
         )}
         {bootstrap.user.userType === "operator" && (
-          <Stack.Screen name="OperatorHome" component={OperatorHomeScreen} />
+          <>
+            <Stack.Screen name="OperatorHome" component={OperatorHomeScreen} />
+            <Stack.Screen
+              name="Inspections"
+              component={InspectionsScreen}
+              options={{ headerShown: true, title: "Minhas Vistorias" }}
+            />
+            <Stack.Screen
+              name="InspectionCapture"
+              component={InspectionCaptureScreen}
+              options={{ headerShown: false }}
+            />
+          </>
         )}
         {bootstrap.user.userType === "unprovisioned" && (
           <Stack.Screen name="Unprovisioned" component={UnprovisionedScreen} />

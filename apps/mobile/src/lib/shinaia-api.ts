@@ -506,21 +506,37 @@ export const shinaia = {
   // Inspection Engine — no mock fallback on any of these (item 29 of the
   // spec: never present simulated data as a real feature; a checklist and
   // its findings are exactly the kind of thing that must never be faked).
-  inspections: (params?: { assetId?: string; status?: string }) => {
+  //
+  // `scope` picks the base path: "staff" hits /api/inspections
+  // (requireTenantScope — tenant_user persona, sees every tenant
+  // inspection it has permission for), "operator" hits
+  // /api/mobile/operator-inspections (requireMobileContext — operator
+  // persona, server-side filtered to only inspections assigned to that
+  // operator). Same request/response shapes either way, so
+  // InspectionsScreen/InspectionCaptureScreen work unmodified for both
+  // personas — only the base path differs. Defaults to "staff" so every
+  // existing call site keeps working unchanged.
+  inspectionsBasePath: (scope: "staff" | "operator") =>
+    scope === "operator" ? "/api/mobile/operator-inspections" : "/api/inspections",
+  inspections: (params?: { assetId?: string; status?: string; scope?: "staff" | "operator" }) => {
+    const base =
+      params?.scope === "operator" ? "/api/mobile/operator-inspections" : "/api/inspections";
     const qs = new URLSearchParams();
     if (params?.assetId) qs.set("assetId", params.assetId);
     if (params?.status) qs.set("status", params.status);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return request<InspectionListItem[]>("GET", `/api/inspections${suffix}`).then((data) => ({
+    return request<InspectionListItem[]>("GET", `${base}${suffix}`).then((data) => ({
       data,
       source: "live" as const,
     }));
   },
-  inspectionDetail: (id: string) =>
-    request<InspectionDetail>("GET", `/api/inspections/${id}`).then((data) => ({
+  inspectionDetail: (id: string, scope: "staff" | "operator" = "staff") => {
+    const base = scope === "operator" ? "/api/mobile/operator-inspections" : "/api/inspections";
+    return request<InspectionDetail>("GET", `${base}/${id}`).then((data) => ({
       data,
       source: "live" as const,
-    })),
+    }));
+  },
   createInspection: (input: {
     assetId: string;
     type: string;
@@ -530,8 +546,10 @@ export const shinaia = {
     linkedInspectionId?: string;
   }) =>
     mutate<{ id: string; templateId: string; status: string }>("POST", "/api/inspections", input),
-  transitionInspection: (id: string, status: string) =>
-    request<{ ok: true }>("PATCH", `/api/inspections/${id}`, { status }),
+  transitionInspection: (id: string, status: string, scope: "staff" | "operator" = "staff") => {
+    const base = scope === "operator" ? "/api/mobile/operator-inspections" : "/api/inspections";
+    return request<{ ok: true }>("PATCH", `${base}/${id}`, { status });
+  },
   saveInspectionResponse: (
     inspectionId: string,
     itemId: string,
@@ -542,9 +560,17 @@ export const shinaia = {
       valueJson?: unknown;
       notes?: string | null;
     },
-  ) => mutate<{ ok: true }>("PATCH", `/api/inspections/${inspectionId}/items/${itemId}`, value),
+    scope: "staff" | "operator" = "staff",
+  ) => {
+    const base = scope === "operator" ? "/api/mobile/operator-inspections" : "/api/inspections";
+    return mutate<{ ok: true }>("PATCH", `${base}/${inspectionId}/items/${itemId}`, value);
+  },
   compareInspection: (id: string) =>
     mutate<{ comparisons: unknown[] }>("POST", `/api/inspections/${id}/compare`, undefined),
+  signInspection: (id: string, scope: "staff" | "operator" = "operator") => {
+    const base = scope === "operator" ? "/api/mobile/operator-inspections" : "/api/inspections";
+    return mutate<{ id: string; documentHash: string }>("POST", `${base}/${id}/sign`, undefined);
+  },
 
   // Multipart upload — the only endpoint that isn't JSON, so it bypasses
   // request()/mutate() entirely and builds its own fetch call, reusing
@@ -561,6 +587,7 @@ export const shinaia = {
       fileName?: string;
       latitude?: number;
       longitude?: number;
+      scope?: "staff" | "operator";
     } = {},
   ): Promise<{ id: string; storagePath: string }> {
     if (!API_BASE) throw new ApiError("EXPO_PUBLIC_SHINAIA_API_URL is not configured");
@@ -587,7 +614,9 @@ export const shinaia = {
     const timeoutId = setTimeout(() => controller.abort(), 30_000); // uploads get more time than REQUEST_TIMEOUT_MS
     let res: Response;
     try {
-      res = await fetch(`${API_BASE}/api/inspections/${inspectionId}/media`, {
+      const base =
+        options.scope === "operator" ? "/api/mobile/operator-inspections" : "/api/inspections";
+      res = await fetch(`${API_BASE}${base}/${inspectionId}/media`, {
         method: "POST",
         headers: { Accept: "application/json", ...headers }, // no Content-Type — fetch sets the multipart boundary itself
         body: form,
