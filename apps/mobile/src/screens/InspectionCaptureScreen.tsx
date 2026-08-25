@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   TextInput,
 } from "react-native";
-import { useRoute, type RouteProp } from "@react-navigation/native";
+import { useRoute, useFocusEffect, type RouteProp } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
 import { theme } from "../theme";
@@ -16,6 +16,14 @@ import { BackHeader, Card, GradientButton, T, Loader } from "../components/ui";
 import { useAsyncData } from "../lib/use-async-data";
 import { shinaia, type InspectionDetail, type InspectionTemplateItem } from "../lib/shinaia-api";
 import { usePersona } from "../lib/persona-context";
+import {
+  queueResponse,
+  queueMedia,
+  getQueueStatus,
+  flushQueue,
+  subscribeToReconnect,
+  type QueueStatus,
+} from "../lib/inspection-offline-queue";
 import type { RootStackParamList } from "../navigation";
 
 // Fase D (docs/architecture/INSPECTION_ENGINE.md) — the guided capture flow
@@ -49,6 +57,40 @@ export function InspectionCaptureScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
   const [signed, setSigned] = useState(false);
+  const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
+
+  const refreshQueueStatus = useCallback(() => {
+    void getQueueStatus(inspectionId).then(setQueueStatus);
+  }, [inspectionId]);
+
+  // Flush on mount, on screen focus (operator switching back to this
+  // capture after checking something else), and immediately when the
+  // device reconnects — a dropped connection must resolve itself without
+  // the operator having to notice and retry manually (item 20 of the
+  // spec).
+  useEffect(() => {
+    void flushQueue(inspectionId, scope).then((s) => {
+      setQueueStatus(s);
+      if (s.syncedCount > 0 || s.pendingResponses > 0 || s.pendingMedia > 0) void reload(true);
+    });
+    const unsubscribe = subscribeToReconnect(() => {
+      void flushQueue(inspectionId, scope).then((s) => {
+        setQueueStatus(s);
+        void reload(true);
+      });
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inspectionId, scope]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void flushQueue(inspectionId, scope).then((s) => {
+        setQueueStatus(s);
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [inspectionId, scope]),
+  );
 
   const items = useMemo(() => {
     if (state.status !== "ready") return [];
@@ -89,6 +131,20 @@ export function InspectionCaptureScreen() {
     setSubmitting(true);
     setSubmitError(null);
     try {
+      // The server's completion check only sees what actually reached
+      // it — a queued-but-not-yet-synced answer/photo would make
+      // submission fail with a confusing "missing item" instead of the
+      // real cause. Force a flush first so the only way this legitimately
+      // fails offline is if the device truly has nothing to send with.
+      const flushed = await flushQueue(inspectionId, scope);
+      setQueueStatus(flushed);
+      if (flushed.pendingResponses > 0 || flushed.pendingMedia > 0) {
+        setSubmitError(
+          "Sem conexão — vistoria salva neste aparelho. Envie novamente quando o sinal voltar.",
+        );
+        setSubmitting(false);
+        return;
+      }
       await shinaia.transitionInspection(inspectionId, "pending_review", scope);
       Alert.alert("Vistoria enviada", "Enviada para revisão com sucesso.");
       await reload(true);
@@ -195,6 +251,7 @@ export function InspectionCaptureScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.surface }}>
       <BackHeader title="Vistoria" />
+      <OfflineQueueBanner status={queueStatus} />
       <ChecklistItemStep
         key={item.id}
         item={item}
@@ -204,10 +261,48 @@ export function InspectionCaptureScreen() {
         total={items.length}
         inspectionId={inspectionId}
         scope={scope}
-        onSaved={() => void reload(true)}
+        onSaved={() => {
+          refreshQueueStatus();
+          void reload(true);
+        }}
         onNext={() => setIndex((i) => Math.min(i + 1, items.length))}
         onPrev={() => setIndex((i) => Math.max(i - 1, 0))}
       />
+    </View>
+  );
+}
+
+// Item 20 of the spec's own worked example: "✓ 8 itens sincronizados /
+// ⟳ 2 fotos aguardando envio / Sem conexão — vistoria salva neste
+// aparelho". Silent when there's nothing to report, so it doesn't add
+// noise to a screen that's fully synced.
+function OfflineQueueBanner({ status }: { status: QueueStatus | null }) {
+  if (!status) return null;
+  const pending = status.pendingResponses + status.pendingMedia;
+  if (pending === 0 && status.online) return null;
+  return (
+    <View
+      style={{
+        paddingHorizontal: theme.spacing.lg,
+        paddingVertical: theme.spacing.sm,
+        backgroundColor: status.online ? theme.colors.warning + "1A" : theme.colors.error + "1A",
+      }}
+    >
+      {!status.online && (
+        <Text style={T.text(theme.font.sm, theme.colors.error)}>
+          Sem conexão — vistoria salva neste aparelho
+        </Text>
+      )}
+      {pending > 0 && (
+        <Text style={T.text(theme.font.sm, theme.colors.warning)}>
+          ⟳ {pending} item{pending === 1 ? "" : "s"} aguardando envio
+        </Text>
+      )}
+      {status.syncedCount > 0 && pending === 0 && status.online && (
+        <Text style={T.text(theme.font.sm, theme.colors.success)}>
+          ✓ {status.syncedCount} sincronizado{status.syncedCount === 1 ? "" : "s"}
+        </Text>
+      )}
     </View>
   );
 }
@@ -255,10 +350,12 @@ function ChecklistItemStep({
   }) {
     setSaving(true);
     try {
-      await shinaia.saveInspectionResponse(inspectionId, item.id, value, scope);
+      // Local-first: queueResponse() never throws — it persists to
+      // AsyncStorage before attempting the network, so a dropped
+      // connection here degrades to "queued for later", never a lost
+      // answer or a hard error blocking the operator's progress.
+      await queueResponse(inspectionId, item.id, value, scope);
       onSaved();
-    } catch {
-      Alert.alert("Erro", "Não foi possível salvar a resposta. Tente novamente.");
     } finally {
       setSaving(false);
     }
@@ -296,15 +393,17 @@ function ChecklistItemStep({
                     // Geolocation is best-effort (item 6 of the spec: "quando
                     // autorizada") — never blocks the capture itself.
                   }
-                  await shinaia.uploadInspectionMedia(inspectionId, uri, {
-                    itemId: item.id,
-                    latitude,
-                    longitude,
+                  // Same local-first guarantee as saveValue() — the file
+                  // stays at its local uri regardless of network state,
+                  // so queueing it costs nothing extra and never blocks
+                  // capture on a bad connection.
+                  await queueMedia(
+                    inspectionId,
+                    uri,
+                    { itemId: item.id, latitude, longitude },
                     scope,
-                  });
+                  );
                   onSaved();
-                } catch {
-                  Alert.alert("Erro", "Não foi possível enviar a foto. Tente novamente.");
                 } finally {
                   setSaving(false);
                 }
