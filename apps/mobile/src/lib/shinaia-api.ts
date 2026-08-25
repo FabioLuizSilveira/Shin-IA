@@ -213,6 +213,81 @@ export interface BillingSummary {
   nextDue: { invoiceId: string; amount: number; currency: string; dueDate: string } | null;
 }
 
+// ── Inspection Engine (docs/architecture/INSPECTION_ENGINE.md) ─────────────
+// Types kept intentionally loose (matching the API's real JSON shape,
+// snake_case as returned) rather than re-deriving from
+// @shina/inspection-engine — this app has no workspace dependency on that
+// package, same posture already used for OperationItem/AssetItem above.
+export interface InspectionTemplateItem {
+  id: string;
+  section_id?: string;
+  key: string;
+  label: string;
+  field_type: string;
+  required: boolean;
+  instructions: string | null;
+  reference_image_url: string | null;
+  min_photos: number | null;
+  max_photos: number | null;
+  select_options: { value: string; label: string; severity?: string }[] | null;
+  condition: { field: string; op: string; value: unknown } | null;
+  approval_gate: boolean;
+  sort_order: number;
+}
+export interface InspectionTemplateSection {
+  id: string;
+  key: string;
+  title: string;
+  instructions: string | null;
+  sort_order: number;
+  items: InspectionTemplateItem[];
+}
+export interface InspectionTemplate {
+  id: string;
+  name: string;
+  status: string;
+  sections: InspectionTemplateSection[];
+}
+export interface InspectionListItem {
+  id: string;
+  asset_id: string;
+  type: string;
+  status: string;
+  created_at: string;
+  completed_at: string | null;
+}
+export interface InspectionResponseItem {
+  id: string;
+  item_id: string;
+  value_text: string | null;
+  value_number: number | null;
+  value_boolean: boolean | null;
+  value_json: { value: string; label: string; severity?: string } | null;
+  notes: string | null;
+}
+export interface InspectionMediaItem {
+  id: string;
+  item_id: string | null;
+  finding_id: string | null;
+  media_type: string;
+  storage_path: string;
+}
+export interface InspectionFindingItem {
+  id: string;
+  item_id: string | null;
+  description: string;
+  severity: string;
+  status: string;
+  ai_suggested: boolean;
+}
+export interface InspectionDetail {
+  inspection: InspectionListItem & { linked_inspection_id: string | null };
+  template: InspectionTemplate | null;
+  responses: InspectionResponseItem[];
+  media: InspectionMediaItem[];
+  findings: InspectionFindingItem[];
+}
+
 export const shinaia = {
   // Pre-auth — the mobile login screen's "Demonstração" button. Signs in as
   // one of two real, dedicated demo accounts against the real Veloz Rent a
@@ -427,6 +502,118 @@ export const shinaia = {
         changePercent: number | null;
       }[];
     }>(`/api/mobile/reports/summary?range=${range}`, MOCK.reports),
+
+  // Inspection Engine — no mock fallback on any of these (item 29 of the
+  // spec: never present simulated data as a real feature; a checklist and
+  // its findings are exactly the kind of thing that must never be faked).
+  inspections: (params?: { assetId?: string; status?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.assetId) qs.set("assetId", params.assetId);
+    if (params?.status) qs.set("status", params.status);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<InspectionListItem[]>("GET", `/api/inspections${suffix}`).then((data) => ({
+      data,
+      source: "live" as const,
+    }));
+  },
+  inspectionDetail: (id: string) =>
+    request<InspectionDetail>("GET", `/api/inspections/${id}`).then((data) => ({
+      data,
+      source: "live" as const,
+    })),
+  createInspection: (input: {
+    assetId: string;
+    type: string;
+    purpose: "check_in" | "check_out";
+    blueprintId?: string;
+    contractId?: string;
+    linkedInspectionId?: string;
+  }) =>
+    mutate<{ id: string; templateId: string; status: string }>("POST", "/api/inspections", input),
+  transitionInspection: (id: string, status: string) =>
+    request<{ ok: true }>("PATCH", `/api/inspections/${id}`, { status }),
+  saveInspectionResponse: (
+    inspectionId: string,
+    itemId: string,
+    value: {
+      valueText?: string | null;
+      valueNumber?: number | null;
+      valueBoolean?: boolean | null;
+      valueJson?: unknown;
+      notes?: string | null;
+    },
+  ) => mutate<{ ok: true }>("PATCH", `/api/inspections/${inspectionId}/items/${itemId}`, value),
+  compareInspection: (id: string) =>
+    mutate<{ comparisons: unknown[] }>("POST", `/api/inspections/${id}/compare`, undefined),
+
+  // Multipart upload — the only endpoint that isn't JSON, so it bypasses
+  // request()/mutate() entirely and builds its own fetch call, reusing
+  // authHeader() for the same Firebase/Supabase branching every other call
+  // gets. photoUri is a local file:// URI (from expo-camera's
+  // takePictureAsync or an already-picked file); expo-file-system's File
+  // class implements Blob so it can go straight into FormData.
+  async uploadInspectionMedia(
+    inspectionId: string,
+    photoUri: string,
+    options: {
+      itemId?: string;
+      mimeType?: string;
+      fileName?: string;
+      latitude?: number;
+      longitude?: number;
+    } = {},
+  ): Promise<{ id: string; storagePath: string }> {
+    if (!API_BASE) throw new ApiError("EXPO_PUBLIC_SHINAIA_API_URL is not configured");
+    const headers = await authHeader();
+
+    const form = new FormData();
+    // React Native's FormData accepts this {uri, name, type} shape
+    // directly (unlike web FormData, which needs a real Blob/File) — the
+    // long-standing RN idiom, still current per the SDK 56 docs fetched
+    // for this module (expo-file-system's new File class is Blob-shaped
+    // for web `fetch`, but isn't needed here since RN's own fetch
+    // polyfill already knows this {uri,name,type} shape).
+    form.append("file", {
+      uri: photoUri,
+      name: options.fileName ?? `photo-${Date.now()}.jpg`,
+      type: options.mimeType ?? "image/jpeg",
+    } as unknown as Blob);
+    if (options.itemId) form.append("itemId", options.itemId);
+    if (options.latitude !== undefined) form.append("latitude", String(options.latitude));
+    if (options.longitude !== undefined) form.append("longitude", String(options.longitude));
+    form.append("captureSource", "mobile_camera");
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000); // uploads get more time than REQUEST_TIMEOUT_MS
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/api/inspections/${inspectionId}/media`, {
+        method: "POST",
+        headers: { Accept: "application/json", ...headers }, // no Content-Type — fetch sets the multipart boundary itself
+        body: form,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        throw new ApiError("O envio da foto demorou demais.");
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try {
+        const errJson = (await res.json()) as { error?: string };
+        if (errJson?.error) message = errJson.error;
+      } catch {
+        /* ignore parse failure */
+      }
+      throw new ApiError(message, res.status);
+    }
+    const json = (await res.json()) as { data: { id: string; storagePath: string } };
+    return json.data;
+  },
 };
 
 export { ApiError };

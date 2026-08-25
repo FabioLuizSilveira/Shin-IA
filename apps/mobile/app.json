@@ -35,7 +35,19 @@
       "expo-image",
       "expo-font",
       "expo-apple-authentication",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O Shinã usa a câmera para capturar as fotos da vistoria digital."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O Shinã usa sua localização para registrar onde a vistoria foi realizada (opcional)."
+        }
+      ]
     ],
     "extra": {
       "eas": {

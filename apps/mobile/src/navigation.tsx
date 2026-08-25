@@ -24,6 +24,8 @@ import { AssetDetailScreen } from "./screens/AssetDetailScreen";
 import { InvoicesScreen } from "./screens/InvoicesScreen";
 import { RenewalScreen } from "./screens/RenewalScreen";
 import { CustomerInvoicesScreen } from "./screens/CustomerInvoicesScreen";
+import { InspectionsScreen } from "./screens/InspectionsScreen";
+import { InspectionCaptureScreen } from "./screens/InspectionCaptureScreen";
 import { useAuth } from "./lib/auth-context";
 import { usePersona } from "./lib/persona-context";
 import { theme } from "./theme";
@@ -47,6 +49,8 @@ export type RootStackParamList = {
   AssetDetail: { assetId: string };
   Invoices: { statusFilter?: "issued" | "overdue" | "paid" } | undefined;
   CustomerInvoices: undefined;
+  Inspections: undefined;
+  InspectionCapture: { inspectionId: string };
 };
 
 export type TenantTabParamList = {
@@ -197,6 +201,16 @@ export function RootNavigator() {
               name="Invoices"
               component={InvoicesScreen}
               options={{ headerShown: true, title: "Faturas" }}
+            />
+            <Stack.Screen
+              name="Inspections"
+              component={InspectionsScreen}
+              options={{ headerShown: true, title: "Vistorias" }}
+            />
+            <Stack.Screen
+              name="InspectionCapture"
+              component={InspectionCaptureScreen}
+              options={{ headerShown: false }}
             />
           </>
         )}

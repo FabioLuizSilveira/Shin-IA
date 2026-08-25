@@ -1,9 +1,10 @@
-import { useCallback } from "react";
-import { View, Text, ScrollView } from "react-native";
+import { useCallback, useState } from "react";
+import { View, Text, ScrollView, Alert } from "react-native";
 import { Image } from "expo-image";
-import { useRoute, type RouteProp } from "@react-navigation/native";
+import { useRoute, useNavigation, type RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { theme } from "../theme";
-import { BackHeader, Card, Chip, T, Loader } from "../components/ui";
+import { BackHeader, Card, Chip, T, Loader, GradientButton } from "../components/ui";
 import { useAsyncData } from "../lib/use-async-data";
 import { shinaia, type AssetItem } from "../lib/shinaia-api";
 import type { RootStackParamList } from "../navigation";
@@ -27,10 +28,27 @@ const FIELD_LABELS: Record<string, string> = {
 
 export function AssetDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, "AssetDetail">>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { assetId } = route.params;
+  const [creatingInspection, setCreatingInspection] = useState(false);
 
   const fetcher = useCallback(() => shinaia.asset(assetId), [assetId]);
   const { state } = useAsyncData(fetcher, () => false);
+
+  async function startInspection(purpose: "check_in" | "check_out") {
+    setCreatingInspection(true);
+    try {
+      const created = await shinaia.createInspection({ assetId, type: purpose, purpose });
+      navigation.navigate("InspectionCapture", { inspectionId: created.id });
+    } catch (err) {
+      Alert.alert(
+        "Não foi possível iniciar a vistoria",
+        err instanceof Error ? err.message : "Erro inesperado.",
+      );
+    } finally {
+      setCreatingInspection(false);
+    }
+  }
 
   if (state.status === "loading") {
     return (
@@ -58,6 +76,24 @@ export function AssetDetailScreen() {
     <ScrollView style={{ flex: 1, backgroundColor: theme.colors.surface }}>
       <BackHeader title={asset.name} />
       <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
+        <View style={{ flexDirection: "row", gap: theme.spacing.sm }}>
+          <GradientButton
+            label="Vistoria de Check-in"
+            icon="camera-outline"
+            onPress={() => void startInspection("check_in")}
+            loading={creatingInspection}
+            style={{ flex: 1 }}
+          />
+          <GradientButton
+            label="Check-out"
+            icon="checkmark-circle-outline"
+            colors={theme.gradients.violet}
+            onPress={() => void startInspection("check_out")}
+            loading={creatingInspection}
+            style={{ flex: 1 }}
+          />
+        </View>
+
         {asset.metadata?.photo_url && (
           <Image
             source={{ uri: asset.metadata.photo_url, headers: HOTLINK_HEADERS }}
