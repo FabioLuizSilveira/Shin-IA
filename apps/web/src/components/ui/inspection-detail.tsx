@@ -7,6 +7,8 @@ import type {
   InspectionFindingStatus,
   InspectionStatus,
 } from "@shina/inspection-engine";
+import { InspectionComparisonViewer } from "./inspection-comparison-viewer";
+import { InspectionOverlayPicker, type OverlayRegion } from "./inspection-overlay-picker";
 
 interface InspectionRow {
   id: string;
@@ -102,6 +104,7 @@ export function InspectionDetail({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [comparisons, setComparisons] = useState<ComparisonRow[] | null>(null);
+  const [linkedMedia, setLinkedMedia] = useState<MediaRow[]>([]);
   const [report, setReport] = useState<{ id: string; version: number; contentHash: string } | null>(
     null,
   );
@@ -112,6 +115,9 @@ export function InspectionDetail({
   const [findingDescription, setFindingDescription] = useState("");
   const [findingSeverity, setFindingSeverity] = useState<string>("medium");
   const [findingItemId, setFindingItemId] = useState("");
+  const [findingMediaId, setFindingMediaId] = useState<string | null>(null);
+  const [findingMediaUrl, setFindingMediaUrl] = useState<string | null>(null);
+  const [findingOverlay, setFindingOverlay] = useState<OverlayRegion | null>(null);
 
   const load = useCallback(async () => {
     if (!inspectionId) return;
@@ -242,6 +248,16 @@ export function InspectionDetail({
       };
       if (!res.ok) throw new Error(json.error ?? "Falha ao comparar.");
       setComparisons(json.data?.comparisons ?? []);
+
+      // Photo evidence isn't part of the text-value comparison above
+      // (computeComparisons only diffs inspection_responses) — fetch the
+      // linked check-in's media separately so the viewer can pair photos
+      // by item_id (never by upload order, item 14 of the spec).
+      if (data?.inspection.linked_inspection_id) {
+        const linkedRes = await fetch(`/api/inspections/${data.inspection.linked_inspection_id}`);
+        const linkedJson = (await linkedRes.json()) as { data?: { media: MediaRow[] } };
+        setLinkedMedia(linkedJson.data?.media ?? []);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
     } finally {
@@ -281,12 +297,28 @@ export function InspectionDetail({
           description: findingDescription.trim(),
           severity: findingSeverity,
           itemId: findingItemId || undefined,
+          overlayRegion: findingOverlay ?? undefined,
         }),
       });
-      const json = (await res.json()) as { error?: string };
+      const json = (await res.json()) as { data?: { id: string }; error?: string };
       if (!res.ok) throw new Error(json.error ?? "Falha ao registrar constatação.");
+
+      // Photo <-> finding link (item 11: the overlay is drawn on a
+      // specific photo — this is what makes that association real, not
+      // just a coordinate floating with no image to anchor it to).
+      if (findingMediaId && json.data?.id) {
+        await fetch(`/api/inspections/${inspectionId}/media/${findingMediaId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ findingId: json.data.id }),
+        }).catch(() => {});
+      }
+
       setFindingDescription("");
       setFindingItemId("");
+      setFindingMediaId(null);
+      setFindingMediaUrl(null);
+      setFindingOverlay(null);
       setShowFindingForm(false);
       await load();
     } catch (err) {
@@ -488,6 +520,41 @@ export function InspectionDetail({
                 </div>
               )}
 
+              {/* Photo BEFORE×AFTER — paired by template_item_id, never
+                  upload order (item 14 of the spec). */}
+              {comparisons && data.inspection.linked_inspection_id && (
+                <div className="space-y-2">
+                  {(data.template?.sections ?? [])
+                    .flatMap((s) => s.items)
+                    .map((item) => {
+                      const beforeMedia = linkedMedia.find((m) => m.item_id === item.id);
+                      const afterMedia = data.media.find((m) => m.item_id === item.id);
+                      if (!beforeMedia && !afterMedia) return null;
+                      const comparison = comparisons.find((c) => c.itemId === item.id);
+                      return (
+                        <InspectionComparisonViewer
+                          key={item.id}
+                          itemLabel={item.label}
+                          differs={comparison?.differs ?? false}
+                          before={
+                            beforeMedia
+                              ? {
+                                  inspectionId: data.inspection.linked_inspection_id!,
+                                  mediaId: beforeMedia.id,
+                                }
+                              : null
+                          }
+                          after={
+                            afterMedia
+                              ? { inspectionId: data.inspection.id, mediaId: afterMedia.id }
+                              : null
+                          }
+                        />
+                      );
+                    })}
+                </div>
+              )}
+
               {/* Checklist */}
               {data.template && (
                 <div className="space-y-4">
@@ -573,6 +640,43 @@ export function InspectionDetail({
                         </select>
                       )}
                     </div>
+
+                    {/* Marcar avaria (item 11 do spec) — só faz sentido
+                        depois que um item com fotos foi escolhido acima. */}
+                    {findingItemId && (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {data.media
+                            .filter((m) => m.item_id === findingItemId)
+                            .map((m) => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => {
+                                  setFindingMediaId(m.id);
+                                  setFindingOverlay(null);
+                                  fetch(`/api/inspections/${inspectionId}/media/${m.id}/url`)
+                                    .then((r) => r.json())
+                                    .then((j: { data?: { url: string } }) =>
+                                      setFindingMediaUrl(j.data?.url ?? null),
+                                    )
+                                    .catch(() => setFindingMediaUrl(null));
+                                }}
+                                className={`px-2 py-1 rounded text-[10px] border cursor-pointer ${findingMediaId === m.id ? "border-shina-blue text-shina-blue" : "border-slate-200 dark:border-slate-700 text-slate-500"}`}
+                              >
+                                Foto {m.id.slice(0, 6)}
+                              </button>
+                            ))}
+                        </div>
+                        {findingMediaUrl && (
+                          <InspectionOverlayPicker
+                            imageUrl={findingMediaUrl}
+                            onChange={setFindingOverlay}
+                          />
+                        )}
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       disabled={busy || !findingDescription.trim()}
