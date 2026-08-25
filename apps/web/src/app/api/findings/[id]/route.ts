@@ -3,6 +3,7 @@ import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, hasTenantPermission } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 import { createNotification } from "@/lib/notifications/create-notification";
+import { ensureFindingCharge } from "@/lib/inspection-billing";
 import { canTransitionFinding, type InspectionFindingStatus } from "@shina/inspection-engine";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +93,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         body: "Uma constatação de vistoria foi confirmada e pode gerar cobrança.",
         priority: "high",
       });
+    }
+
+    // item 15 do spec: "AI suggestion → human confirmation → business rule
+    // → approval → billing" — chargeable é exatamente o ponto em que um
+    // humano já aprovou o custo (approvedCostAmount só chega aqui via essa
+    // mesma rota, nunca de sugestão de IA). Só gera cobrança de fato se o
+    // custo aprovado já estiver setado (nesta chamada ou numa anterior).
+    if (body.status === "chargeable") {
+      const { data: findingRow } = await scope.db
+        .from("inspection_findings")
+        .select(
+          "id, tenant_id, inspection_id, description, approved_cost_amount, approved_cost_currency",
+        )
+        .eq("id", id)
+        .maybeSingle();
+      if (findingRow) {
+        await ensureFindingCharge(scope.db, findingRow);
+      }
     }
   }
 

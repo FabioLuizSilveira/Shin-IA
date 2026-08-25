@@ -102,6 +102,10 @@ export function InspectionDetail({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [comparisons, setComparisons] = useState<ComparisonRow[] | null>(null);
+  const [report, setReport] = useState<{ id: string; version: number; contentHash: string } | null>(
+    null,
+  );
+  const [signed, setSigned] = useState(false);
   const [showFindingForm, setShowFindingForm] = useState(false);
   const [findingDescription, setFindingDescription] = useState("");
   const [findingSeverity, setFindingSeverity] = useState<string>("medium");
@@ -117,12 +121,59 @@ export function InspectionDetail({
       const json = (await res.json()) as { data?: DetailPayload; error?: string };
       if (!res.ok) throw new Error(json.error ?? "Falha ao carregar vistoria.");
       setData(json.data ?? null);
+
+      const reportRes = await fetch(`/api/inspections/${inspectionId}/report`);
+      const reportJson = (await reportRes.json()) as {
+        data?: { id: string; version: number; content_hash: string } | null;
+      };
+      setReport(
+        reportJson.data
+          ? {
+              id: reportJson.data.id,
+              version: reportJson.data.version,
+              contentHash: reportJson.data.content_hash,
+            }
+          : null,
+      );
+      setSigned(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
     } finally {
       setLoading(false);
     }
   }, [inspectionId]);
+
+  async function generateReport() {
+    if (!inspectionId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/inspections/${inspectionId}/report`, { method: "POST" });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Falha ao gerar laudo.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signReport() {
+    if (!inspectionId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/inspections/${inspectionId}/sign`, { method: "POST" });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Falha ao assinar.");
+      setSigned(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -330,7 +381,37 @@ export function InspectionDetail({
                     Comparar com vistoria vinculada
                   </button>
                 )}
+                {data.inspection.status === "completed" && !report && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void generateReport()}
+                    className="px-3 py-1.5 bg-shina-blue text-white text-xs font-semibold rounded-lg border-0 cursor-pointer disabled:opacity-60"
+                  >
+                    Gerar Laudo
+                  </button>
+                )}
+                {report && !signed && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void signReport()}
+                    className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer disabled:opacity-60"
+                  >
+                    Assinar Laudo (equipe)
+                  </button>
+                )}
               </div>
+
+              {report && (
+                <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-4 text-xs text-slate-500 space-y-1">
+                  <p>
+                    Laudo v{report.version} —{" "}
+                    <span className="font-mono">{report.contentHash.slice(0, 16)}…</span>
+                  </p>
+                  {signed && <p className="text-emerald-600 font-medium">Assinado pela equipe ✓</p>}
+                </div>
+              )}
 
               {/* Comparison results */}
               {comparisons && (
