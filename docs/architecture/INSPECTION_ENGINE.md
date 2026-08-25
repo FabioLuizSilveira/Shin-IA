@@ -1,9 +1,8 @@
 # Shinã Inspection Engine — Vistoria Digital
 
-**Status: Fases A–G concluídas (V0). Production Completion (V1 comercial, P0.1–P1.2) concluída
-2026-08-25 — ver seção "Production Completion" no fim deste documento. P1.3–P1.5 (offline
-hardening real, suíte HTTP permanente, overlay mobile, teste em device real) seguem pendentes,
-documentados explicitamente, não escondidos.**
+**Status: Fases A–G concluídas (V0). Production Completion (V1 comercial, P0.1–P1.4) concluída
+2026-08-25 — ver seção "Production Completion" no fim deste documento. Overlay no mobile e
+verificação em device real seguem pendentes, documentados explicitamente, não escondidos.**
 
 Log corrido do módulo, no mesmo padrão de `docs/architecture/FIREBASE_AUTH_MIGRATION.md` — cada
 fase atualiza este arquivo com o que foi entregue, decisões tomadas e pendências.
@@ -615,18 +614,48 @@ duas `customer.inspections.*` restantes já existiam desde a Fase B).
   avaria com foto para navegar visualmente nesta rodada (mesma ressalva já registrada na Fase A
   sobre overlay).
 
+### P1.3/P1.4 — atualização (mesma rodada, após o corte inicial acima)
+
+**P1.3 — Offline real no mobile: implementado.** `apps/mobile/src/lib/inspection-offline-queue.ts`
+— toda resposta/foto do `InspectionCaptureScreen` agora grava primeiro em AsyncStorage (nunca só
+em estado React) e só depois tenta a rede; falha vira item na fila, retentado automaticamente em
+três gatilhos: reconexão real (`NetInfo`), a tela voltando a ficar em foco, e antes de "Enviar
+para revisão" (que agora bloqueia com mensagem clara se ainda há item na fila, em vez do erro
+genérico "item faltando" que o completion-check do servidor daria). Retry cego é seguro porque as
+duas escritas já eram idempotentes do lado do servidor (upsert em `inspection_id+item_id`;
+dedupe de mídia por `checksum_sha256`, adicionado nesta mesma rodada). Banner de status usa
+exatamente o texto de exemplo do spec ("✓ N sincronizados" / "⟳ N aguardando envio" / "Sem
+conexão — vistoria salva neste aparelho"). Usa `crypto.getRandomValues` (já polyfilled via
+`react-native-get-random-values`, usado em `secure-session-store.ts`) em vez de
+`crypto.randomUUID()`, que não é garantido disponível no Hermes desta versão do app — checado
+antes de usar, não assumido. Verificado: typecheck limpo + `expo export --platform android`
+recompila o bundle Hermes completo sem erro de resolução. **Não verificado**: comportamento real
+em device (cota EAS ainda esgotada até 2026-09-01) — a UX de offline/reconexão em si não foi
+observada rodando de verdade, só validada estaticamente.
+
+**P1.4 — Suíte de testes de isolamento permanente: implementado (parcial, ver escopo abaixo).**
+`apps/web/src/lib/mobile-inspections-scope.ts` (`resolveInspectionVisibility`/
+`isInspectionVisible`, seguindo exatamente o padrão já usado por `mobile-operations-scope.ts`) +
+`apps/web/src/__tests__/lib/mobile-inspections-scope.test.ts`, 14 testes reais: operador A não lê
+vistoria de operador B (nos dois sentidos), cliente A não lê vistoria/aceite de cliente B (nos
+dois sentidos), `tenant_user` não atravessa tenant, e um caso de borda (operator_id igual mas
+tenant diferente também é negado). As rotas de lista (`operator-inspections`,
+`customer/inspections`) foram refatoradas para usar essa função em vez de inlinar o filtro —
+então o que está testado é a lógica que realmente roda, não uma reimplementação em paralelo.
+`apps/web` já roda `pnpm test` no CI existente (`.github/workflows/ci.yml`, task `test` do Turbo)
+— esse arquivo entra automaticamente na esteira, sem mudança de CI. Todos os 125 testes vitest
+pré-existentes de `apps/web` continuam passando (204 no total somando `inspection-engine` e
+`blueprint-runtime`). **Escopo real do que ficou coberto**: só o nível de
+descriptor/predicate/rota-de-lista. As rotas de detalhe/PATCH/mídia/assinatura (`[id]/route.ts`,
+`[id]/media/route.ts`, `[id]/sign/route.ts`, tanto do lado operador quanto cliente) continuam
+inlinando o `.eq()` de posse diretamente — corretas na leitura de código, mas não exercitadas por
+este arquivo de teste nem por uma suíte HTTP completa fim-a-fim (subir servidor, autenticar,
+bater na rota de verdade). Isso é mais forte que o script manual que existia antes (prova a
+função que a rota de fato usa, roda em CI, permanece no repo), mas ainda não é a suíte HTTP
+completa que o item 24 do spec pede no sentido mais literal.
+
 ### Pendências (não escondidas)
 
-- **P1.3 — Offline real no mobile**: continua não implementado. O mobile ainda envia cada
-  resposta/foto direto ao servidor (sem fila local/AsyncStorage/idempotency key do lado do
-  device, sem indicador visual de sincronização pendente). O upload de mídia do lado do servidor
-  já é idempotente por checksum (novidade desta rodada), mas isso não substitui uma fila de
-  escrita local — se o dispositivo perder conexão no meio de uma captura, a tentativa atual ainda
-  falha visivelmente em vez de enfileirar e sincronizar depois.
-- **P1.4 — Suíte de testes HTTP/segurança permanente**: não criada como testes automatizados
-  (vitest/CI) nesta rodada — a verificação de isolamento (ver "Testado") foi um script real, não
-  reutilizável em CI. Fica como pendência explícita, igual ao gap já reconhecido na rodada
-  anterior.
 - **Overlay no mobile** (item 12 do spec): não implementado — só a versão web existe. O fluxo de
   "2-3 interações" no celular (tocar/arrastar sobre a foto recém-capturada) fica para uma próxima
   rodada.
