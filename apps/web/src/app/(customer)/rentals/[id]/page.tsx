@@ -168,6 +168,13 @@ export default function RentalDetailPage() {
           </Link>
         )}
 
+        <Link
+          href={`/rentals/${rental.id}/inspections`}
+          className="block text-center px-4 py-2.5 bg-white/5 border border-white/10 text-white text-sm font-semibold rounded-xl transition hover:bg-white/10"
+        >
+          Vistorias digitais
+        </Link>
+
         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
           <p className="text-sm font-bold text-white">Solicitar</p>
           <textarea

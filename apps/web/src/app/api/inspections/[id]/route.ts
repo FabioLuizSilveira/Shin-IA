@@ -43,6 +43,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     { data: responses, error: responsesError },
     { data: media, error: mediaError },
     { data: findings, error: findingsError },
+    { data: disputes, error: disputesError },
   ] = await Promise.all([
     scope.db
       .from("inspection_responses")
@@ -57,12 +58,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       .order("sort_order", { ascending: true }),
     scope.db
       .from("inspection_findings")
-      .select("id, item_id, description, severity, status, ai_suggested")
+      .select(
+        "id, item_id, description, severity, status, ai_suggested, preexisting_finding_id, overlay_region",
+      )
       .eq("inspection_id", id),
+    scope.db
+      .from("inspection_disputes")
+      .select("id, item_id, customer_id, description, status, resolution_notes, created_at")
+      .eq("inspection_id", id)
+      .order("created_at", { ascending: false }),
   ]);
   if (responsesError) return internalError(responsesError);
   if (mediaError) return internalError(mediaError);
   if (findingsError) return internalError(findingsError);
+  if (disputesError) return internalError(disputesError);
 
   const repo = createInspectionTemplateRepository(scope.db);
   const template = await repo.getHydratedTemplateById(inspection.template_id);
@@ -74,6 +83,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       responses: responses ?? [],
       media: media ?? [],
       findings: findings ?? [],
+      disputes: disputes ?? [],
     },
   });
 }
