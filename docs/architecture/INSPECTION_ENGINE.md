@@ -272,7 +272,70 @@ que pelo menos 1 foto já foi enviada pra ele) e coberto por dois testes de regr
   verificação foi via chamada direta ao repositório/domínio contra o banco real (mesmo código,
   sem a camada HTTP). Teste via requisição HTTP real fica pra Fase G (hardening).
 
+## Fase D — UX (Tenant Web concluído; Mobile pendente)
+
+**Status: Tenant Web completo e verificado ao vivo, incluindo a criação e o preenchimento de uma
+vistoria real pela UI (não só via chamada direta ao domínio, como na Fase C). Mobile (captura
+guiada) ainda não iniciado — próximo passo.**
+
+### Arquivos criados
+
+- `apps/web/src/app/api/inspection-templates/` (+ `[id]`, `[id]/sections`,
+  `[id]/sections/[sectionId]/items`, `[id]/sections/[sectionId]/items/[itemId]`) — CRUD real de
+  templates (o Inspection Builder precisa disso pra não ser uma tela fake). Template global
+  (`tenant_id` null) é sempre somente-leitura por essas rotas; só o template do próprio tenant é
+  editável. `manage_templates` fica restrito a `tenant_owner`/`tenant_admin`.
+- `apps/web/src/app/(tenant)/tenant/inspections/page.tsx` — lista com filtro por status,
+  formulário de criação (ativo/tipo/propósito, blueprint como override manual quando o ativo não
+  tem um associado).
+- `apps/web/src/app/(tenant)/tenant/inspections/templates/page.tsx` — Inspection Builder: lista
+  de templates (globais com cadeado, do tenant editáveis), criação de seção/item por formulário,
+  publicação.
+- `apps/web/src/components/ui/inspection-detail.tsx` — gaveta de detalhe: timeline (Rascunho →
+  Em andamento → Aguardando revisão → Concluída), ações de transição, checklist com contagem de
+  fotos, botão de comparação BEFORE×AFTER, revisão de constatações (revisar/confirmar/rejeitar).
+- `apps/web/src/components/layout/sidebar.tsx` — item "Vistorias" adicionado à navegação.
+
+### Bug real encontrado e corrigido nesta fase
+
+**`hasTenantPermission()` sempre retornava `false` pra qualquer papel que não fosse
+`tenant_owner`/`tenant_admin`** — bug pré-existente, não introduzido por este módulo, mas que
+bloqueava a própria entrega da Fase D. A função comparava `tenant_user_roles.user_id` direto com
+o uid canônico de auth, mas essa coluna na real guarda `user_profiles.id` (mesma resolução que
+`custom_access_token_hook` já faz). Como `tenant_owner`/`tenant_admin` saem por atalho antes da
+query (sem round-trip ao banco), o bug nunca tinha sido exercitado por uma conta real que não
+fosse dono/admin — até a conta demo `fleet_manager` (que já tem `operations:write`) bater um
+`Forbidden` real criando uma vistoria pela UI, mesmo com o grant existindo em
+`tenant_role_permissions`. Corrigido em `apps/web/src/lib/tenant-context.ts`, nas duas funções
+(`hasTenantPermission`/`getEffectiveTenantPermissions`). Migration
+`20260100000000_inspection_permissions_operational_roles.sql` também concede as permissions
+operacionais de vistoria a `fleet_manager`/`operations_manager`.
+
+### Verificação ao vivo pela UI real (não só chamada direta ao domínio)
+
+Com a conta real `demo.equipe@shinaia.com.br` (papel `fleet_manager`): criei uma vistoria de
+check-in real pelo formulário da lista (ativo Chevrolet Onix), a gaveta abriu mostrando o
+checklist vazio do `vehicle_standard_v1`; cliquei "Iniciar vistoria" e o status mudou pra "Em
+andamento" corretamente; cliquei "Enviar para revisão" sem preencher nada e o sistema bloqueou
+corretamente, listando os itens obrigatórios faltando (`plate, odometer, fuel_level, tires,
+dashboard_alerts, operating_condition`) — confirmando que `checkTemplateCompletion()` está
+realmente conectado, não só testado isoladamente. Builder testado abrindo o template global
+`vehicle_standard_v1` e confirmando que as 4 seções/21 itens reais aparecem com tipo de campo e
+obrigatoriedade corretos. Dados de teste limpos do banco ao final.
+
+### Pendências desta fase
+
+- Mobile (captura guiada) — não iniciado. Maior lacuna de dependências novas (sem
+  `expo-camera`/`expo-image-picker`/`expo-file-system`/`expo-location` hoje) e sem possibilidade
+  de teste em device real (cota EAS esgotada até 2026-09-01, mesmo bloqueio já documentado no
+  módulo Firebase).
+- Nenhum teste automatizado novo nesta fase (componentes React sem suíte de testes no padrão do
+  projeto — as demais páginas `tenant/*` também não têm). Verificação foi ao vivo, via navegador,
+  contra o banco hospedado real.
+
 ### Próximo passo
 
-Fase D — UX: Tenant Web (lista de vistorias, detalhe com timeline, Inspection Builder) e Mobile
-(captura guiada — maior lacuna de dependências novas do módulo, ver Fase A §5).
+Continuar a Fase D com Mobile (captura guiada) — adicionar as dependências de câmera ao
+`apps/mobile`, construir as telas de vistoria (lista, checklist com captura foto-a-foto guiada),
+conectar às rotas de API já existentes. Testável via Expo Go (câmera funciona lá, ao contrário do
+Google Sign-In); verificação em device real de produção fica pendente pelo bloqueio de EAS.
