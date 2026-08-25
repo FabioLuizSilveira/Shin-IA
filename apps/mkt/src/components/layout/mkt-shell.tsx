@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -24,7 +25,11 @@ import {
   Sun,
   Moon,
   Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+
+const SIDEBAR_COLLAPSED_KEY = "shina_mkt_sidebar_collapsed";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -43,6 +48,22 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
   const pathname = usePathname();
   const router = useRouter();
   const { theme, preference, setPreference } = useShinaTheme();
+  // Starts expanded on the server (and on first client render, to match)
+  // — the real value is read from localStorage right after mount, same
+  // pattern useShinaTheme() itself uses to avoid a hydration mismatch.
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") setCollapsed(true);
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      return next;
+    });
+  }
 
   async function handleLogout() {
     const supabase = createClient();
@@ -53,21 +74,50 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
 
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-slate-950">
-      <aside className="w-60 shrink-0 border-r border-slate-200 dark:border-white/5 flex flex-col">
-        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-slate-200 dark:border-white/5">
+      <aside
+        className={[
+          "shrink-0 border-r border-slate-200 dark:border-white/5 flex flex-col transition-[width] duration-200 relative",
+          collapsed ? "w-[72px]" : "w-60",
+        ].join(" ")}
+      >
+        <div
+          className={[
+            "h-16 flex items-center border-b border-slate-200 dark:border-white/5",
+            collapsed ? "justify-center px-0" : "gap-2.5 px-5",
+          ].join(" ")}
+        >
           <Image
             src="/brand/shina-icon-square.png"
             alt="Shinã"
             width={32}
             height={32}
-            className="rounded-lg"
+            className="rounded-lg shrink-0"
             priority
           />
-          <span className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-            Marketing IA
-            <span className="block text-[10px] font-medium text-slate-500">by Shinã</span>
-          </span>
+          {!collapsed && (
+            <span className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+              Marketing IA
+              <span className="block text-[10px] font-medium text-slate-500">by Shinã</span>
+            </span>
+          )}
         </div>
+
+        {/* Floating toggle on the sidebar's border, same pattern used by
+            most retractable-sidebar apps (VS Code, Notion, Linear) —
+            always reachable regardless of collapsed state, doesn't take
+            up space inside the nav list. */}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          title={collapsed ? "Expandir menu" : "Recolher menu"}
+          className="absolute -right-3 top-[52px] w-6 h-6 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-sm cursor-pointer z-10"
+        >
+          {collapsed ? (
+            <ChevronRight className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronLeft className="w-3.5 h-3.5" />
+          )}
+        </button>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {NAV_ITEMS.map((item) => {
@@ -77,15 +127,17 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
               <Link
                 key={item.href}
                 href={item.href}
+                title={collapsed ? item.label : undefined}
                 className={[
                   "flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors no-underline",
+                  collapsed ? "justify-center px-0" : "",
                   active
                     ? "bg-mkt-primary/15 text-mkt-glow"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5",
                 ].join(" ")}
               >
                 <Icon className="w-4 h-4 shrink-0" />
-                {item.label}
+                {!collapsed && item.label}
               </Link>
             );
           })}
@@ -95,10 +147,14 @@ export function MktShell({ children, title }: { children: ReactNode; title: stri
           <button
             type="button"
             onClick={() => void handleLogout()}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors bg-transparent border-0 cursor-pointer"
+            title={collapsed ? "Sair" : undefined}
+            className={[
+              "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors bg-transparent border-0 cursor-pointer",
+              collapsed ? "justify-center px-0" : "",
+            ].join(" ")}
           >
-            <LogOut className="w-4 h-4" />
-            Sair
+            <LogOut className="w-4 h-4 shrink-0" />
+            {!collapsed && "Sair"}
           </button>
         </div>
       </aside>
