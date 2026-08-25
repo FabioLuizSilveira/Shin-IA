@@ -1,8 +1,9 @@
 # Shinã Inspection Engine — Vistoria Digital
 
 **Status: Fases A–G concluídas (V0). Production Completion (V1 comercial, P0.1–P1.4) concluída
-2026-08-25 — ver seção "Production Completion" no fim deste documento. Overlay no mobile e
-verificação em device real seguem pendentes, documentados explicitamente, não escondidos.**
+2026-08-25 — ver seção "Production Completion" no fim deste documento. Overlay no mobile
+concluído na mesma rodada; verificação em device real segue pendente (cota EAS), documentado
+explicitamente, não escondido.**
 
 Log corrido do módulo, no mesmo padrão de `docs/architecture/FIREBASE_AUTH_MIGRATION.md` — cada
 fase atualiza este arquivo com o que foi entregue, decisões tomadas e pendências.
@@ -654,11 +655,22 @@ bater na rota de verdade). Isso é mais forte que o script manual que existia an
 função que a rota de fato usa, roda em CI, permanece no repo), mas ainda não é a suíte HTTP
 completa que o item 24 do spec pede no sentido mais literal.
 
+### Overlay no mobile — atualização (mesma rodada, após o corte inicial)
+
+**Implementado.** `InspectionOverlayMarker` (`apps/mobile/src/components/inspection-overlay-marker.tsx`)
+— fluxo de 2 passos (marcar região → descrição/severidade), usando `PanResponder` nativo do React
+Native (sem dependência nova de gesture-handler), mesmas coordenadas normalizadas 0..1 do
+`overlay_region` já usadas na versão web — uma marcação feita no celular é lida corretamente na
+gaveta do Tenant Web e vice-versa. Três rotas novas escopadas por operador (espelhando as rotas
+de staff, mas autorizadas via `requireMobileContext()` + posse por `operator_id`, já que operador
+não tem linha de `tenant_role`/permission pra checar): `POST .../findings`,
+`PATCH .../media/:mediaId` (vincula a foto ao finding), `GET .../media/:mediaId/url`.
+Verificado: typecheck limpo, `expo export --platform android` recompila o bundle Hermes completo
+sem erro de resolução. **Não verificado**: comportamento em device real — cota EAS segue
+esgotada até 2026-09-01.
+
 ### Pendências (não escondidas)
 
-- **Overlay no mobile** (item 12 do spec): não implementado — só a versão web existe. O fluxo de
-  "2-3 interações" no celular (tocar/arrastar sobre a foto recém-capturada) fica para uma próxima
-  rodada.
 - **`preexisting_finding_id`**: coluna existe (migration desta rodada), mas nenhuma rota
   preenche esse campo automaticamente ao criar um finding de check-out — hoje é só uma FK
   disponível para uso manual/futuro, não uma automação real de "vincular ao finding do check-in
