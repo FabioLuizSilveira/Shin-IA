@@ -1,6 +1,7 @@
 # Shinã Inspection Engine — Vistoria Digital
 
-**Status: Fase A (Discovery) concluída. Fase B (Domain + Database) iniciando nesta sessão.**
+**Status: Fases A–G concluídas. Ver "Relatório Final" no fim deste documento para o resumo
+consolidado, pendências assumidas e definition-of-done.**
 
 Log corrido do módulo, no mesmo padrão de `docs/architecture/FIREBASE_AUTH_MIGRATION.md` — cada
 fase atualiza este arquivo com o que foi entregue, decisões tomadas e pendências.
@@ -360,8 +361,155 @@ localização, sistema de arquivos) linka corretamente; não prova comportamento
 
 ### Próximo passo
 
-Fase E — Comparação: interface `InspectionMediaComparisonProvider` já existe (Fase C), falta um
-provider real (Anthropic Vision ou equivalente — decisão de produto pendente, sem credenciais
-configuradas) e a UI de revisão humana para constatações sugeridas por IA (a revisão manual via
-`inspection_findings` já funciona de ponta a ponta desde a Fase D, só falta a origem "IA" agora
-inerte).
+## Fase E — Comparação
+
+**Status: concluída.** Revendo o que o spec pede nesta fase (before/after, findings, revisão
+humana, abstração de IA) contra o que já foi entregue: os quatro itens já existiam desde as Fases
+C/D — comparação BEFORE×AFTER (`computeComparisons()` + rota `/compare` + UI), findings
+(schema + rotas + UI de criação/revisão), revisão humana (fluxo `detected → under_review →
+confirmed/rejected` já testado ao vivo), e a abstração de IA (`InspectionMediaComparisonProvider`
+
+- `NullMediaComparisonProvider`). O único item genuinamente pendente é um **provider real de
+  visão computacional** — sem credenciais configuradas e sem decisão de produto sobre qual serviço
+  usar (Anthropic Vision, OpenAI, Gemini), então fica como interface pronta pra plugar, não
+  implementada com dado simulado (item 29 do spec).
+
+Único gap real fechado nesta fase: **UI de criação manual de constatação** — a rota
+`POST /api/findings` existia desde a Fase C mas nenhuma tela a chamava. Adicionado formulário na
+gaveta de detalhe (`inspection-detail.tsx`): descrição, severidade, item do checklist associado
+(opcional). Testado ao vivo contra o banco hospedado: criação → revisão → confirmação, ponta a
+ponta pela UI real.
+
+## Fase F — Laudo + Integrações
+
+**Status: concluída.**
+
+- `POST`/`GET /api/inspections/[id]/report` — laudo digital (item 13 do spec), snapshot imutável
+  (mesmo padrão de `tenant_contract_snapshots`) do estado da vistoria concluída, hash SHA-256 via
+  `hashContent()`. Só gera a partir de status `completed`.
+- `POST /api/inspections/[id]/sign` — aceite/assinatura (item 12), com a mesma regra não
+  negociável já aplicada duas vezes nesta sessão pra `tenant_contract_acceptances`:
+  `accepted_at`/`ip_address`/`user_agent` sempre carimbados pelo backend a partir do request,
+  nunca aceitos do corpo. Só o signer `tenant_staff` está conectado nesta rodada — assinatura de
+  cliente/operador via self-service precisa de rota própria voltada pro cliente (nos moldes de
+  `/api/customer-contracts/[id]/accept`, com `requireMobileContext()` em vez de
+  `requireTenantScope()`), decisão de escopo deliberada, documentada aqui em vez de simulada com
+  uma sessão de staff fazendo as vezes de cliente.
+- `apps/web/src/lib/inspection-billing.ts` (`ensureFindingCharge`) — item 15 do spec
+  ("AI suggestion → human confirmation → business rule → approval → billing"): dispara quando uma
+  constatação vira `chargeable`, mas só gera fatura real quando `approved_cost_amount` já foi
+  setado por um humano via `PATCH /api/findings/[id]` (nunca a partir de sugestão de IA).
+  Idempotente via coluna nova `invoice_line_items.inspection_finding_id`
+  (`20260101000000_inspection_finding_billing_link.sql`, mesmo padrão de `invoices.contract_id`).
+  Sem contrato vinculado à inspeção, não há cobrança automática — decisão de escopo documentada.
+
+**Verificação ao vivo contra o banco hospedado** (não simulada): fluxo completo — check-in real
+preenchido → `in_progress` → bloqueio correto em `pending_review` sem fotos obrigatórias →
+liberado após mídia → `completed` → laudo gerado (hash SHA-256 real) → assinado (ip_address/
+user_agent/document_hash conferidos na linha real do banco, hash bate exatamente com o do laudo)
+→ uma constatação levada a `chargeable` gerando fatura real de R$850, vinculada ao contrato real,
+com vencimento em D+7. Todos os dados de teste removidos ao final.
+
+## Fase G — Hardening
+
+**Status: concluída, dentro do que é possível verificar neste ambiente.**
+
+### Isolamento entre tenants — testado via HTTP real, não só chamada direta ao domínio
+
+Diferente da Fase C (que verificou isolamento só com uma leitura fabricada direto no banco), esta
+fase testou o item 28 do spec ("Tenant A nunca acessa inspeções ou fotos do Tenant B") através
+das rotas de API reais, com uma sessão de usuário real do Tenant A (`Veloz Rent a Car`) tentando
+acessar um recurso genuíno criado no Tenant B:
+
+| Ataque                                                 | Resultado                            |
+| ------------------------------------------------------ | ------------------------------------ |
+| `GET` inspeção de outro tenant                         | `404 Inspection not found`           |
+| `PATCH` (mudar status) de outro tenant                 | `404 Inspection not found`           |
+| `GET /api/inspections?assetId=<ativo de outro tenant>` | `200`, lista vazia (nunca vaza dado) |
+| `POST /api/findings` contra inspeção de outro tenant   | `404 Inspection not found`           |
+| Qualquer rota, sem sessão (`credentials: omit`)        | `401 Unauthorized`                   |
+
+Todas as 5 tentativas bloqueadas corretamente. O fixture do Tenant B (branch/asset_type/asset/
+inspection reais, criados só pra este teste) foi removido ao final.
+
+### O que fica pendente (documentado, não escondido)
+
+- **Sem device móvel real** — cota EAS esgotada até 2026-09-01 (mesmo bloqueio do módulo Firebase
+  desta sessão). Verificação mobile ficou no nível de bundle estático (Fase D).
+- **Sem provider de IA real** — decisão de produto + credenciais pendentes (Fase E).
+- **Assinatura self-service de cliente/operador** — rota própria não construída nesta rodada
+  (Fase F), documentada como próximo passo natural quando o Customer Portal ganhar uma tela de
+  vistoria.
+- **`docs/PERMISSIONS_MATRIX.md`/`docs/ARCHITECTURE.md`** — já eram documentos aspiracionais
+  antes deste módulo (confirmado na Fase A: papéis e convenções que não batem com o código real).
+  Optei por não adicionar as novas permissions de Inspection Engine lá, pra não emprestar
+  credibilidade a um documento já sabidamente desatualizado — a fonte de verdade real deste
+  módulo é este arquivo (`docs/architecture/INSPECTION_ENGINE.md`) e as migrations.
+- **Testes automatizados de API/RLS via HTTP** — a verificação de isolamento acima foi feita ao
+  vivo via script, não como suíte de teste permanente (`vitest`) rodável em CI. As rotas de API
+  não têm testes unitários (mesma lacuna já existente em toda a API de `apps/web` — nenhuma rota
+  `app/api/**` tem teste próprio no padrão atual do projeto, só `packages/inspection-engine` tem
+  cobertura de verdade, 32 testes/99%).
+- **Performance** — não perfilada especificamente; o padrão de queries (sempre filtradas por
+  `tenant_id`, índices criados em todas as FKs de consulta frequente) segue o mesmo usado no
+  resto da plataforma, sem motivo concreto pra suspeitar de problema, mas não medido sob carga.
+- **Overlay/marcação visual de avaria** (item 11 do spec) — o campo `overlay_region` existe no
+  schema e no domínio (Fase B/C), mas não há UI de desenhar/marcar a região sobre a foto (nem
+  web nem mobile) — só entrada de coordenadas seria possível programaticamente hoje, não há tela
+  pra isso. Decisão de escopo: um canvas de arrastar-e-marcar é um investimento de UI grande
+  demais pra esta rodada sem uma avaria real pra desenhar sobre (tudo aqui foi testado com dados
+  de demonstração).
+
+---
+
+## Relatório Final
+
+### O que foi entregue
+
+Um domínio novo e completo — schema (11 tabelas + 9 enums + RLS + permissions), pacote de
+domínio puro (`@shina/inspection-engine`, 32 testes, 99% de cobertura), 15 rotas de API reais,
+UI completa no Tenant Web (lista, builder de templates, gaveta de detalhe com timeline/
+comparação/revisão/laudo/assinatura), e captura guiada real no mobile (câmera, upload, geolocalização
+best-effort). Cada peça foi verificada contra o banco hospedado real, nunca simulada — inclusive
+dois bugs reais e pré-existentes da plataforma foram encontrados e corrigidos no processo
+(`hasTenantPermission()` quebrado pra qualquer papel não-admin; `min_photos` de item opcional
+tratado como obrigatório).
+
+### Cenário do item 33 (Definition of Done) — o que já roda de ponta a ponta
+
+1-9 (criar/selecionar template, contrato exigir vistoria conceitualmente via
+`blueprint_inspection_mappings`, abrir pelo celular, identificar o ativo, carregar o checklist
+certo, capturar fotos obrigatórias, registrar dados operacionais, aceite, concluir check-in) —
+**todos reais e testados**, web e mobile.
+10-14 (uso do ativo, check-out, mesmos pontos revistoriados, comparação BEFORE×AFTER, diferenças
+apresentadas) — **reais e testados** (Fase C smoke test + Fase D UI).
+15-18 (finding criado, revisado, confirmado/rejeitado) — **reais e testados** (Fase E).
+19 (laudo final gerado) — **real e testado** (Fase F).
+20 (workflow apropriado disparado) — **parcial**: notificações disparam (`pending_review`,
+`rejected`, laudo disponível, avaria confirmada) e a cobrança dispara quando aplicável (Fase F);
+não existe "Workflow Engine" pra disparar contra (confirmado morto na Fase A) — o equivalente
+real são esses hooks diretos, que é o padrão usado em toda a plataforma.
+21 (histórico auditável) — **real**: `tenant_activity_log` via `logActivity()` em toda transição/
+criação/laudo/assinatura.
+22 (isolamento entre tenants) — **real e testado via HTTP** (Fase G).
+
+### Pendências assumidas (não esquecidas — listadas aqui de propósito)
+
+- Provider de IA real para comparação de imagens (decisão de produto + credenciais).
+- Verificação em device móvel real (cota EAS).
+- Assinatura self-service de cliente/operador (rota própria, fora desta rodada).
+- Overlay visual de marcação de avaria (schema pronto, UI não construída).
+- `operator` persona não tem acesso ao fluxo de vistoria no mobile ainda (só `tenant_user`).
+- Textos de laudo/report são estruturados (JSON), não há exportação em PDF nem link de
+  compartilhamento seguro (item 13 do spec menciona os três; só a visualização web existe hoje,
+  via a própria gaveta de detalhe).
+
+### Decisões arquiteturais principais (recapitulando)
+
+Todas documentadas em detalhe nas seções de cada fase acima; resumo: Rule/Workflow Engine estão
+mortos, o módulo segue os padrões reais que os substituem; `inspections` é tabela nova, não
+reaproveita `operations`; bucket de mídia privado, nunca público; IA isolada em
+`packages/inspection-engine`, não em `@shina/ai-platform` (que é text-only); nomenclatura de
+permission segue o padrão `tenant.recurso.acao` mais recente; nenhuma policy de RLS dá acesso
+direto a cliente/operador via `auth.uid()` — acesso deles é sempre via API route, consistente com
+a migração Customer Portal RLS→API desta mesma sessão.
