@@ -102,6 +102,10 @@ export function InspectionDetail({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [comparisons, setComparisons] = useState<ComparisonRow[] | null>(null);
+  const [showFindingForm, setShowFindingForm] = useState(false);
+  const [findingDescription, setFindingDescription] = useState("");
+  const [findingSeverity, setFindingSeverity] = useState<string>("medium");
+  const [findingItemId, setFindingItemId] = useState("");
 
   const load = useCallback(async () => {
     if (!inspectionId) return;
@@ -185,6 +189,34 @@ export function InspectionDetail({
       });
       const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json.error ?? "Falha ao revisar constatação.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createFinding() {
+    if (!inspectionId || !findingDescription.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/findings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inspectionId,
+          description: findingDescription.trim(),
+          severity: findingSeverity,
+          itemId: findingItemId || undefined,
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Falha ao registrar constatação.");
+      setFindingDescription("");
+      setFindingItemId("");
+      setShowFindingForm(false);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
@@ -359,9 +391,67 @@ export function InspectionDetail({
 
               {/* Findings */}
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50 mb-2 flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-amber-500" /> Constatações / Avarias
-                </h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-500" /> Constatações / Avarias
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowFindingForm((v) => !v)}
+                    className="text-xs text-shina-blue hover:text-blue-700 font-medium bg-transparent border-0 cursor-pointer"
+                  >
+                    {showFindingForm ? "Cancelar" : "+ Registrar constatação"}
+                  </button>
+                </div>
+
+                {showFindingForm && (
+                  <div className="mb-3 p-3 rounded-xl border border-slate-100 dark:border-slate-700 space-y-2">
+                    <textarea
+                      placeholder="Descreva a constatação (ex: risco no para-choque traseiro)"
+                      value={findingDescription}
+                      onChange={(e) => setFindingDescription(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+                      rows={2}
+                    />
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={findingSeverity}
+                        onChange={(e) => setFindingSeverity(e.target.value)}
+                        className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                      >
+                        <option value="low">Baixa</option>
+                        <option value="medium">Média</option>
+                        <option value="high">Alta</option>
+                        <option value="critical">Crítica</option>
+                      </select>
+                      {data.template && (
+                        <select
+                          value={findingItemId}
+                          onChange={(e) => setFindingItemId(e.target.value)}
+                          className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs flex-1"
+                        >
+                          <option value="">Item do checklist (opcional)</option>
+                          {data.template.sections.flatMap((s) =>
+                            s.items.map((i) => (
+                              <option key={i.id} value={i.id}>
+                                {s.title} · {i.label}
+                              </option>
+                            )),
+                          )}
+                        </select>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={busy || !findingDescription.trim()}
+                      onClick={() => void createFinding()}
+                      className="px-3 py-1.5 bg-shina-blue text-white text-xs font-semibold rounded-lg border-0 cursor-pointer disabled:opacity-60"
+                    >
+                      Registrar
+                    </button>
+                  </div>
+                )}
+
                 {data.findings.length === 0 ? (
                   <p className="text-xs text-slate-500">Nenhuma constatação registrada.</p>
                 ) : (
