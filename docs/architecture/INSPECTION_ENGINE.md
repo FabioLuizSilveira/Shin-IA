@@ -696,3 +696,54 @@ esgotada até 2026-09-01.
 - Componentes novos: 3 (`InspectionComparisonViewer`, `InspectionOverlayPicker`, mais a
   integração ampliada de `InspectionDetail`).
 - Dependência nova: `@react-pdf/renderer` + `qrcode` (produção), `@types/qrcode` (dev).
+
+---
+
+## Vistoria feita pelo cliente (self-service), por decisão de cada tenant
+
+Feature nova, fora do escopo original do spec V1, pedida explicitamente pelo usuário depois da
+rodada de produção. Decisões confirmadas com o usuário antes de implementar:
+
+1. **Um único interruptor por tenant** (`tenants.customer_self_inspection_enabled`, migration
+   `20260103000000`), **default `false`** — "vistoria continua interna pelo tenant" até o tenant
+   optar explicitamente. Não é granular por blueprint/tipo de ativo (decisão explícita — mais
+   simples de configurar).
+2. **O cliente inicia a vistoria sozinho** pelo Customer Portal (`POST
+/api/mobile/customer/inspections`), a partir do próprio contrato — não é staff que cria e
+   delega.
+3. **Preencher e enviar já conta como aceite.** Ao transicionar para `pending_review`, o backend
+   grava sozinho uma `inspection_signatures` (`signer_type=customer`, `document_hash`/`ip`/
+   `user_agent`/timestamp sempre derivados do servidor, `metadata.autoAcceptedOnSelfServiceSubmit:
+true`) — sem clique extra de "Concordo" sobre o que o próprio cliente acabou de preencher. O
+   fluxo normal de aceite/disputa (Fase P0.2/P0.3) continua existindo e funcionando exatamente
+   igual para o caso comum (vistoria preenchida por operador/staff).
+
+**Como a permissão de escrita é isolada**: toda inspeção self-service é marcada com
+`metadata.selfService = true` na criação. As rotas novas de preenchimento (`items`, `media`,
+transição de status) exigem essa flag **além** da posse por `customer_id` — isso impede que um
+cliente edite o checklist de uma vistoria que só referencia seu `customer_id` para
+acompanhamento/revisão (o caso normal, preenchida por operador). Rotas novas:
+`POST /api/mobile/customer/inspections`, `PATCH .../[id]/items/[itemId]`,
+`POST .../[id]/media`, `PATCH .../[id]` (transição + auto-assinatura),
+`GET /api/mobile/customer/contracts/[id]/inspection-config` (expõe só `{enabled, assets}` — nunca
+a linha de `tenants` inteira ao cliente).
+
+**UI**: `tenant/settings` (aba Empresa) ganhou o checkbox "Permitir vistoria pelo próprio
+cliente". O Customer Portal (`rentals/[id]/inspections`) ganhou "Iniciar vistoria" (só aparece
+quando o config confirma `enabled` e há ativo elegível no contrato) e uma página nova de
+preenchimento (`.../inspections/[id]/fill`) — formulário único com scroll (não wizard passo-a-
+passo como o mobile do operador; em desktop/tablet ver o checklist inteiro de uma vez é a UX
+normal), reaproveitando exatamente o mesmo contrato de API (upsert idempotente por item, dedupe
+de mídia por checksum, gate de `checkTemplateCompletion`).
+
+**Testado**: script real contra o banco hospedado (fixtures criadas e limpas na mesma execução,
+flag do tenant restaurada ao final) — flag default `false` e liga/desliga corretamente; posse do
+contrato resolve só pela organização do cliente; resolução de blueprint/template funciona
+(inclusive stampando temporariamente `asset_types.metadata.blueprintId` num asset de demo sem
+blueprint mapeado, já que os ativos seed não tinham nenhum); inspeção criada tem `customer_id`
+correto, `operator_id` nulo, `metadata.selfService=true`; um `customer_id` diferente não enxerga
+a inspeção; assinatura automática grava com `signer_type=customer` e a flag de auto-aceite. Build
+de produção e os 125 testes vitest de `apps/web` seguem limpos.
+
+**Não testado**: fluxo real navegado no browser (só verificado via script contra o banco +
+typecheck/build); UI do Customer Portal não foi aberta visualmente nesta rodada.
