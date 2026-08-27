@@ -6,7 +6,8 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { InfractionDetail } from "@/components/ui/infraction-detail";
-import { Plus, X } from "lucide-react";
+import { InfractionCsvImportModal } from "@/components/ui/infraction-csv-import-modal";
+import { Plus, X, Upload } from "lucide-react";
 
 interface InfractionCaseRow {
   id: string;
@@ -85,6 +86,7 @@ export default function TenantInfractionsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
+  const [showCsvImport, setShowCsvImport] = useState(false);
   const [plate, setPlate] = useState("");
   const [occurredAt, setOccurredAt] = useState("");
   const [amount, setAmount] = useState("");
@@ -199,13 +201,22 @@ export default function TenantInfractionsPage() {
         title="Infrações"
         description="Multas recebidas, vínculo com ativos/contratos, responsabilidade, prazos e cobrança."
         action={
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-shina-blue hover:bg-blue-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" /> Lançar infração
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCsvImport(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg border-0 cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importar CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-shina-blue hover:bg-blue-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Lançar infração
+            </button>
+          </div>
         }
       />
 
@@ -328,6 +339,13 @@ export default function TenantInfractionsPage() {
             </form>
           </div>
         </>
+      )}
+
+      {showCsvImport && (
+        <InfractionCsvImportModal
+          onClose={() => setShowCsvImport(false)}
+          onImported={() => void load(filter)}
+        />
       )}
     </AppShell>
   );
