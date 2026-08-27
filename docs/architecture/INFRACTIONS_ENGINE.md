@@ -1,8 +1,8 @@
 # Shinã Infractions Engine — Gestão de Infrações, Responsabilidade e Multas
 
-**Status (2026-08-27): Fases A–H e J (segurança) entregues e verificadas em produção. Fase I
-(CSV real + `docs/integrations/SENATRAN_INFRACTIONS.md`) ainda não começada — ver "Pendências" no
-fim deste documento.**
+**Status (2026-08-27): Fases A–J entregues e verificadas em produção — o roadmap original
+(seção 61 do spec) está completo. Pendências reais continuam listadas no fim deste documento;
+"completo" aqui significa as fases nomeadas, não 100% do spec.**
 
 Log corrido do módulo, no mesmo padrão de `docs/architecture/INSPECTION_ENGINE.md` — cada fase
 atualiza este arquivo com o que foi entregue, decisões tomadas e pendências.
@@ -251,11 +251,53 @@ chamado de dentro da rota vs. a mesma chamada rodada como script standalone, que
 verificação real foi refeita direto contra o deploy de produção. Registrado aqui para a próxima
 sessão não repetir a mesma investigação.
 
+## Fase I — Importação CSV + Provider Foundation (entregue)
+
+`infraction-csv-import.ts` (novo, puro, sem `SupabaseClient`, testável isolado — 14 testes):
+`parseCsv()` (delimitador vírgula/ponto-e-vírgula autodetectado, suporte a campo entre aspas, sem
+dependência externa), `suggestColumnMapping()` (sugestão por semelhança de nome de cabeçalho —
+sempre confirmável/editável pelo tenant, nunca aplicada sem confirmação), `mapCsvRows()`
+(validação linha a linha — uma linha inválida nunca derruba o lote, item 34). Datas BR
+(`dd/mm/aaaa`) e valores BR (`"195,34"`) parseados sem inventar um fallback quando falham.
+
+`POST /api/infractions/import/preview` (headers + 5 linhas de amostra + mapeamento sugerido,
+somente leitura) → `POST /api/infractions/import` (import real, mesmo pipeline
+`CsvInfractionProvider` → `ingestInfraction()` que a entrada manual usa — dedup/matching
+idênticos independente da fonte). Todo o lote é rastreado em `infraction_provider_sync_runs`
+(schema existia desde a Fase B, sem uso até agora) — contagem recebidas/criadas/duplicadas/
+falhadas + log de erro por linha. UI: `InfractionCsvImportModal`, upload ou colar → mapeamento com
+amostra ao vivo → resultado.
+
+**Bug real encontrado e corrigido durante a verificação ao vivo** (reimportar o mesmo CSV duas
+vezes criava duas infrações em vez de deduplicar): `infractions_fallback_dedup_idx`
+`(auto_number, plate, occurred_at, authority_code) where external_id is null` é um índice único
+padrão — Postgres trata cada `NULL` como distinto de outro `NULL`, então duas linhas com
+`auto_number=NULL`/`authority_code=NULL` (o caso comum de uma linha de CSV ou entrada manual sem
+número de auto) nunca colidiam. O pré-check de aplicação tinha o mesmo bug pelo lado inverso
+(`.eq("auto_number", dedupKey.autoNumber ?? "")` nunca casa com uma coluna genuinamente `NULL`).
+Corrigido nas duas camadas: migration `20260110000000` recria o índice com `NULLS NOT DISTINCT`
+(Postgres 15+, confirmado suportado pelo projeto hospedado — aplicar a migration contra as linhas
+duplicadas reais deixadas pela primeira tentativa de verificação falhou alto e claro com
+`SQLSTATE 23505`, confirmação viva extra do bug antes do fix), e `infraction-ingest.ts` passa a
+usar `.is(col, null)` em vez de `.eq(col, "")` quando o campo está genuinamente ausente. Reverificado
+ao vivo depois do fix: reimportar o mesmo CSV agora deduplica corretamente (5/5 checks).
+Também corrigido no mesmo achado: `suggestColumnMapping()` mapeava "Descrição" e "Data da
+Infração" para a mesma coluna (hint genérico "infração" colidia com qualquer cabeçalho de data) —
+hints de `description` restritos, com teste de regressão.
+
+`docs/integrations/SENATRAN_INFRACTIONS.md` (novo) — por que "SNE" não é o nome certo pra
+modelar o domínio (múltiplos sistemas federais/estaduais/municipais, não um único endpoint),
+inventário do que já existe no código pronto para plugar um adapter real
+(`NullOfficialProvider`, enum `infraction_source`, interface `InfractionProvider`), e a lista
+explícita de `TO_BE_CONFIRMED` que bloqueia qualquer implementação real (qual API, modelo de
+credencial, pull vs. push, se indicação/defesa têm protocolo oficial) — nenhum código de
+integração oficial foi escrito, só o documento.
+
+150/150 testes de `apps/web` passam (135 anteriores + 15 novos de CSV import, incluindo o de
+regressão do bug de mapeamento), typecheck limpo em todo o monorepo.
+
 ## Pendências (não construídas nesta rodada)
 
-- **Fase I** — importação CSV real (upload → preview → mapeamento de coluna → validação →
-  import; não existe precedente algum no repo para esse fluxo, seria 100% novo),
-  `CsvInfractionProvider` ligado a uma rota real, `docs/integrations/SENATRAN_INFRACTIONS.md`.
 - Testes E2E dos 3 cenários críticos do spec com HTTP completo (feliz, contestação,
   unmatched-depois-reprocessado) — a Fase J cobriu isolamento e o gate de billing, não o fluxo
   completo ponta a ponta dos 3 cenários.
