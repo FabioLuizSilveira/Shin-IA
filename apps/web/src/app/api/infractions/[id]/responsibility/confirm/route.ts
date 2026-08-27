@@ -4,6 +4,7 @@ import { requireTenantScope, isReadOnlyScope, hasTenantPermission } from "@/lib/
 import { logActivity } from "@/lib/activity-log";
 import { createNotification } from "@/lib/notifications/create-notification";
 import { canTransitionCase, type InfractionResponsiblePartyType } from "@shina/infractions-engine";
+import { ensureInfractionCharge } from "@/lib/infraction-billing";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: current, error: fetchError } = await scope.db
     .from("infraction_cases")
-    .select("id, status, responsible_party_type, responsible_party_id")
+    .select("id, status, contract_id, responsible_party_type, responsible_party_id")
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
@@ -90,6 +91,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     body: "Um responsável foi confirmado para uma infração.",
     priority: "normal",
     recipient,
+  });
+
+  // Fase G: cobre o caso em que o pagamento to_authority já existia antes
+  // da confirmação (a ordem pode ir nos dois sentidos) -- ensureInfractionCharge()
+  // é idempotente e decide sozinha se um pagamento elegível já existe.
+  void ensureInfractionCharge(scope.db, {
+    id: current.id,
+    tenant_id: scope.tenantId,
+    contract_id: current.contract_id,
+    responsible_party_type: responsibleType,
+    responsible_party_id: responsibleId,
+    responsibility_confirmed_at: new Date().toISOString(),
   });
 
   return NextResponse.json({ data: { ok: true } });

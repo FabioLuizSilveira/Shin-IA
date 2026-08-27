@@ -3,6 +3,7 @@ import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, hasTenantPermission } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 import { canTransitionCase } from "@shina/infractions-engine";
+import { ensureInfractionCharge } from "@/lib/infraction-billing";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: infractionCase, error: caseError } = await scope.db
     .from("infraction_cases")
-    .select("id, status")
+    .select(
+      "id, status, contract_id, responsible_party_type, responsible_party_id, responsibility_confirmed_at",
+    )
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
@@ -70,6 +73,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .update({ status: "paid", updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("tenant_id", scope.tenantId);
+  }
+
+  // Fase G: a cobrança de reembolso só é elegível depois que este
+  // pagamento to_authority existe com valor real -- ensureInfractionCharge()
+  // ainda decide sozinha se as outras condições (responsabilidade
+  // confirmada, tipo customer) também estão satisfeitas.
+  if (body.kind === "to_authority" && body.amountPaidCents) {
+    void ensureInfractionCharge(scope.db, {
+      id: infractionCase.id,
+      tenant_id: scope.tenantId,
+      contract_id: infractionCase.contract_id,
+      responsible_party_type: infractionCase.responsible_party_type,
+      responsible_party_id: infractionCase.responsible_party_id,
+      responsibility_confirmed_at: infractionCase.responsibility_confirmed_at,
+    });
   }
 
   void logActivity(scope.db, {
