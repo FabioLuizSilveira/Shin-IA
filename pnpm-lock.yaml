@@ -323,6 +323,9 @@ importers:
       '@shina/identity':
         specifier: workspace:*
         version: link:../../packages/identity
+      '@shina/infractions-engine':
+        specifier: workspace:*
+        version: link:../../packages/infractions-engine
       '@shina/inspection-engine':
         specifier: workspace:*
         version: link:../../packages/inspection-engine

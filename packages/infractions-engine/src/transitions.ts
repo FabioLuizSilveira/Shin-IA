@@ -13,7 +13,11 @@ export const ALLOWED_CASE_TRANSITIONS: Record<InfractionCaseStatus, InfractionCa
   matched: ["responsibility_pending", "cancelled"],
   responsibility_pending: ["responsibility_suggested", "responsibility_confirmed", "cancelled"],
   responsibility_suggested: ["responsibility_confirmed", "responsibility_pending", "cancelled"],
-  responsibility_confirmed: ["notified", "disputed", "cancelled"],
+  // "responsibility_pending" is reachable from confirmed too — a
+  // confirmed responsibility can be walked back (item 22's dispute flow,
+  // or a reviewer catching a mistake after the fact), not just from the
+  // suggested state.
+  responsibility_confirmed: ["notified", "disputed", "responsibility_pending", "cancelled"],
   disputed: ["responsibility_pending", "responsibility_confirmed", "cancelled"],
   notified: ["action_pending", "driver_identification_pending", "cancelled"],
   driver_identification_pending: ["driver_identified", "action_pending", "cancelled"],

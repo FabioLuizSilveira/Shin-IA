@@ -22,6 +22,7 @@
     "@shina/flow-engine": "workspace:*",
     "@shina/icons": "workspace:*",
     "@shina/identity": "workspace:*",
+    "@shina/infractions-engine": "workspace:*",
     "@shina/inspection-engine": "workspace:*",
     "@shina/landing": "workspace:*",
     "@shina/reporting-engine": "workspace:*",
