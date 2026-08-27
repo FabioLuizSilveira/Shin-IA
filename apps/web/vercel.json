@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/forfeit-reservations",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/infraction-deadlines",
+      "schedule": "0 7 * * *"
     }
   ]
 }

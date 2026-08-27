@@ -3,6 +3,7 @@ import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, hasTenantPermission } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 import { ingestInfraction } from "@/lib/infraction-ingest";
+import { createDeadlinesForCase } from "@/lib/infraction-deadlines";
 import { ManualInfractionProvider } from "@shina/infractions-engine";
 import type { ExternalInfraction, InfractionCaseStatus } from "@shina/infractions-engine";
 
@@ -103,6 +104,25 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await ingestInfraction(scope.db, normalized, scope.userId, scope.tenantId);
+
+    if (!result.deduplicated) {
+      // Deadlines (item 16/17) only make sense once the case has a real
+      // tenant — created right after ingest for the manual-entry path,
+      // since the tenant is already known here (unlike CSV/official
+      // import, where matching may resolve the tenant later).
+      const { data: infractionRow } = await scope.db
+        .from("infractions")
+        .select(
+          "driver_identification_deadline, defense_deadline, discount_deadline, payment_deadline",
+        )
+        .eq("id", result.infractionId)
+        .maybeSingle();
+      if (infractionRow) {
+        await createDeadlinesForCase(scope.db, scope.tenantId, result.caseId, infractionRow).catch(
+          () => {},
+        );
+      }
+    }
 
     void logActivity(scope.db, {
       tenantId: scope.tenantId,
