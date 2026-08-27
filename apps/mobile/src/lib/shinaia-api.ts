@@ -214,32 +214,42 @@ export interface BillingSummary {
 }
 
 // ── Inspection Engine (docs/architecture/INSPECTION_ENGINE.md) ─────────────
-// Types kept intentionally loose (matching the API's real JSON shape,
-// snake_case as returned) rather than re-deriving from
+// Types kept intentionally loose rather than re-deriving from
 // @shina/inspection-engine — this app has no workspace dependency on that
 // package, same posture already used for OperationItem/AssetItem above.
+// IMPORTANT: template items/sections are camelCase, NOT snake_case —
+// they come back through createInspectionTemplateRepository
+// (apps/web/src/lib/inspection-repository.ts), which maps DB rows to
+// packages/inspection-engine/src/types.ts's HydratedInspectionTemplate
+// shape (fieldType/minPhotos/selectOptions/sortOrder). Found live via a
+// real browser E2E test: this file previously claimed snake_case here,
+// which silently made every photo/boolean/select/condition item on the
+// real capture screen fall through to a plain text input — the same bug
+// existed on the Customer Portal's web fill page and was fixed there
+// first. Responses/media below (item_id, value_text, etc.) are genuinely
+// snake_case — those come from raw Supabase rows, not the repository.
 export interface InspectionTemplateItem {
   id: string;
-  section_id?: string;
+  sectionId?: string;
   key: string;
   label: string;
-  field_type: string;
+  fieldType: string;
   required: boolean;
   instructions: string | null;
-  reference_image_url: string | null;
-  min_photos: number | null;
-  max_photos: number | null;
-  select_options: { value: string; label: string; severity?: string }[] | null;
+  referenceImageUrl: string | null;
+  minPhotos: number | null;
+  maxPhotos: number | null;
+  selectOptions: { value: string; label: string; severity?: string }[] | null;
   condition: { field: string; op: string; value: unknown } | null;
-  approval_gate: boolean;
-  sort_order: number;
+  approvalGate: boolean;
+  sortOrder: number;
 }
 export interface InspectionTemplateSection {
   id: string;
   key: string;
   title: string;
   instructions: string | null;
-  sort_order: number;
+  sortOrder: number;
   items: InspectionTemplateItem[];
 }
 export interface InspectionTemplate {

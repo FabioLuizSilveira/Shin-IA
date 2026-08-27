@@ -171,8 +171,8 @@ export function InspectionCaptureScreen() {
           mediaCountByItemId.set(m.item_id, (mediaCountByItemId.get(m.item_id) ?? 0) + 1);
       }
       const firstMissingIndex = items.findIndex((it) => {
-        if (isPhotoType(it.field_type)) {
-          const min = it.min_photos ?? (it.required ? 1 : 0);
+        if (isPhotoType(it.fieldType)) {
+          const min = it.minPhotos ?? (it.required ? 1 : 0);
           return (mediaCountByItemId.get(it.id) ?? 0) < min;
         }
         return it.required && !responseByItemId.get(it.id);
@@ -352,8 +352,8 @@ function ChecklistItemStep({
   const [markerSaving, setMarkerSaving] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
 
-  const minPhotos = item.min_photos ?? (item.required ? 1 : 0);
-  const photoSatisfied = !isPhotoType(item.field_type) || mediaCount >= minPhotos;
+  const minPhotos = item.minPhotos ?? (item.required ? 1 : 0);
+  const photoSatisfied = !isPhotoType(item.fieldType) || mediaCount >= minPhotos;
 
   async function saveValue(value: {
     valueText?: string | null;
@@ -412,7 +412,7 @@ function ChecklistItemStep({
         <Text style={T.display(theme.font.xxl)}>{item.label}</Text>
         {item.instructions && <Text style={T.text()}>{item.instructions}</Text>}
 
-        {isPhotoType(item.field_type) ? (
+        {isPhotoType(item.fieldType) ? (
           <Card style={{ gap: theme.spacing.md, alignItems: "center" }}>
             {cameraOpen ? (
               <InlineCamera
@@ -490,7 +490,7 @@ function ChecklistItemStep({
               </>
             )}
           </Card>
-        ) : item.field_type === "boolean" ? (
+        ) : item.fieldType === "boolean" ? (
           <View style={{ flexDirection: "row", gap: theme.spacing.md }}>
             <ChoiceButton
               label="Sim"
@@ -503,9 +503,9 @@ function ChecklistItemStep({
               onPress={() => void saveValue({ valueBoolean: false })}
             />
           </View>
-        ) : item.field_type === "single_select" || item.field_type === "condition" ? (
+        ) : item.fieldType === "single_select" || item.fieldType === "condition" ? (
           <View style={{ gap: theme.spacing.sm }}>
-            {(item.select_options ?? []).map((opt) => (
+            {(item.selectOptions ?? []).map((opt) => (
               <ChoiceButton
                 key={opt.value}
                 label={opt.label}
@@ -520,14 +520,14 @@ function ChecklistItemStep({
             <SimpleTextInput
               value={textValue}
               keyboardType={
-                ["number", "odometer", "hour_meter", "percentage"].includes(item.field_type)
+                ["number", "odometer", "hour_meter", "percentage"].includes(item.fieldType)
                   ? "numeric"
                   : "default"
               }
               onChangeText={setTextValue}
               onBlur={() => {
                 const isNumeric = ["number", "odometer", "hour_meter", "percentage"].includes(
-                  item.field_type,
+                  item.fieldType,
                 );
                 void saveValue(
                   isNumeric ? { valueNumber: Number(textValue) || 0 } : { valueText: textValue },
