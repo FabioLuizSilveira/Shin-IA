@@ -28,6 +28,7 @@ import {
   Palette,
   UserCog,
   ClipboardCheck,
+  ShieldAlert,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -48,6 +49,7 @@ const TENANT_NAV_ITEMS = [
   { href: "/tenant/resources", label: "Recursos", icon: Users2 },
   { href: "/tenant/assets", label: "Frota & Ativos", icon: Truck },
   { href: "/tenant/inspections", label: "Vistorias", icon: ClipboardCheck },
+  { href: "/tenant/infractions", label: "Infrações", icon: ShieldAlert },
   { href: "/tenant/crm", label: "Clientes & Parceiros", icon: Users },
   { href: "/tenant/contracts", label: "Contratos", icon: FileText },
   { href: "/tenant/operators", label: "Operadores", icon: UserCog },
