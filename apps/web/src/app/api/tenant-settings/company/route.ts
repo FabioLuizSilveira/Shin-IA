@@ -15,7 +15,9 @@ export async function GET() {
 
   const { data, error } = await scope.db
     .from("tenants")
-    .select("id, name, slug, plan, status, default_currency, metadata")
+    .select(
+      "id, name, slug, plan, status, default_currency, metadata, customer_self_inspection_enabled",
+    )
     .eq("id", scope.tenantId)
     .single();
   if (error) return internalError(error);
@@ -40,6 +42,7 @@ export async function PATCH(req: NextRequest) {
     name?: string;
     default_currency?: string;
     metadata?: Record<string, unknown>;
+    customer_self_inspection_enabled?: boolean;
   };
 
   if (body.name !== undefined && !body.name.trim()) {
@@ -50,12 +53,17 @@ export async function PATCH(req: NextRequest) {
   if (body.name !== undefined) update.name = body.name.trim();
   if (body.default_currency !== undefined) update.default_currency = body.default_currency;
   if (body.metadata !== undefined) update.metadata = body.metadata;
+  if (body.customer_self_inspection_enabled !== undefined) {
+    update.customer_self_inspection_enabled = body.customer_self_inspection_enabled;
+  }
 
   const { data, error } = await scope.db
     .from("tenants")
     .update(update)
     .eq("id", scope.tenantId)
-    .select("id, name, slug, plan, status, default_currency, metadata")
+    .select(
+      "id, name, slug, plan, status, default_currency, metadata, customer_self_inspection_enabled",
+    )
     .single();
   if (error) return internalError(error);
 

@@ -22,6 +22,7 @@ interface Company {
   status: string;
   default_currency: string;
   metadata: { support_email?: string; phone?: string };
+  customer_self_inspection_enabled: boolean;
   can_edit: boolean;
 }
 
@@ -55,6 +56,7 @@ export default function TenantSettingsPage() {
     default_currency: "BRL",
     support_email: "",
     phone: "",
+    customer_self_inspection_enabled: false,
   });
   const [companySaving, setCompanySaving] = useState(false);
   const [companySaved, setCompanySaved] = useState(false);
@@ -84,6 +86,8 @@ export default function TenantSettingsPage() {
           default_currency: companyJson.data.default_currency,
           support_email: companyJson.data.metadata?.support_email ?? "",
           phone: companyJson.data.metadata?.phone ?? "",
+          customer_self_inspection_enabled:
+            companyJson.data.customer_self_inspection_enabled ?? false,
         });
       }
     } finally {
@@ -132,6 +136,7 @@ export default function TenantSettingsPage() {
             support_email: companyForm.support_email || undefined,
             phone: companyForm.phone || undefined,
           },
+          customer_self_inspection_enabled: companyForm.customer_self_inspection_enabled,
         }),
       });
       const json = (await res.json()) as { data?: Company };
@@ -293,6 +298,31 @@ export default function TenantSettingsPage() {
                 className={inputClass}
               />
             </Field>
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+              <label className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={companyForm.customer_self_inspection_enabled}
+                  onChange={(e) =>
+                    setCompanyForm((f) => ({
+                      ...f,
+                      customer_self_inspection_enabled: e.target.checked,
+                    }))
+                  }
+                />
+                <span>
+                  <span className="block font-medium text-slate-900 dark:text-white">
+                    Permitir vistoria pelo próprio cliente
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    Quando ativado, o cliente pode iniciar e preencher a própria vistoria digital
+                    (check-in/check-out) pelo Portal do Cliente, sem depender de um operador/equipe.
+                    Desativado por padrão — a vistoria continua interna ao tenant.
+                  </span>
+                </span>
+              </label>
+            </div>
           </fieldset>
           {company?.can_edit && (
             <button
