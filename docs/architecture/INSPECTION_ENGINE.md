@@ -747,3 +747,30 @@ de produção e os 125 testes vitest de `apps/web` seguem limpos.
 
 **Não testado**: fluxo real navegado no browser (só verificado via script contra o banco +
 typecheck/build); UI do Customer Portal não foi aberta visualmente nesta rodada.
+
+### Atualização — navegado de ponta a ponta no browser (mesma rodada)
+
+O fluxo acima **foi** navegado de verdade num browser real (login como cliente demo, toggle
+ligado ao vivo, "Iniciar vistoria", checklist completo, 5 fotos obrigatórias, envio) — não ficou
+só no script. Dois bugs reais foram encontrados e corrigidos com deploy em produção:
+
+1. **Bug nesta feature**: a página de preenchimento assumia `snake_case` (`field_type`,
+   `min_photos`) nos itens do template, mas `createInspectionTemplateRepository` sempre retornou
+   `camelCase` (`fieldType`, `minPhotos`, `selectOptions` —
+   `packages/inspection-engine/src/types.ts`). Todo item de foto/booleano/seleção caía
+   silenciosamente num campo de texto genérico. Corrigido.
+2. **Bug pré-existente, mais grave, encontrado na mesma auditoria**: o mesmo erro de
+   `snake_case`/`camelCase` existia em `apps/mobile/src/lib/shinaia-api.ts` desde a Fase D —
+   ou seja, a tela real de captura do operador (`InspectionCaptureScreen`) **nunca renderizou
+   corretamente** nenhum item de foto/booleano/seleção/condição, porque só foi verificada por
+   `expo export` estático, nunca rodada contra dado real num browser/device. Corrigido
+   (`apps/mobile/src/lib/shinaia-api.ts` + `InspectionCaptureScreen.tsx` migrados para
+   `camelCase`, verificado por typecheck + `expo export` novamente).
+3. **Bug de dado, não de código**: todo item `field_type='condition'` nos dois templates globais
+   (`vehicle_standard_v1`, `equipment_standard_v1`) foi seedado com `select_options = null`,
+   incluindo dois obrigatórios (`Pneus`, `Funcionamento geral`) — tornava **qualquer** vistoria
+   desses templates impossível de completar, para qualquer ator. Corrigido via migration de
+   backfill de dados (`20260104000000`), aplicada no banco hospedado real.
+
+Todos os três já estão em produção. Ambiente de teste (tenant/asset/vistoria/mídia/assinatura)
+foi criado, exercitado e limpo — produção restaurada ao estado anterior ao teste.
