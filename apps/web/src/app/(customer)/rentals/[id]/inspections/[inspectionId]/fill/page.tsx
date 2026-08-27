@@ -4,14 +4,19 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Camera, CheckCircle2 } from "lucide-react";
 
+// Matches HydratedInspectionTemplate (packages/inspection-engine/src/types.ts)
+// as returned by createInspectionTemplateRepository — camelCase, unlike
+// the raw snake_case DB rows the rest of this page's response/media
+// state comes from (those are read directly off inspection_responses/
+// inspection_media, not through the repository).
 interface TemplateItem {
   id: string;
   label: string;
   instructions: string | null;
-  field_type: string;
+  fieldType: string;
   required: boolean;
-  min_photos: number | null;
-  select_options: { value: string; label: string; severity?: string }[] | null;
+  minPhotos: number | null;
+  selectOptions: { value: string; label: string; severity?: string }[] | null;
 }
 interface TemplateSection {
   id: string;
@@ -241,7 +246,7 @@ export default function RentalInspectionFillPage() {
                     <p className="text-xs text-slate-400">{item.instructions}</p>
                   )}
 
-                  {PHOTO_TYPES.has(item.field_type) ? (
+                  {PHOTO_TYPES.has(item.fieldType) ? (
                     <div className="flex items-center gap-3">
                       <label className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 cursor-pointer">
                         {saving ? (
@@ -264,11 +269,11 @@ export default function RentalInspectionFillPage() {
                         />
                       </label>
                       <span className="text-xs text-slate-500">
-                        {mediaCount} / {item.min_photos || (item.required ? 1 : 0)} foto
-                        {item.min_photos === 1 ? "" : "s"}
+                        {mediaCount} / {item.minPhotos || (item.required ? 1 : 0)} foto
+                        {item.minPhotos === 1 ? "" : "s"}
                       </span>
                     </div>
-                  ) : item.field_type === "boolean" ? (
+                  ) : item.fieldType === "boolean" ? (
                     <div className="flex gap-2">
                       <button
                         onClick={() => void saveResponse(item.id, { valueBoolean: true })}
@@ -283,9 +288,9 @@ export default function RentalInspectionFillPage() {
                         Não
                       </button>
                     </div>
-                  ) : item.field_type === "single_select" || item.field_type === "condition" ? (
+                  ) : item.fieldType === "single_select" || item.fieldType === "condition" ? (
                     <div className="flex flex-wrap gap-2">
-                      {(item.select_options ?? []).map((opt) => (
+                      {(item.selectOptions ?? []).map((opt) => (
                         <button
                           key={opt.value}
                           onClick={() => void saveResponse(item.id, { valueJson: opt })}
@@ -297,16 +302,16 @@ export default function RentalInspectionFillPage() {
                     </div>
                   ) : (
                     <input
-                      type={NUMERIC_TYPES.has(item.field_type) ? "number" : "text"}
+                      type={NUMERIC_TYPES.has(item.fieldType) ? "number" : "text"}
                       defaultValue={
-                        NUMERIC_TYPES.has(item.field_type)
+                        NUMERIC_TYPES.has(item.fieldType)
                           ? (response?.value_number ?? "")
                           : (response?.value_text ?? "")
                       }
                       onBlur={(e) =>
                         void saveResponse(
                           item.id,
-                          NUMERIC_TYPES.has(item.field_type)
+                          NUMERIC_TYPES.has(item.fieldType)
                             ? { valueNumber: Number(e.target.value) || 0 }
                             : { valueText: e.target.value },
                         )
