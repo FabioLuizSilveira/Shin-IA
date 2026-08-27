@@ -1,7 +1,8 @@
 # Shinã Infractions Engine — Gestão de Infrações, Responsabilidade e Multas
 
-**Status: Fase A (Architecture Assessment) concluída. Execução em andamento — ver seções
-seguintes conforme cada fase é entregue.**
+**Status (2026-08-27): Fases A–H entregues e no ar em produção. Fase I (CSV real +
+`docs/integrations/SENATRAN_INFRACTIONS.md`) e Fase J (isolamento permanente/E2E de segurança)
+ainda não começadas — ver "Pendências" no fim deste documento.**
 
 Log corrido do módulo, no mesmo padrão de `docs/architecture/INSPECTION_ENGINE.md` — cada fase
 atualiza este arquivo com o que foi entregue, decisões tomadas e pendências.
@@ -133,3 +134,84 @@ Fase B (schema/migrations/RLS/IAM) → Fase C (ingestão/normalização/dedup) �
 asset + temporal + responsabilidade) → Fase E (prazos + notificações) → Fase F (indicação/
 defesa/contestação/pagamento) → Fase G (billing + reporting) → Fase H (Tenant Web + mobile) →
 Fase I (CSV + provider foundation) → Fase J (hardening/E2E/isolamento).
+
+---
+
+## Fase B — Schema, `packages/infractions-engine`, IAM (entregue)
+
+4 migrations (`20260105000000` a `20260108000000`): 10 tabelas + 15 enums, RLS select-only por
+`tenant_id` do JWT em todas, mais a policy de cliente via `rental_customer_organizations` (mesma
+cadeia de subquery já usada em `contracts`). IAM seedado (`tenant.infractions.*` +
+`customer.infractions.view/respond`), grant automático a `tenant_owner`/`tenant_admin`.
+`packages/infractions-engine` criado espelhando `packages/inspection-engine` (types, normalize,
+dedup, matching, responsibility, deadline, transitions, providers) — 29 testes, 99%
+statement/81.8% branch coverage.
+
+**Bug real pego antes de dado de produção**: `infraction_cases.tenant_id` estava `not null`, mas
+um caso pode nascer `unmatched` (tenant ainda desconhecido) — corrigido via
+`20260107000000_infraction_cases_nullable_tenant.sql` antes de qualquer insert real acontecer.
+
+## Fase C — Ingestão, matching, prazos (entregue)
+
+`ingestInfraction()` (dedup via os dois índices únicos parciais + matching de asset por
+placa/RENAVAM, nunca escolhendo sozinho em caso de ambiguidade), `resolveTemporalContext()`
+(resolve contrato/operação/alocação/operador cobrindo `occurred_at`, chama
+`suggestResponsibility()`), `createDeadlinesForCase()`/`sweepInfractionDeadlines()` (cron diário,
+`api/cron/infraction-deadlines`, um alerta por limiar 7/3/1 dias + um ao virar `overdue`, via
+`alerted_thresholds`).
+
+## Fase D — Rotas de match e responsabilidade (entregue)
+
+`POST /api/infractions` (entrada manual, mesmo pipeline que qualquer provider usaria),
+`GET/POST /api/infractions/[id]/match`, `/responsibility/suggest`, `/confirm`, `/reject` — o
+humano sempre decide, a sugestão nunca vira decisão sozinha. **Pendência conhecida**: reprocessar
+casos genuinamente `unmatched` (tenant ainda desconhecido) fica para um cron futuro, não uma rota
+de usuário — não implementado ainda.
+
+## Fase E — Prazos ao vivo (entregue)
+
+Verificado contra o banco hospedado: insert de deadline com enum inválido rejeitado pelo Postgres
+(confirma que o enum é real, não só declarado); sweep recalculando status e disparando
+notificação certa por limiar.
+
+## Fase F — Fluxo operacional (entregue)
+
+`disputes` (POST/PATCH, aceitar uma contestação devolve a responsabilidade para `pending`),
+`driver-identification` (POST/PATCH, minimiza dado pessoal — só `operator_id` quando o condutor
+já é cadastrado), `defense`/`appeal` (registro administrativo, nunca protocola sozinho numa
+autoridade), `payment` (kind `to_authority` vs. `reimbursement_from_responsible`, dois conceitos
+nunca misturados numa linha).
+
+## Fase G — Billing (entregue)
+
+`ensureInfractionCharge()` (`apps/web/src/lib/infraction-billing.ts`), mirror literal de
+`ensureFindingCharge()`. Só dispara com responsabilidade confirmada + parte `customer` + um
+pagamento `to_authority` real já registrado — nunca no recebimento da infração. Coluna nova
+`invoice_line_items.infraction_case_id` (migration `20260109000000`), verificada ao vivo contra o
+banco hospedado (insert → select → cleanup). **Reembolso de operador é uma lacuna conhecida** —
+sem trilho de fatura/organização hoje, fica para o tenant resolver internamente (folha/acerto).
+KPI de Reporting (`packages/reporting-engine`) **não construído** nesta rodada — risco de escopo
+já registrado na Fase A, mantido como pendência.
+
+## Fase H — Tenant Web UI (entregue)
+
+`tenant/infractions` (lista com filtros de status, lançamento manual) + `InfractionDetail`
+(drawer: resumo, sugerir/confirmar/rejeitar responsabilidade, prazos, contestação, registro de
+pagamento). Item novo "Infrações" na sidebar. **Fora do drawer nesta rodada**: UI dedicada para
+indicação de condutor e defesa/recurso — as rotas de API já existem (Fase F), só falta a tela;
+telas mobile (operador/gestor) e Contract-Center-style self-service do cliente/operador também
+não foram construídas. Preview local verificado sem erro de console; typecheck limpo em todo o
+monorepo em cada fase.
+
+## Pendências (não construídas nesta rodada)
+
+- **Fase I** — importação CSV real (upload → preview → mapeamento de coluna → validação →
+  import; não existe precedente algum no repo para esse fluxo, seria 100% novo),
+  `CsvInfractionProvider` ligado a uma rota real, `docs/integrations/SENATRAN_INFRACTIONS.md`.
+- **Fase J** — suite de isolamento permanente (tenant×tenant, operator×operator, customer×
+  customer, seguindo o padrão `mobile-*-scope.ts` já usado no Inspection Engine) e testes E2E dos
+  3 cenários críticos do spec (feliz, contestação, unmatched-depois-reprocessado).
+- Reprocessamento de casos `unmatched` via cron (Fase D, mencionado acima).
+- UI de indicação de condutor / defesa / recurso, telas mobile, self-service do cliente/operador.
+- KPI cards de Reporting.
+- Reembolso quando o responsável é `operator` (sem trilho de billing hoje).
