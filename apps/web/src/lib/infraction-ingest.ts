@@ -41,15 +41,31 @@ export async function ingestInfraction(
           .select("id")
           .eq("source", dedupKey.source)
           .eq("external_id", dedupKey.externalId!)
-      : db
-          .from("infractions")
-          .select("id")
-          .eq("source", dedupKey.source)
-          .is("external_id", null)
-          .eq("auto_number", dedupKey.autoNumber ?? "")
-          .eq("plate", dedupKey.plate ?? "")
-          .eq("occurred_at", dedupKey.occurredAt ?? "")
-          .eq("authority_code", dedupKey.authorityCode ?? "");
+      : (() => {
+          // dedupKey.autoNumber/authorityCode are genuinely undefined
+          // (not "") whenever the source infraction has no value for
+          // them -- and the DB stores that as NULL, not ''. .eq(col, "")
+          // never matches a NULL column, so a plain .eq() chain here
+          // silently failed to find a real duplicate whenever both were
+          // absent (found live during Fase I CSV import verification;
+          // see infractions_fallback_dedup_idx's NULLS NOT DISTINCT fix,
+          // migration 20260110000000, which is the layer that actually
+          // enforces this -- this query is only the cheap pre-check).
+          let q = db
+            .from("infractions")
+            .select("id")
+            .eq("source", dedupKey.source)
+            .is("external_id", null)
+            .eq("plate", dedupKey.plate ?? "")
+            .eq("occurred_at", dedupKey.occurredAt ?? "");
+          q = dedupKey.autoNumber
+            ? q.eq("auto_number", dedupKey.autoNumber)
+            : q.is("auto_number", null);
+          q = dedupKey.authorityCode
+            ? q.eq("authority_code", dedupKey.authorityCode)
+            : q.is("authority_code", null);
+          return q;
+        })();
 
   const { data: existing } = await existingQuery.maybeSingle();
   if (existing) {

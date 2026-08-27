@@ -56,6 +56,12 @@ describe("suggestColumnMapping", () => {
     const mapping = suggestColumnMapping(["column_x", "column_y"]);
     expect(mapping.plate).toBeUndefined();
   });
+
+  it("never maps 'Data da Infração' to description -- regression for a real bug found live in fase i", () => {
+    const mapping = suggestColumnMapping(["Placa", "Data da Infração", "Descrição", "Valor"]);
+    expect(mapping.occurredAt).toBe("Data da Infração");
+    expect(mapping.description).toBe("Descrição");
+  });
 });
 
 describe("mapCsvRows", () => {

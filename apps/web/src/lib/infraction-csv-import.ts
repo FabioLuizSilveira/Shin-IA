@@ -119,7 +119,12 @@ const HEADER_HINTS: Record<CsvImportTargetField, string[]> = {
   authorityCode: ["codigo orgao", "código órgão", "orgao autuador", "órgão autuador"],
   authorityName: ["orgao", "órgão", "autoridade", "authority"],
   infractionCode: ["codigo infracao", "código infração", "enquadramento", "infraction code"],
-  description: ["descricao", "descrição", "infracao", "infração", "description"],
+  // Deliberately does NOT include bare "infracao"/"infração" -- that
+  // matched "Data da Infração" too (found live during Fase I
+  // verification: description and occurredAt both got mapped to the
+  // same header). "descricao da infracao" is specific enough to not
+  // collide with a date-column header.
+  description: ["descricao", "descrição", "descricao da infracao", "description"],
   occurredAt: ["data", "data infracao", "data da infração", "occurred", "date"],
   location: ["local", "endereco", "endereço", "location"],
   municipality: ["municipio", "município", "cidade", "city"],
