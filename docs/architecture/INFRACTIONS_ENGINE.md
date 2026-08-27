@@ -1,8 +1,8 @@
 # Shinã Infractions Engine — Gestão de Infrações, Responsabilidade e Multas
 
-**Status (2026-08-27): Fases A–H entregues e no ar em produção. Fase I (CSV real +
-`docs/integrations/SENATRAN_INFRACTIONS.md`) e Fase J (isolamento permanente/E2E de segurança)
-ainda não começadas — ver "Pendências" no fim deste documento.**
+**Status (2026-08-27): Fases A–H e J (segurança) entregues e verificadas em produção. Fase I
+(CSV real + `docs/integrations/SENATRAN_INFRACTIONS.md`) ainda não começada — ver "Pendências" no
+fim deste documento.**
 
 Log corrido do módulo, no mesmo padrão de `docs/architecture/INSPECTION_ENGINE.md` — cada fase
 atualiza este arquivo com o que foi entregue, decisões tomadas e pendências.
@@ -203,15 +203,66 @@ telas mobile (operador/gestor) e Contract-Center-style self-service do cliente/o
 não foram construídas. Preview local verificado sem erro de console; typecheck limpo em todo o
 monorepo em cada fase.
 
+## Fase J — Segurança (entregue)
+
+Verificação ao vivo contra o banco/deploy de produção reais (não simulada), seguindo o mesmo
+padrão de `INSPECTION_ENGINE.md` Fase G — sessão de usuário real do Tenant A (`Veloz Rent a Car`)
+atacando um caso genuíno criado num Tenant B fixture, via HTTP contra `shin-ia-le1a.vercel.app`:
+
+| Ataque                                                             | Resultado                      |
+| ------------------------------------------------------------------ | ------------------------------ |
+| `GET /api/infractions/:id` de caso de outro tenant                 | `404 Case not found`           |
+| `POST .../responsibility/confirm` em caso de outro tenant          | `404 Case not found`           |
+| `POST .../payment` em caso de outro tenant                         | `404 Case not found`           |
+| `GET /api/infractions` (lista) nunca inclui o caso do outro tenant | `200`, 0 linhas, sem vazamento |
+| Qualquer rota sem sessão (`Authorization` ausente)                 | `401 Unauthorized`             |
+| Controle positivo: Tenant B lendo o próprio caso                   | `200`                          |
+
+6/6 checks passaram. Fixture (role/usuário/infração/caso do Tenant B) removido ao final.
+
+**Camada de RLS testada isoladamente também** (defesa em profundidade — `requireTenantScope()`
+usa o client admin, que ignora RLS; isso prova que a política protege qualquer rota futura que
+use um client autenticado comum em vez do admin): JWT real do Tenant A fazendo `select` direto
+via PostgREST (anon key) em `infraction_cases`/`infractions` do Tenant B — 0 linhas nos dois
+casos, sem erro. Um `select` totalmente anônimo (sem JWT algum) na mesma linha — 0 linhas. 4/4
+checks passaram.
+
+**Auditoria estrutural**: as 12 rotas mutáveis do módulo (`disputes`, `driver-identification`,
+`defense`, `payment`, `match`, `responsibility/*`, `infractions` POST) foram conferidas uma a uma
+— todas chamam `hasTenantPermission()` e `isReadOnlyScope()` antes de qualquer escrita. Nenhuma
+lacuna encontrada.
+
+**Suite permanente nova** (`apps/web/src/__tests__/lib/infraction-billing.test.ts`, 10 testes):
+cobre o gate "nunca automático" de `ensureInfractionCharge()` isoladamente — sem
+`responsibility_confirmed_at`, sem parte `customer`, sem contrato, sem pagamento real, com
+pagamento zerado, contrato sem organização, idempotência (não cobra duas vezes), cobrança
+completa quando as 4 condições valem, criação de `billing_account` sob demanda, e nenhuma linha
+de fatura escrita se o insert da fatura falhar. É a primeira cobertura de teste que qualquer
+helper de billing de `apps/web/src/lib/*.ts` já teve neste projeto — `ensureFindingCharge()`
+(Inspection Engine) nunca teve teste unitário, só verificação ao vivo, lacuna documentada no
+próprio `INSPECTION_ENGINE.md`. Todos os 135 testes de `apps/web` seguem verdes (0 regressão);
+typecheck limpo em todo o monorepo.
+
+**Pendência descoberta durante a Fase J, não um bug**: tentar rodar o mesmo ataque HTTP contra o
+preview local (`next dev`, ambiente sandboxed desta sessão) resultou em `401` universal, inclusive
+no controle positivo — não é uma falha de isolamento, é o processo do servidor local sem saída de
+rede para validar o token junto ao Supabase Auth (confirmado isolando `admin.auth.getUser()`
+chamado de dentro da rota vs. a mesma chamada rodada como script standalone, que funcionou). A
+verificação real foi refeita direto contra o deploy de produção. Registrado aqui para a próxima
+sessão não repetir a mesma investigação.
+
 ## Pendências (não construídas nesta rodada)
 
 - **Fase I** — importação CSV real (upload → preview → mapeamento de coluna → validação →
   import; não existe precedente algum no repo para esse fluxo, seria 100% novo),
   `CsvInfractionProvider` ligado a uma rota real, `docs/integrations/SENATRAN_INFRACTIONS.md`.
-- **Fase J** — suite de isolamento permanente (tenant×tenant, operator×operator, customer×
-  customer, seguindo o padrão `mobile-*-scope.ts` já usado no Inspection Engine) e testes E2E dos
-  3 cenários críticos do spec (feliz, contestação, unmatched-depois-reprocessado).
+- Testes E2E dos 3 cenários críticos do spec com HTTP completo (feliz, contestação,
+  unmatched-depois-reprocessado) — a Fase J cobriu isolamento e o gate de billing, não o fluxo
+  completo ponta a ponta dos 3 cenários.
 - Reprocessamento de casos `unmatched` via cron (Fase D, mencionado acima).
-- UI de indicação de condutor / defesa / recurso, telas mobile, self-service do cliente/operador.
+- UI de indicação de condutor / defesa / recurso, telas mobile, self-service do cliente/operador
+  — e, por consequência, isolamento operator×operator/customer×customer só foi testado na camada
+  de RLS (não existe rota de app ainda que leia infrações por `operator_id`/`customer_id` para
+  testar como `mobile-inspections-scope.ts` testa hoje).
 - KPI cards de Reporting.
 - Reembolso quando o responsável é `operator` (sem trilho de billing hoje).
