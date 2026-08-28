@@ -86,19 +86,28 @@ interface DetailPayload {
   payments: PaymentRow[];
 }
 
+// Full 20-value infraction_case_status enum -- see the matching fix/
+// comment in tenant/infractions/page.tsx's STATUS_LABEL.
 const CASE_STATUS_LABEL: Record<string, string> = {
   received: "Recebida",
-  matching_asset: "Vinculando ativo",
+  matching: "Vinculando ativo",
   unmatched: "Sem ativo vinculado",
   matched: "Ativo vinculado",
   responsibility_pending: "Responsabilidade pendente",
+  responsibility_suggested: "Responsabilidade sugerida",
   responsibility_confirmed: "Responsabilidade confirmada",
+  notified: "Notificado",
+  action_pending: "Ação pendente",
+  disputed: "Contestada",
   driver_identification_pending: "Indicação de condutor pendente",
   driver_identified: "Condutor indicado",
-  disputed: "Contestada",
   defense_pending: "Defesa pendente",
   appealed: "Recurso em andamento",
+  payment_pending: "Pagamento pendente",
   paid: "Paga",
+  overdue: "Vencida",
+  waived: "Perdoada",
+  cancelled: "Cancelada",
   closed: "Encerrada",
 };
 

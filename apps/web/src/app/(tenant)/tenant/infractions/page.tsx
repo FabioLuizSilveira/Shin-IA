@@ -25,19 +25,31 @@ interface InfractionCaseRow {
   [key: string]: unknown;
 }
 
+// Full 20-value infraction_case_status enum (20260105000000_infractions_engine.sql)
+// -- was missing 6 real values and had a dead "matching_asset" entry that
+// never matches the real "matching" status, found while writing E2E
+// scenario checks (a case sitting in an unlisted status silently fell
+// back to the raw enum string instead of a real label).
 const STATUS_LABEL: Record<string, string> = {
   received: "Recebida",
-  matching_asset: "Vinculando ativo",
+  matching: "Vinculando ativo",
   unmatched: "Sem ativo",
   matched: "Ativo vinculado",
   responsibility_pending: "Responsabilidade pendente",
+  responsibility_suggested: "Responsabilidade sugerida",
   responsibility_confirmed: "Responsabilidade confirmada",
+  notified: "Notificado",
+  action_pending: "Ação pendente",
+  disputed: "Contestada",
   driver_identification_pending: "Indicação pendente",
   driver_identified: "Condutor indicado",
-  disputed: "Contestada",
   defense_pending: "Defesa pendente",
   appealed: "Recurso",
+  payment_pending: "Pagamento pendente",
   paid: "Paga",
+  overdue: "Vencida",
+  waived: "Perdoada",
+  cancelled: "Cancelada",
   closed: "Encerrada",
 };
 
@@ -45,17 +57,23 @@ function statusToUi(status: string): "active" | "inactive" | "pending" | "warnin
   switch (status) {
     case "paid":
     case "closed":
+    case "waived":
       return "inactive";
     case "responsibility_confirmed":
     case "driver_identified":
       return "active";
     case "disputed":
     case "unmatched":
+    case "overdue":
+    case "cancelled":
       return "error";
     case "responsibility_pending":
+    case "responsibility_suggested":
+    case "action_pending":
     case "driver_identification_pending":
     case "defense_pending":
     case "appealed":
+    case "payment_pending":
       return "warning";
     default:
       return "pending";
