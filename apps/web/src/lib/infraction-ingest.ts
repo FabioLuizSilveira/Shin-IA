@@ -131,15 +131,28 @@ export async function ingestInfraction(
   }));
   const match = resolveAssetMatch(external.renavam, external.plate, candidates);
 
-  if (match.tenantId) {
-    await db.from("infractions").update({ tenant_id: match.tenantId }).eq("id", infractionId);
+  // Bug found while building the unmatched-reprocessing cron: when the
+  // caller already knows the tenant (tenantHint -- manual entry or CSV
+  // import, both done by an authenticated staff member registering
+  // *their own* fleet's infraction), a failed asset match used to leave
+  // tenant_id null anyway, making the case invisible to that very tenant
+  // via RLS -- indistinguishable from a genuinely external, tenant-unknown
+  // infraction. A vehicle not yet onboarded as an asset is a real,
+  // common case (the ticket often arrives before the asset does), so
+  // "known tenant, no asset yet" must stay visible and correctable via
+  // the existing tenant-scoped POST /api/infractions/:id/match retry --
+  // only a genuinely unknown tenant (no hint) goes into the anonymous
+  // UNMATCHED pool the cron sweep (infraction-unmatched-sweep.ts) processes.
+  const resolvedTenantId = match.tenantId ?? tenantHint ?? null;
+  if (resolvedTenantId) {
+    await db.from("infractions").update({ tenant_id: resolvedTenantId }).eq("id", infractionId);
   }
 
   const caseId = crypto.randomUUID();
   const caseStatus = match.assetId ? "matched" : "unmatched";
   await db.from("infraction_cases").insert({
     id: caseId,
-    tenant_id: match.tenantId, // nullable — stays null until an asset is found (item 5: UNMATCHED)
+    tenant_id: resolvedTenantId, // nullable — null only when the tenant is genuinely unknown (item 5)
     infraction_id: infractionId,
     status: caseStatus,
     asset_id: match.assetId,

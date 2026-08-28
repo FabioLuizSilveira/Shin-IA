@@ -341,12 +341,12 @@ describe("KpiEngine", () => {
     expect(kpi.changePercent).toBeNull();
   });
 
-  it("computes all 6 KPI types", async () => {
+  it("computes all 7 KPI types", async () => {
     const provider = makeProvider(50, 40);
     const engine = new KpiEngine(provider);
     const kpis = await engine.computeAll("tenant-1", period);
 
-    expect(kpis).toHaveLength(6);
+    expect(kpis).toHaveLength(7);
     const types: KpiType[] = [
       "operations",
       "assets",
@@ -354,6 +354,7 @@ describe("KpiEngine", () => {
       "commissions",
       "utilization",
       "tracking",
+      "infractions",
     ];
     for (const type of types) {
       expect(kpis.find((k) => k.type === type)).toBeDefined();
@@ -374,6 +375,7 @@ describe("KpiEngine", () => {
       "commissions",
       "utilization",
       "tracking",
+      "infractions",
     ];
     const engine = new KpiEngine(makeProvider());
     for (const type of types) {

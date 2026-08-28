@@ -100,6 +100,28 @@ async function distinctResourceCountFromOperations(
   return new Set((data ?? []).map((r) => r.resource_id)).size;
 }
 
+// infraction_cases has no deleted_at column (hard deletes only, per
+// 20260105000000_infractions_engine.sql) -- countInWindow's .is(
+// "deleted_at", null) would error against a column that doesn't exist,
+// so this is a separate, smaller helper rather than forcing every table
+// through the same shape.
+async function countInWindowNoSoftDelete(
+  db: SupabaseClient,
+  table: string,
+  dateColumn: string,
+  tenantId: string,
+  window: { start: string; end: string },
+) {
+  const { count, error } = await db
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .gte(dateColumn, window.start)
+    .lt(dateColumn, window.end);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 async function distinctResourceCountFromLocations(
   db: SupabaseClient,
   tenantId: string,
@@ -179,6 +201,21 @@ export function createKpiDataProvider(db: SupabaseClient): KpiDataProvider {
           const [value, previousValue] = await Promise.all([
             distinctResourceCountFromLocations(db, tenantId, period),
             distinctResourceCountFromLocations(db, tenantId, previous),
+          ]);
+          return { value, previousValue };
+        }
+
+        case "infractions": {
+          // Cases created in the window, not the underlying immutable
+          // infractions.occurred_at -- created_at is when the tenant's
+          // exposure actually started being tracked (a CSV/manual entry
+          // for an old infraction still counts against the period it was
+          // registered in, same as every other KPI here counts by
+          // creation/scheduling, never by an external event date the
+          // tenant didn't control).
+          const [value, previousValue] = await Promise.all([
+            countInWindowNoSoftDelete(db, "infraction_cases", "created_at", tenantId, period),
+            countInWindowNoSoftDelete(db, "infraction_cases", "created_at", tenantId, previous),
           ]);
           return { value, previousValue };
         }

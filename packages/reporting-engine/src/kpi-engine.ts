@@ -43,6 +43,7 @@ export class KpiEngine {
       "commissions",
       "utilization",
       "tracking",
+      "infractions",
     ];
     return Promise.all(types.map((t) => this.compute(tenantId, t, period)));
   }
@@ -55,6 +56,7 @@ export class KpiEngine {
       commissions: "Total Commissions",
       utilization: "Fleet Utilization",
       tracking: "Tracked Vehicles",
+      infractions: "Infrações Recebidas",
     };
     return labels[type];
   }
@@ -67,6 +69,7 @@ export class KpiEngine {
       commissions: "BRL",
       utilization: "%",
       tracking: "count",
+      infractions: "count",
     };
     return units[type];
   }

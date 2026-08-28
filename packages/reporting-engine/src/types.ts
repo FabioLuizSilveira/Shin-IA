@@ -10,7 +10,8 @@ export type KpiType =
   | "revenue"
   | "commissions"
   | "utilization"
-  | "tracking";
+  | "tracking"
+  | "infractions";
 
 export interface ReportFilter {
   field: string;

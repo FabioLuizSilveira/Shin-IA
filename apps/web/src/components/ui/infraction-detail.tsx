@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { X, ShieldAlert, CheckCircle2, XCircle, Clock, DollarSign } from "lucide-react";
+import {
+  X,
+  ShieldAlert,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  DollarSign,
+  UserCog,
+  FileWarning,
+} from "lucide-react";
 
 interface InfractionRow {
   id: string;
@@ -59,6 +68,7 @@ interface DefenseRow {
   id: string;
   kind: string;
   status: string;
+  external_protocol: string | null;
 }
 
 interface PaymentRow {
@@ -92,6 +102,25 @@ const CASE_STATUS_LABEL: Record<string, string> = {
   closed: "Encerrada",
 };
 
+const DRIVER_ID_STATUS_LABEL: Record<string, string> = {
+  pending: "Pendente",
+  ready: "Pronta",
+  submitted: "Enviada",
+  accepted: "Aceita",
+  rejected: "Rejeitada",
+  expired: "Expirada",
+  not_required: "Não exigida",
+};
+
+const DEFENSE_STATUS_LABEL: Record<string, string> = {
+  draft: "Rascunho",
+  submitted: "Enviada",
+  under_analysis: "Em análise",
+  accepted: "Aceita",
+  rejected: "Rejeitada",
+  expired: "Expirada",
+};
+
 function formatCents(cents: number | null, currency = "BRL"): string {
   if (cents === null) return "—";
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency });
@@ -122,7 +151,11 @@ export function InfractionDetail({
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [reimbursementAmount, setReimbursementAmount] = useState("");
   const [disputeReason, setDisputeReason] = useState("");
+  const [driverName, setDriverName] = useState("");
+  const [defenseNotes, setDefenseNotes] = useState("");
+  const [defenseKind, setDefenseKind] = useState<"defense" | "appeal">("defense");
 
   const load = useCallback(async () => {
     if (!caseId) return;
@@ -379,6 +412,257 @@ export function InfractionDetail({
                 <p className="text-xs text-slate-400 mt-2">
                   Se a responsabilidade estiver confirmada para um cliente, o reembolso vira fatura
                   automaticamente após o registro do pagamento.
+                </p>
+              </section>
+
+              <section className="border-t border-slate-100 dark:border-slate-700 pt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase mb-2">
+                  Reembolso do responsável
+                </h3>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Valor reembolsado (R$)"
+                    value={reimbursementAmount}
+                    onChange={(e) => setReimbursementAmount(e.target.value)}
+                    className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy || !reimbursementAmount}
+                    onClick={() =>
+                      void runAction(async () => {
+                        await postJson(`/api/infractions/${caseId}/payment`, {
+                          kind: "reimbursement_from_responsible",
+                          amountPaidCents: Math.round(Number(reimbursementAmount) * 100),
+                        });
+                        setReimbursementAmount("");
+                      })
+                    }
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg border-0 cursor-pointer disabled:opacity-60 whitespace-nowrap"
+                  >
+                    Registrar reembolso
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 mt-2">
+                  Registro manual — cobre tanto reembolso de cliente (fora do ciclo automático de
+                  fatura acima) quanto de operador, que não tem fatura/conta de cobrança própria
+                  hoje. Nunca gera cobrança automática por conta própria.
+                </p>
+              </section>
+
+              <section className="border-t border-slate-100 dark:border-slate-700 pt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase mb-2 flex items-center gap-1">
+                  <UserCog className="w-3.5 h-3.5" /> Indicação de condutor
+                </h3>
+                <div className="flex gap-2">
+                  <input
+                    placeholder="Nome do condutor indicado"
+                    value={driverName}
+                    onChange={(e) => setDriverName(e.target.value)}
+                    className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy || !driverName.trim()}
+                    onClick={() =>
+                      void runAction(async () => {
+                        await postJson(`/api/infractions/${caseId}/driver-identification`, {
+                          driverName,
+                        });
+                        setDriverName("");
+                      })
+                    }
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg border-0 cursor-pointer disabled:opacity-60 whitespace-nowrap"
+                  >
+                    Registrar indicação
+                  </button>
+                </div>
+                {data.driverIdentifications.length > 0 && (
+                  <ul className="mt-2 space-y-1.5">
+                    {data.driverIdentifications.map((d) => (
+                      <li key={d.id} className="flex items-center justify-between text-xs">
+                        <span className="text-slate-600 dark:text-slate-300">
+                          {d.driver_name ?? (d.operator_id ? "Operador cadastrado" : "—")} —{" "}
+                          {DRIVER_ID_STATUS_LABEL[d.status] ?? d.status}
+                        </span>
+                        <div className="flex gap-1">
+                          {d.status === "ready" && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                void runAction(() =>
+                                  postJson(
+                                    `/api/infractions/${caseId}/driver-identification/${d.id}`,
+                                    { status: "submitted" },
+                                  ),
+                                )
+                              }
+                              className="px-2 py-1 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 text-xs rounded-md border-0 cursor-pointer disabled:opacity-60"
+                            >
+                              Enviar
+                            </button>
+                          )}
+                          {d.status === "submitted" && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  void runAction(() =>
+                                    postJson(
+                                      `/api/infractions/${caseId}/driver-identification/${d.id}`,
+                                      { status: "accepted" },
+                                    ),
+                                  )
+                                }
+                                className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs rounded-md border-0 cursor-pointer disabled:opacity-60"
+                              >
+                                Aceitar
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  void runAction(() =>
+                                    postJson(
+                                      `/api/infractions/${caseId}/driver-identification/${d.id}`,
+                                      { status: "rejected" },
+                                    ),
+                                  )
+                                }
+                                className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs rounded-md border-0 cursor-pointer disabled:opacity-60"
+                              >
+                                Rejeitar
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <section className="border-t border-slate-100 dark:border-slate-700 pt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase mb-2 flex items-center gap-1">
+                  <FileWarning className="w-3.5 h-3.5" /> Defesa / Recurso
+                </h3>
+                <div className="flex gap-2">
+                  <select
+                    value={defenseKind}
+                    onChange={(e) => setDefenseKind(e.target.value as "defense" | "appeal")}
+                    className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                  >
+                    <option value="defense">Defesa prévia</option>
+                    <option value="appeal">Recurso</option>
+                  </select>
+                  <input
+                    placeholder="Observações (opcional)"
+                    value={defenseNotes}
+                    onChange={(e) => setDefenseNotes(e.target.value)}
+                    className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      void runAction(async () => {
+                        await postJson(`/api/infractions/${caseId}/defense`, {
+                          kind: defenseKind,
+                          notes: defenseNotes || undefined,
+                        });
+                        setDefenseNotes("");
+                      })
+                    }
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg border-0 cursor-pointer disabled:opacity-60 whitespace-nowrap"
+                  >
+                    Registrar
+                  </button>
+                </div>
+                {data.defenses.length > 0 && (
+                  <ul className="mt-2 space-y-1.5">
+                    {data.defenses.map((d) => (
+                      <li key={d.id} className="flex items-center justify-between text-xs">
+                        <span className="text-slate-600 dark:text-slate-300">
+                          {d.kind === "appeal" ? "Recurso" : "Defesa"} —{" "}
+                          {DEFENSE_STATUS_LABEL[d.status] ?? d.status}
+                        </span>
+                        <div className="flex gap-1">
+                          {d.status === "draft" && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                void runAction(() =>
+                                  postJson(`/api/infractions/${caseId}/defense/${d.id}`, {
+                                    status: "submitted",
+                                  }),
+                                )
+                              }
+                              className="px-2 py-1 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 text-xs rounded-md border-0 cursor-pointer disabled:opacity-60"
+                            >
+                              Enviar
+                            </button>
+                          )}
+                          {d.status === "submitted" && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                void runAction(() =>
+                                  postJson(`/api/infractions/${caseId}/defense/${d.id}`, {
+                                    status: "under_analysis",
+                                  }),
+                                )
+                              }
+                              className="px-2 py-1 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 text-xs rounded-md border-0 cursor-pointer disabled:opacity-60"
+                            >
+                              Em análise
+                            </button>
+                          )}
+                          {d.status === "under_analysis" && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  void runAction(() =>
+                                    postJson(`/api/infractions/${caseId}/defense/${d.id}`, {
+                                      status: "accepted",
+                                    }),
+                                  )
+                                }
+                                className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs rounded-md border-0 cursor-pointer disabled:opacity-60"
+                              >
+                                Aceita
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  void runAction(() =>
+                                    postJson(`/api/infractions/${caseId}/defense/${d.id}`, {
+                                      status: "rejected",
+                                    }),
+                                  )
+                                }
+                                className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs rounded-md border-0 cursor-pointer disabled:opacity-60"
+                              >
+                                Rejeitada
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-xs text-slate-400 mt-2">
+                  Registro administrativo — nunca protocola automaticamente com uma autoridade
+                  pública.
                 </p>
               </section>
 
