@@ -3,6 +3,7 @@ import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, hasTenantPermission } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 import { createNotification } from "@/lib/notifications/create-notification";
+import { canTransitionCase, type InfractionCaseStatus } from "@shina/infractions-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -55,11 +56,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
   if (insertError) return internalError(insertError);
 
-  await scope.db
-    .from("infraction_cases")
-    .update({ status: "driver_identification_pending", updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("tenant_id", scope.tenantId);
+  // Soft transition, same pattern as disputes/defense POST: the driver
+  // identification is always registered regardless; the case's own
+  // status only advances when the transition is actually valid (was
+  // previously an unconditional write with no canTransitionCase check
+  // at all -- the only route in the module with none, found live while
+  // E2E-testing).
+  if (
+    canTransitionCase(
+      infractionCase.status as InfractionCaseStatus,
+      "driver_identification_pending",
+    )
+  ) {
+    await scope.db
+      .from("infraction_cases")
+      .update({ status: "driver_identification_pending", updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("tenant_id", scope.tenantId);
+  }
 
   void logActivity(scope.db, {
     tenantId: scope.tenantId,

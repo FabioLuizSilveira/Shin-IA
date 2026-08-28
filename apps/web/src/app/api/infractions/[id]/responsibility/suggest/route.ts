@@ -3,6 +3,7 @@ import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, hasTenantPermission } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 import { resolveTemporalContext } from "@/lib/infraction-temporal-resolver";
+import { canTransitionCase, type InfractionCaseStatus } from "@shina/infractions-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,19 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (!infractionCase.asset_id) {
     return NextResponse.json(
       { error: "Não é possível sugerir responsável sem um ativo identificado." },
+      { status: 422 },
+    );
+  }
+  // Found live while writing the E2E happy-path check: this route used
+  // to overwrite status unconditionally, bypassing canTransitionCase
+  // entirely -- the only route in the module that did. matched/
+  // responsibility_pending/responsibility_suggested (re-run) are all
+  // valid sources for "responsibility_suggested" per the transition map.
+  if (
+    !canTransitionCase(infractionCase.status as InfractionCaseStatus, "responsibility_suggested")
+  ) {
+    return NextResponse.json(
+      { error: `cannot suggest responsibility from status ${infractionCase.status}` },
       { status: 422 },
     );
   }

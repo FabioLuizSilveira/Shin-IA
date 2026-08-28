@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, hasTenantPermission } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
+import { canTransitionCase, type InfractionCaseStatus } from "@shina/infractions-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -71,11 +72,22 @@ export async function PATCH(
   if (updateError) return internalError(updateError);
 
   if (body.status === "accepted") {
-    await scope.db
+    const { data: infractionCase } = await scope.db
       .from("infraction_cases")
-      .update({ status: "driver_identified", updated_at: new Date().toISOString() })
+      .select("status")
       .eq("id", id)
-      .eq("tenant_id", scope.tenantId);
+      .eq("tenant_id", scope.tenantId)
+      .maybeSingle();
+    if (
+      infractionCase &&
+      canTransitionCase(infractionCase.status as InfractionCaseStatus, "driver_identified")
+    ) {
+      await scope.db
+        .from("infraction_cases")
+        .update({ status: "driver_identified", updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("tenant_id", scope.tenantId);
+    }
   }
 
   void logActivity(scope.db, {
