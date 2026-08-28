@@ -1,13 +1,14 @@
 # Shinã Infractions Engine — Gestão de Infrações, Responsabilidade e Multas
 
 **Status (2026-08-28): Fases A–J entregues e verificadas em produção — o roadmap original
-(seção 61 do spec) está completo, e as 5 lacunas que ainda restavam depois disso (KPI de
-Reporting, reprocessamento de `unmatched`, UI de indicação/defesa, reembolso de operador, E2E dos
-3 cenários críticos) também foram fechadas e verificadas ao vivo (ver "Fechamento das lacunas
-restantes"). O que segue de fato fora de escopo desta rodada — decisões deliberadas, não
-esquecimentos — está descrito em "Riscos assumidos" e nos itens de arquitetura (integração
-oficial via `docs/integrations/SENATRAN_INFRACTIONS.md`, telas mobile, self-service de
-cliente/operador).**
+(seção 61 do spec) está completo, as 5 lacunas que restavam depois disso (KPI de Reporting,
+reprocessamento de `unmatched`, UI de indicação/defesa, reembolso de operador, E2E dos 3
+cenários críticos) foram fechadas, e a fase mobile das telas (gestor completo + operador
+somente-leitura) também foi entregue e verificada ao vivo (ver "Fechamento das lacunas
+restantes" e "Fase mobile das telas"). O que segue de fato fora de escopo desta rodada —
+decisões deliberadas, não esquecimentos — está descrito em "Riscos assumidos" e nos itens de
+arquitetura (integração oficial via `docs/integrations/SENATRAN_INFRACTIONS.md`, self-service de
+escrita do operador pelo celular, qualquer tela de cliente).**
 
 Log corrido do módulo, no mesmo padrão de `docs/architecture/INSPECTION_ENGINE.md` — cada fase
 atualiza este arquivo com o que foi entregue, decisões tomadas e pendências.
@@ -202,10 +203,10 @@ já registrado na Fase A, mantido como pendência.
 
 `tenant/infractions` (lista com filtros de status, lançamento manual) + `InfractionDetail`
 (drawer: resumo, sugerir/confirmar/rejeitar responsabilidade, prazos, contestação, registro de
-pagamento). Item novo "Infrações" na sidebar. **Fora do drawer nesta rodada**: UI dedicada para
-indicação de condutor e defesa/recurso — as rotas de API já existem (Fase F), só falta a tela;
-telas mobile (operador/gestor) e Contract-Center-style self-service do cliente/operador também
-não foram construídas. Preview local verificado sem erro de console; typecheck limpo em todo o
+pagamento). Item novo "Infrações" na sidebar. **Fora do drawer nesta rodada** (fechado depois —
+ver "Fechamento das lacunas restantes" e "Fase mobile das telas"): UI dedicada para indicação de
+condutor e defesa/recurso, telas mobile. Contract-Center-style self-service do cliente/operador
+continua não construído. Preview local verificado sem erro de console; typecheck limpo em todo o
 monorepo em cada fase.
 
 ## Fase J — Segurança (entregue)
@@ -360,3 +361,34 @@ Também corrigido de passagem: os dicionários de rótulo de status na UI (`STAT
 valor de escrita em lugar nenhum), mas corrigido para as 20 entradas reais.
 
 Com isso, **nenhuma das 5 lacunas listadas anteriormente continua em aberto.**
+
+## Fase mobile das telas (entregue)
+
+**Gestor (tenant_user)**: `InfractionsScreen` (lista) + `InfractionDetailScreen` (detalhe) em
+`apps/mobile`, reaproveitando as rotas reais `/api/infractions/*` sem nenhuma mudança de backend
+— já eram compatíveis com Bearer token (confirmado ao vivo na Fase J). O detalhe cobre as ações
+de maior valor no dia a dia (sugerir/confirmar/rejeitar responsabilidade, registrar pagamento,
+abrir contestação); indicação de condutor/defesa continuam só na web — documentado como próximo
+passo, não esquecido.
+
+**Operador**: tela nova, **somente leitura** (item 47 — nenhuma rota de escrita para
+self-service de operador existe ainda, mesmo gap já documentado). `GET
+/api/mobile/operator-infractions` (novo), seguindo exatamente o precedente de
+`operator-inspections`: `mobile-infractions-scope.ts`
+(`resolveInfractionVisibility`/`isInfractionVisible`, mesmo padrão P1.4) + rota escopada por
+`operator_id`, nunca por tenant inteiro. **12 testes de isolamento permanentes novos** — a
+lacuna que este documento apontava antes ("isolamento operator×operator só testado na camada de
+RLS, não existe rota de app") está fechada: agora existe rota real, testada do mesmo jeito que
+`mobile-inspections-scope.test.ts` já testa inspeções.
+
+**Verificação ao vivo da rota nova** contra produção: Operador A vê o próprio caso (`200`, 1
+linha); Operador B não vê o caso do Operador A (`200`, 0 linhas); sem sessão, `401`. 3/3.
+
+**Verificação do app mobile**: `tsc --noEmit` limpo; `expo export --platform android` empacota
+com sucesso (1520 módulos, sem erros) — mesma profundidade de verificação usada para
+`InspectionCaptureScreen` mais cedo nesta sessão, já que a cota EAS segue esgotada até
+2026-09-01 (sem teste em dispositivo real possível). 162/162 testes de `apps/web` (12 novos).
+
+Segue de fato fora de escopo — decisão deliberada, não esquecimento —: self-service de escrita
+do operador (reconhecer/contestar indicação de condutor pelo celular) e qualquer tela de
+cliente (nenhuma rota de infração exposta ao cliente existe ainda).
