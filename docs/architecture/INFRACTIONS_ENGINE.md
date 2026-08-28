@@ -1,8 +1,13 @@
 # Shinã Infractions Engine — Gestão de Infrações, Responsabilidade e Multas
 
-**Status (2026-08-27): Fases A–J entregues e verificadas em produção — o roadmap original
-(seção 61 do spec) está completo. Pendências reais continuam listadas no fim deste documento;
-"completo" aqui significa as fases nomeadas, não 100% do spec.**
+**Status (2026-08-28): Fases A–J entregues e verificadas em produção — o roadmap original
+(seção 61 do spec) está completo, e as 5 lacunas que ainda restavam depois disso (KPI de
+Reporting, reprocessamento de `unmatched`, UI de indicação/defesa, reembolso de operador, E2E dos
+3 cenários críticos) também foram fechadas e verificadas ao vivo (ver "Fechamento das lacunas
+restantes"). O que segue de fato fora de escopo desta rodada — decisões deliberadas, não
+esquecimentos — está descrito em "Riscos assumidos" e nos itens de arquitetura (integração
+oficial via `docs/integrations/SENATRAN_INFRACTIONS.md`, telas mobile, self-service de
+cliente/operador).**
 
 Log corrido do módulo, no mesmo padrão de `docs/architecture/INSPECTION_ENGINE.md` — cada fase
 atualiza este arquivo com o que foi entregue, decisões tomadas e pendências.
@@ -296,15 +301,62 @@ integração oficial foi escrito, só o documento.
 150/150 testes de `apps/web` passam (135 anteriores + 15 novos de CSV import, incluindo o de
 regressão do bug de mapeamento), typecheck limpo em todo o monorepo.
 
-## Pendências (não construídas nesta rodada)
+## Fechamento das lacunas restantes (entregue)
 
-- Testes E2E dos 3 cenários críticos do spec com HTTP completo (feliz, contestação,
-  unmatched-depois-reprocessado) — a Fase J cobriu isolamento e o gate de billing, não o fluxo
-  completo ponta a ponta dos 3 cenários.
-- Reprocessamento de casos `unmatched` via cron (Fase D, mencionado acima).
-- UI de indicação de condutor / defesa / recurso, telas mobile, self-service do cliente/operador
-  — e, por consequência, isolamento operator×operator/customer×customer só foi testado na camada
-  de RLS (não existe rota de app ainda que leia infrações por `operator_id`/`customer_id` para
-  testar como `mobile-inspections-scope.ts` testa hoje).
-- KPI cards de Reporting.
-- Reembolso quando o responsável é `operator` (sem trilho de billing hoje).
+Todos os 5 itens que ainda apareciam como pendência foram fechados nesta passada, cada um
+verificado ao vivo em produção, não só declarado:
+
+1. **KPI de Reporting** — `KpiType` ganhou `"infractions"` (`packages/reporting-engine`), contado
+   do mesmo jeito que todo outro KPI aqui (casos _criados_ na janela, data que o tenant controla,
+   não `occurred_at` externo). 44/44 testes do `reporting-engine` (2 atualizados para o 7º tipo).
+2. **Reprocessamento de `unmatched` via cron** (item 32) — `infraction-unmatched-sweep.ts`, novo
+   cron diário (`vercel.json`). Verificado ao vivo: um caso genuinamente sem tenant (`tenant_id
+null`) fica invisível ao Tenant A (`404` real) até o sweep rodar; depois de um ativo com a
+   placa aparecer, o sweep resolve o caso, e o Tenant A passa a enxergá-lo (`200`).
+
+   **Bug real encontrado construindo isso**: `tenantHint` (entrada manual/CSV, sempre de um staff
+   autenticado) era descartado silenciosamente quando o match de ativo falhava — um veículo ainda
+   não cadastrado tornava a própria infração do tenant invisível via RLS, indistinguível de um
+   caso genuinamente externo. Corrigido: `tenant_id` agora cai para o `tenantHint` quando o match
+   falha, então um caso de tenant conhecido sem ativo ainda fica visível e corrigível via o
+   `POST /:id/match` já existente — só casos genuinamente sem tenant entram no pool que o cron
+   novo processa.
+
+3. **UI de indicação de condutor / defesa / recurso** — seções novas no `InfractionDetail`
+   (registrar + avançar status), usando as rotas da Fase F que não tinham tela até agora.
+4. **Reembolso quando o responsável é `operator`** — reexaminado: a rota de pagamento já aceitava
+   qualquer `kind` independente do tipo de responsável; a lacuna real era só a UI. Campo
+   "Reembolso do responsável" adicionado ao drawer (registro manual, funciona para cliente e
+   operador) — a fatura automática (`ensureInfractionCharge()`) continua só-cliente por decisão
+   de design (item 25), mas o registro manual deixou de ser uma lacuna.
+5. **Testes E2E dos 3 cenários críticos do spec, HTTP completo** — verificados ao vivo contra
+   produção (`shin-ia-le1a.vercel.app`), sessão real de staff do Tenant A:
+   - **Feliz**: entrada manual → `matched` → sugerir → `responsibility_suggested` → confirmar →
+     `responsibility_confirmed` → pagamento → `paid`.
+   - **Contestação**: confirmar responsabilidade → contestar → `disputed` → aceitar contestação →
+     volta para `responsibility_pending`.
+   - **Unmatched-depois-reprocessado**: caso sem tenant invisível (`404`) → ativo cadastrado →
+     cron resolve → caso visível (`200`), `matched`, tenant correto.
+
+   17/17 checks passaram. **Bug real e sério encontrado escrevendo esses testes** (exatamente o
+   motivo de pedir E2E via HTTP em vez de fixtures direto no banco): três valores reais do enum
+   `infraction_case_status` — `notified`, `action_pending`, `payment_pending` — estavam declarados
+   no mapa de transição e no schema, mas **nenhuma rota jamais escrevia esses status**. Toda rota
+   depois da confirmação de responsabilidade que valida via `canTransitionCase()` (indicação de
+   condutor, pagamento) falhava seu próprio guard silenciosamente em qualquer caso que seguisse o
+   único caminho real que o app implementa — o sub-recurso (indicação, pagamento) sempre era
+   registrado, mas o status do caso nunca avançava, sem erro nenhum. Isso passou despercebido em
+   toda verificação anterior porque todas usavam inserts diretos via service role para simular o
+   status, nunca exercitando esses guards de rota de verdade. Corrigido: `responsibility/suggest`
+   (única rota do módulo sem checagem de transição nenhuma, agora corrigida), `transitions.ts`
+   ganhou os atalhos diretos reais que as rotas de fato usam (aditivo — o caminho
+   `notified`/`action_pending`/`payment_pending` continua válido, para se um dia for construído),
+   e a rota de indicação de condutor ganhou o mesmo guard soft que `disputes`/`defense` já usavam.
+   32/32 testes de `infractions-engine` (8 novos/atualizados cobrindo cada aresta nova).
+
+Também corrigido de passagem: os dicionários de rótulo de status na UI (`STATUS_LABEL`/
+`CASE_STATUS_LABEL`) só listavam 13 dos 20 valores reais do enum, com uma chave morta
+(`matching_asset`, que nunca corresponde ao valor real `matching`) — cosmético (nunca usado como
+valor de escrita em lugar nenhum), mas corrigido para as 20 entradas reais.
+
+Com isso, **nenhuma das 5 lacunas listadas anteriormente continua em aberto.**
