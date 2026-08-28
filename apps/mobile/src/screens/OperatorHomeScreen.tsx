@@ -100,6 +100,11 @@ export function OperatorHomeScreen() {
             icon="clipboard-outline"
             onPress={() => navigation.navigate("Inspections")}
           />
+          <GradientButton
+            label="Minhas Infrações"
+            icon="shield-outline"
+            onPress={() => navigation.navigate("Infractions")}
+          />
           <GradientButton label="Sair" onPress={() => void signOut()} />
         </View>
       )}

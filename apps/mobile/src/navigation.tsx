@@ -26,6 +26,8 @@ import { RenewalScreen } from "./screens/RenewalScreen";
 import { CustomerInvoicesScreen } from "./screens/CustomerInvoicesScreen";
 import { InspectionsScreen } from "./screens/InspectionsScreen";
 import { InspectionCaptureScreen } from "./screens/InspectionCaptureScreen";
+import { InfractionsScreen } from "./screens/InfractionsScreen";
+import { InfractionDetailScreen } from "./screens/InfractionDetailScreen";
 import { useAuth } from "./lib/auth-context";
 import { usePersona } from "./lib/persona-context";
 import { theme } from "./theme";
@@ -51,6 +53,8 @@ export type RootStackParamList = {
   CustomerInvoices: undefined;
   Inspections: undefined;
   InspectionCapture: { inspectionId: string };
+  Infractions: undefined;
+  InfractionDetail: { caseId: string };
 };
 
 export type TenantTabParamList = {
@@ -212,6 +216,16 @@ export function RootNavigator() {
               component={InspectionCaptureScreen}
               options={{ headerShown: false }}
             />
+            <Stack.Screen
+              name="Infractions"
+              component={InfractionsScreen}
+              options={{ headerShown: true, title: "Infrações" }}
+            />
+            <Stack.Screen
+              name="InfractionDetail"
+              component={InfractionDetailScreen}
+              options={{ headerShown: false }}
+            />
           </>
         )}
         {bootstrap.user.userType === "operator" && (
@@ -226,6 +240,11 @@ export function RootNavigator() {
               name="InspectionCapture"
               component={InspectionCaptureScreen}
               options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Infractions"
+              component={InfractionsScreen}
+              options={{ headerShown: true, title: "Minhas Infrações" }}
             />
           </>
         )}

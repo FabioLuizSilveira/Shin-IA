@@ -298,6 +298,57 @@ export interface InspectionDetail {
   findings: InspectionFindingItem[];
 }
 
+// Mobile screens phase (docs/architecture/INFRACTIONS_ENGINE.md) — the
+// tenant_user/manager screens reuse the real /api/infractions/* routes
+// unmodified (already Bearer-token-compatible, confirmed live during
+// this module's own security hardening pass). The operator screen is
+// read-only against the new /api/mobile/operator-infractions -- no
+// operator write path exists yet for infractions (documented follow-up,
+// same as the manager-facing driver-id/defense actions this list screen
+// doesn't attempt either — the mobile phase covers the highest-value
+// day-to-day actions, not full parity with the web drawer).
+export interface InfractionInfo {
+  id: string;
+  plate: string;
+  auto_number: string | null;
+  occurred_at: string;
+  amount_cents: number | null;
+  amount_currency: string;
+  description: string | null;
+  location?: string | null;
+}
+export interface InfractionCaseListItem {
+  id: string;
+  status: string;
+  responsible_party_type: string | null;
+  responsible_party_id: string | null;
+  responsibility_confidence: number | null;
+  created_at: string;
+  infractions: InfractionInfo;
+}
+export interface InfractionDeadlineItem {
+  id: string;
+  deadline_type: string;
+  due_at: string | null;
+  status: string;
+}
+export interface InfractionDisputeItem {
+  id: string;
+  status: string;
+  description: string;
+}
+export interface InfractionPaymentItem {
+  id: string;
+  kind: string;
+  amount_paid_cents: number | null;
+}
+export interface InfractionCaseDetail {
+  case: InfractionCaseListItem & { contract_id: string | null };
+  deadlines: InfractionDeadlineItem[];
+  disputes: InfractionDisputeItem[];
+  payments: InfractionPaymentItem[];
+}
+
 export const shinaia = {
   // Pre-auth — the mobile login screen's "Demonstração" button. Signs in as
   // one of two real, dedicated demo accounts against the real Veloz Rent a
@@ -686,6 +737,42 @@ export const shinaia = {
     const json = (await res.json()) as { data: { id: string; storagePath: string } };
     return json.data;
   },
+
+  // Infractions — mobile screens phase. "staff" hits the real tenant
+  // routes (requireTenantScope, Bearer-token-compatible); "operator"
+  // hits the new read-only /api/mobile/operator-infractions.
+  infractions: (params?: { status?: string; scope?: "staff" | "operator" }) => {
+    const base =
+      params?.scope === "operator" ? "/api/mobile/operator-infractions" : "/api/infractions";
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<InfractionCaseListItem[]>("GET", `${base}${suffix}`).then((data) => ({
+      data,
+      source: "live" as const,
+    }));
+  },
+  infractionDetail: (caseId: string) =>
+    request<InfractionCaseDetail>("GET", `/api/infractions/${caseId}`).then((data) => ({
+      data,
+      source: "live" as const,
+    })),
+  suggestInfractionResponsibility: (caseId: string) =>
+    mutate<{ responsibleType: string; responsibleId: string | null; confidence: number }>(
+      "POST",
+      `/api/infractions/${caseId}/responsibility/suggest`,
+      {},
+    ),
+  confirmInfractionResponsibility: (caseId: string) =>
+    mutate<{ ok: true }>("POST", `/api/infractions/${caseId}/responsibility/confirm`, {}),
+  rejectInfractionResponsibility: (caseId: string) =>
+    mutate<{ ok: true }>("POST", `/api/infractions/${caseId}/responsibility/reject`, {}),
+  registerInfractionPayment: (
+    caseId: string,
+    input: { kind: "to_authority" | "reimbursement_from_responsible"; amountPaidCents: number },
+  ) => mutate<{ id: string }>("POST", `/api/infractions/${caseId}/payment`, input),
+  createInfractionDispute: (caseId: string, input: { partyType: string; description: string }) =>
+    mutate<{ id: string }>("POST", `/api/infractions/${caseId}/disputes`, input),
 };
 
 export { ApiError };

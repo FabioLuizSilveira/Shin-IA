@@ -15,6 +15,7 @@ const ITEMS: {
   { key: "Clients", label: "Clientes", icon: "people-outline" },
   { key: "Contracts", label: "Contratos", icon: "document-text-outline" },
   { key: "Inspections", label: "Vistorias", icon: "checkmark-done-outline" },
+  { key: "Infractions", label: "Infrações", icon: "shield-outline" },
   { key: "Tracking", label: "Rastreamento", icon: "map-outline" },
   { key: "Notifications", label: "Notificações", icon: "notifications-outline" },
 ];
