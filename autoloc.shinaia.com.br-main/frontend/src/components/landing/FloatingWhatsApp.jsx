@@ -19,12 +19,9 @@ export function FloatingWhatsApp() {
       data-testid="whatsapp-float"
       onClick={open}
       aria-label={label}
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ delay: 1.4, type: "spring", stiffness: 260, damping: 18 }}
       whileHover={{ scale: 1.06 }}
       whileTap={{ scale: 0.94 }}
-      className="group fixed bottom-6 right-6 z-[90] flex items-center gap-3 rounded-full bg-[#25D366] py-3.5 pl-4 pr-4 shadow-[0_10px_40px_rgba(37,211,102,0.45)] md:pr-5"
+      className="group fixed bottom-5 right-5 z-[100] flex items-center gap-3 rounded-full bg-[#25D366] py-3.5 pl-4 pr-4 shadow-[0_10px_40px_rgba(37,211,102,0.45)] md:bottom-6 md:right-6 md:pr-5"
     >
       <span className="absolute inset-0 -z-10 animate-ping rounded-full bg-[#25D366] opacity-40" />
       <svg viewBox="0 0 32 32" width="26" height="26" fill="#fff" aria-hidden="true">

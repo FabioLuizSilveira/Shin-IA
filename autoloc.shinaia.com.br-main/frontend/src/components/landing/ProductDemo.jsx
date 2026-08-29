@@ -18,7 +18,7 @@ export function ProductDemo() {
   const switchTab = (v) => { setTab(v); trackEvent("product_tab", { label: v, section: "product", locale: lang }); };
 
   return (
-    <section id="product" className="relative mx-auto max-w-7xl px-6 py-28 md:py-36">
+    <section id="product" className="relative mx-auto max-w-7xl overflow-hidden px-6 py-28 md:py-36">
       <div className="plasma right-[10%] top-[10%] h-[420px] w-[420px] bg-[#0066ff]/40" />
       <Reveal>
         <p className="mb-3 font-mono text-xs font-bold uppercase tracking-[0.3em] text-gradient">{p.overline}</p>

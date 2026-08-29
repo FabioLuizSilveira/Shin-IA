@@ -11,7 +11,7 @@ export function Benefits() {
   const b = t.benefits;
 
   return (
-    <section id="benefits" className="relative mx-auto max-w-7xl px-6 py-28 md:py-36">
+    <section id="benefits" className="relative mx-auto max-w-7xl overflow-hidden px-6 py-28 md:py-36">
       <div className="plasma left-[20%] top-[30%] h-[400px] w-[400px] bg-[#7000ff]/40" />
       <Reveal>
         <p className="mb-3 font-mono text-xs font-bold uppercase tracking-[0.3em] text-gradient">{b.overline}</p>

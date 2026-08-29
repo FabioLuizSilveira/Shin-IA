@@ -14,7 +14,7 @@ export function Pricing() {
   const choose = (name) => { trackEvent("cta_click", { label: `pricing_${name}`, section: "pricing", locale: lang }); openLead(`pricing_${name}`); };
 
   return (
-    <section id="pricing" className="relative mx-auto max-w-7xl px-6 py-28 md:py-36">
+    <section id="pricing" className="relative mx-auto max-w-7xl overflow-hidden px-6 py-28 md:py-36">
       <div className="plasma left-[35%] top-[10%] h-[460px] w-[460px] bg-[#7000ff]/40" />
       <Reveal>
         <p className="mb-3 text-center font-mono text-xs font-bold uppercase tracking-[0.3em] text-gradient">{p.overline}</p>
