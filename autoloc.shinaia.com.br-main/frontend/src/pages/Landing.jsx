@@ -47,7 +47,7 @@ export default function Landing() {
     <LangProvider>
       <LeadProvider>
         <ReactLenis root options={{ lerp: 0.09, smoothWheel: true }}>
-          <div className="App grain relative bg-[#101019]">
+          <div className="App grain relative bg-[#3A3A4F]">
             <ScrollDepth />
             <Nav />
             <main>

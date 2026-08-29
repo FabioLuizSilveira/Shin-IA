@@ -5,24 +5,24 @@
 
 @layer base {
   :root {
-    --background: 240 22% 8%;
+    --background: 240 15% 27%;
     --foreground: 0 0% 100%;
-    --card: 240 20% 11%;
+    --card: 240 15% 31%;
     --card-foreground: 0 0% 100%;
-    --popover: 240 20% 11%;
+    --popover: 240 15% 31%;
     --popover-foreground: 0 0% 100%;
     --primary: 187 100% 50%;
-    --primary-foreground: 240 22% 8%;
-    --secondary: 240 18% 16%;
+    --primary-foreground: 240 40% 7%;
+    --secondary: 240 14% 34%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 240 14% 18%;
-    --muted-foreground: 240 5% 68%;
+    --muted: 240 12% 36%;
+    --muted-foreground: 240 6% 72%;
     --accent: 265 83% 53%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 16% 18%;
-    --input: 240 16% 18%;
+    --border: 240 12% 38%;
+    --input: 240 12% 38%;
     --ring: 187 100% 50%;
     --radius: 0.75rem;
   }
@@ -53,7 +53,7 @@ html.lenis body {
 
 body {
   margin: 0;
-  background-color: #101019;
+  background-color: #3A3A4F;
   color: #ffffff;
   font-family: "Outfit", sans-serif;
   -webkit-font-smoothing: antialiased;
