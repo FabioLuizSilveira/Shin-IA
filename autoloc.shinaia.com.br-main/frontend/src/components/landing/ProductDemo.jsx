@@ -5,7 +5,7 @@ import { useLang } from "@/context/LangContext";
 import { Reveal } from "@/components/landing/motion";
 import { trackEvent } from "@/lib/api";
 
-const SHOWROOM = "https://images.unsplash.com/photo-1606590526453-9b8ee4569a70?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHw0fHxsdXh1cnklMjBzcG9ydHMlMjBjYXIlMjBkYXJrJTIwbmlnaHR8ZW58MHx8fHwxNzg3NjIwNDYwfDA&ixlib=rb-4.1.0&q=85";
+const SHOWROOM = "/veloz-lot-night.jpg";
 const DRIVER = "https://images.pexels.com/photos/28862374/pexels-photo-28862374.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
 
 export function ProductDemo() {
