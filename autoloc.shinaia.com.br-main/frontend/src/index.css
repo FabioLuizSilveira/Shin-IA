@@ -104,14 +104,14 @@ body {
 
 /* Gradient text */
 .text-gradient {
-  background: linear-gradient(120deg, #00e5ff 0%, #7000ff 60%, #8a2be2 100%);
+  background: linear-gradient(120deg, #4df2ff 0%, #7ba9ff 52%, #c39bff 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .text-glow {
-  text-shadow: 0 0 40px rgba(0, 229, 255, 0.45);
+  text-shadow: 0 0 32px rgba(0, 229, 255, 0.4), 0 2px 24px rgba(4, 6, 16, 0.55);
 }
 
 /* Grid background */

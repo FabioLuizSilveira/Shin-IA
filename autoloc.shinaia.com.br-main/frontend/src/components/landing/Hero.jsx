@@ -6,9 +6,9 @@ import { useLead } from "@/context/LeadContext";
 import { MaskedLines } from "@/components/landing/motion";
 import { trackEvent } from "@/lib/api";
 
-const HERO_VIDEO_WEBM = "/hero-nav.webm";
-const HERO_VIDEO_MP4 = "/hero-nav.mp4";
-const HERO_POSTER = "/hero-nav-poster.jpg";
+const HERO_VIDEO_WEBM = "/hero-devices.webm";
+const HERO_VIDEO_MP4 = "/hero-devices.mp4";
+const HERO_POSTER = "/hero-devices-poster.jpg";
 
 export function Hero() {
   const { t, lang } = useLang();
@@ -32,7 +32,7 @@ export function Hero() {
       <div className="plasma right-[-6%] top-[28%] h-[520px] w-[520px] bg-[#7000ff] animate-pulse-glow" />
 
       <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-6 pb-24 lg:grid-cols-[1.05fr_0.95fr]">
-        <motion.div style={{ y: textY }}>
+        <motion.div style={{ y: textY }} className="min-w-0">
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.7 }}
             className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-zinc-300">
@@ -40,12 +40,12 @@ export function Hero() {
             {h.badge}
           </motion.div>
 
-          <h1 className="font-display text-5xl font-extrabold leading-[0.95] tracking-tighter sm:text-6xl lg:text-7xl">
+          <h1 className="font-display text-3xl font-extrabold leading-[1.05] tracking-tight [overflow-wrap:anywhere] sm:text-5xl sm:leading-[0.95] sm:tracking-tighter md:text-6xl lg:text-7xl">
             <MaskedLines
               lines={[h.title[0], h.title[1], ""]}
               delay={0.3}
             />
-            <span className="block overflow-hidden">
+            <span className="block overflow-hidden pb-[0.12em]">
               <motion.span
                 className="block text-gradient text-glow"
                 initial={{ y: "110%" }} animate={{ y: "0%" }}
@@ -76,7 +76,7 @@ export function Hero() {
 
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.3, duration: 0.8 }}
-            className="mt-12 flex gap-8 border-t border-white/10 pt-8">
+            className="mt-12 flex flex-wrap gap-x-8 gap-y-6 border-t border-white/10 pt-8">
             {[[h.stat1, h.stat1l], [h.stat2, h.stat2l], [h.stat3, h.stat3l]].map(([k, l], i) => (
               <div key={i}>
                 <div className="font-display text-2xl font-bold text-gradient">{k}</div>

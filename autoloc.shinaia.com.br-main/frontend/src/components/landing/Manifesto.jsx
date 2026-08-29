@@ -16,7 +16,7 @@ export function Manifesto() {
         {man.chapters.map((c, i) => (
           <Reveal key={c.n} delay={i * 0.05}>
             <div className="grid gap-6 border-t border-white/10 pt-10 md:grid-cols-[auto_1fr] md:gap-16">
-              <span className="font-display text-6xl font-black text-white/10 md:text-8xl">{c.n}</span>
+              <span className="font-display text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-[#4df2ff]/70 to-[#c39bff]/70 md:text-8xl">{c.n}</span>
               <div className="max-w-3xl">
                 <h3 className="font-display text-2xl font-bold leading-tight tracking-tight md:text-4xl">
                   {c.t}
