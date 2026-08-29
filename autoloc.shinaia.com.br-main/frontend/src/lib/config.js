@@ -15,4 +15,4 @@ export const WHATSAPP = {
   },
 };
 
-export const BRAND_LOGO = "/shina-logo.png";
+export const BRAND_LOGO = "/shina-mark.png";
