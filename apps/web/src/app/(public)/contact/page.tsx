@@ -52,14 +52,14 @@ export default function ContactPage() {
                   {
                     icon: Mail,
                     label: "Email",
-                    value: "contato@shinaia.com.br",
-                    href: "mailto:contato@shinaia.com.br",
+                    value: "diego@shinaia.com.br",
+                    href: "mailto:diego@shinaia.com.br",
                   },
                   {
                     icon: Phone,
                     label: "WhatsApp",
-                    value: "+55 11 99999-0000",
-                    href: "https://wa.me/5511999990000",
+                    value: "+55 11 96628-9405",
+                    href: "https://wa.me/5511966289405",
                   },
                   {
                     icon: MapPin,
