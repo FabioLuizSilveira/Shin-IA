@@ -7,3 +7,6 @@ coverage
 pnpm-lock.yaml
 *.min.js
 *.min.css
+
+# Standalone imported project — has its own craco/eslint/prettier toolchain
+autoloc.shinaia.com.br-main

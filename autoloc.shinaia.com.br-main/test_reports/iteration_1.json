@@ -1,0 +1,31 @@
+{
+  "summary": "Regression test after removal of emergentintegrations from requirements.txt and addition of .npmrc. Both backend (5/5 pytest) and frontend (all key flows) working. Landing page loads with no console errors, WhatsApp float visible & positioned bottom-right, PT/EN toggle switches content, nav-cta opens lead-modal, lead submission POSTs to /api/leads and displays success state, product tabs switch, FAQ accordion clickable. Backend endpoints /api/leads (POST/GET), /api/events (POST), /api/analytics/summary (GET) all return 200 with proper data.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_landing_api.py",
+    "/app/test_reports/pytest/landing_api_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py uses deprecated FastAPI @app.on_event('shutdown'); prefer lifespan handler (non-blocking, cosmetic).",
+    "POST /api/leads returns 200; RESTful convention would be 201 Created (cosmetic, tests pass either way).",
+    "No rate limiting on POST /api/leads which is a public endpoint — could be spammed. Consider basic throttling or captcha for production."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_landing_api.py (new regression test suite)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "N/A - no auth required",
+  "seed_data_creation": "Created TEST_ prefixed lead (test_regression@example.com) and one test event (test_regression_event) in MongoDB via API for verification.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression suite at /app/backend/tests/test_landing_api.py — run with: pytest /app/backend/tests/test_landing_api.py -v. The hero headline text is split into 3 spans (['Sua frota','no piloto','automático.']), so text-based selectors must target individual spans or use partial matches. Lenis smooth scroll instance is exposed at window.__lenis — use for programmatic scrolling with {immediate:true}. Lead modal's profile field is a shadcn Select (Radix); to interact use click + keyboard ArrowDown+Enter, or click force=True on options. FAQ items use data-testid='faq-item-N' and are clickable (state attributes may not update visibly — verify via child content visibility if needed)."
+}

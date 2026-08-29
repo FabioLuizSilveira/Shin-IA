@@ -1,0 +1,157 @@
+{
+  "theme": "dark",
+  "brand": {
+    "name": "Shinã",
+    "concept": "Modern car rental platform (owners + renters). Futuristic, seductive, technological. Glowing blue/purple plasma 'S' on near-black background.",
+    "bilingual": true
+  },
+  "typography": {
+    "primary": "Unbounded, sans-serif",
+    "secondary": "Outfit, sans-serif",
+    "mono": "JetBrains Mono, monospace",
+    "rules": {
+      "h1": "text-5xl sm:text-6xl+ font-black tracking-tighter leading-none text-white",
+      "h2": "text-3xl sm:text-5xl font-bold tracking-tight text-white",
+      "h3": "text-xl sm:text-2xl font-semibold tracking-tight",
+      "body": "text-base md:text-lg font-light leading-relaxed text-zinc-400",
+      "overline": "uppercase text-xs font-bold tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500"
+    }
+  },
+  "colors": {
+    "background": {
+      "default": "#050508",
+      "surface": "#09090E",
+      "elevated": "#12121A"
+    },
+    "primary": {
+      "blue": "#00E5FF",
+      "purple": "#8A2BE2",
+      "plasma": "#7000FF"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A1A1AA",
+      "muted": "#52525B"
+    },
+    "borders": {
+      "subtle": "rgba(255,255,255,0.05)",
+      "glow": "rgba(0, 229, 255, 0.3)"
+    }
+  },
+  "layouts": {
+    "spacing": "Generous scaling: p-8, p-12, p-24, gap-12, gap-24. High breathing room.",
+    "grid_modes": {
+      "bento_marketing": "grid-cols-1 md:grid-cols-12 gap-8. Mix col-span-8, col-span-4 for aggressive asymmetry.",
+      "feature_showcase": "Split-Screen Comparison layout. 50% sticky text/prompt, 50% scrolling visual output."
+    }
+  },
+  "visual_enhancers": {
+    "surfaces": "Tech-Glass (Telematics) combined with Cinema-Black. Deep cockpit black (#050508) with frosted translucent panels (bg-white/5 backdrop-blur-2xl border border-white/10).",
+    "gradients": "No flat gradients. Use mesh/plasma gradient glows blurred heavily (blur-3xl) placed behind key elements.",
+    "borders": "The Tracing Beam (Aceternity style) on high-conversion cards like Pricing/CTA.",
+    "textures": "Subtle noise overlay (grain) on dark backgrounds to kill digital flatness."
+  },
+  "motion": {
+    "scrolling": "Lenis for smooth momentum scrolling.",
+    "reveals": "Framer Motion line-by-line masked text reveals on headings (Kinetic Typography).",
+    "interactions": "Parallax depth effects on hover. Hovering cards tilts them slightly (rotateX/Y) with glare effect.",
+    "marquee": "Very slow editorial marquee for AI features/differentiators, massive outline text (text-8xl)."
+  },
+  "sections_blueprint": [
+    {
+      "id": "hero",
+      "purpose": "Kinetic Hero with signature on-load reveal.",
+      "components": "Header (transparent glass), language toggle (PT/EN), massive 'Unbounded' heading masked reveal. Background uses abstract neon waves (plasma). CTA 'Conheça'. 3D Parallax floating car image."
+    },
+    {
+      "id": "manifesto",
+      "purpose": "Problem -> Promise -> Solution.",
+      "components": "Numbered chapters. Brutalist large typography. High contrast."
+    },
+    {
+      "id": "how-it-works",
+      "purpose": "Steps for Locador & Locatário.",
+      "components": "Sticky vertical timeline. As user scrolls, steps highlight. CTA 'Veja como funciona'."
+    },
+    {
+      "id": "benefits",
+      "purpose": "Results over features.",
+      "components": "Bento Grid (Mode A). Asymmetric cards with subtle 3D hover effects. Deep dark surfaces."
+    },
+    {
+      "id": "differentiators",
+      "purpose": "AI / Automation focus.",
+      "components": "Tech-Glass HUD feel. Background Marquee running large outlined text."
+    },
+    {
+      "id": "product-demo",
+      "purpose": "Demonstration with premium automotive photography.",
+      "components": "Showroom Scroll. Real car photography treated deliberately with spotlights. Clipped frames."
+    },
+    {
+      "id": "social-proof",
+      "purpose": "Testimonials and Metrics.",
+      "components": "Numbers running fast, realistic avatars, high-end quotes. 'Descubra a Plataforma' CTA."
+    },
+    {
+      "id": "objections-faq",
+      "purpose": "Overcome barriers.",
+      "components": "Shadcn Accordion, heavily customized (dark borders, glowing active state, no backgrounds)."
+    },
+    {
+      "id": "pricing-offer",
+      "purpose": "Direct conversion.",
+      "components": "Pricing cards with 'Tracing Beam' border effect. Glowing CTA buttons. 'Comece agora'."
+    }
+  ],
+  "image_urls": {
+    "hero_car": {
+      "url": "https://images.unsplash.com/photo-1666032956671-5cc9a6bcf7a4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwzfHxsdXh1cnklMjBzcG9ydHMlMjBjYXIlMjBkYXJrJTIwbmlnaHR8ZW58MHx8fHwxNzg3NjIwNDYwfDA&ixlib=rb-4.1.0&q=85",
+      "category": "Hero / Product Showcase",
+      "description": "Luxury sports car at dark night, use for parallax hero or showroom."
+    },
+    "plasma_background": {
+      "url": "https://images.unsplash.com/photo-1637825891028-564f672aa42c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGJsdWUlMjBwdXJwbGUlMjBuZW9uJTIwd2F2ZXN8ZW58MHx8fHwxNzg3NjIwNDYwfDA&ixlib=rb-4.1.0&q=85",
+      "category": "Hero Background / Overlays",
+      "description": "Abstract purple/blue neon waves. Use as blur-3xl background glowing effect behind elements."
+    },
+    "driver_lifestyle": {
+      "url": "https://images.pexels.com/photos/28862374/pexels-photo-28862374.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "category": "Benefits / Social Proof",
+      "description": "Driver in dark dramatic lighting. Use for locador/locatário storytelling."
+    },
+    "showroom_car": {
+      "url": "https://images.unsplash.com/photo-1606590526453-9b8ee4569a70?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHw0fHxsdXh1cnklMjBzcG9ydHMlMjBjYXIlMjBkYXJrJTIwbmlnaHR8ZW58MHx8fHwxNzg3NjIwNDYwfDA&ixlib=rb-4.1.0&q=85",
+      "category": "Product Demonstration",
+      "description": "Yellow/black car in dark room for stark contrast, perfect for split-screen demo section."
+    }
+  },
+  "libraries": {
+    "styling": "Tailwind CSS",
+    "components": "shadcn/ui (highly customized)",
+    "icons": "lucide-react",
+    "motion": "framer-motion (for interactions/reveals)",
+    "scrolling": "@studio-freight/react-lenis",
+    "marquee": "react-fast-marquee"
+  },
+  "instructions_to_main_agent": [
+    "1. Setup PT/EN i18n context or simple state toggle to flip content seamlessly.",
+    "2. Ensure all texts have high contrast against deep black backgrounds. Use text-white for headings and text-zinc-400 for body.",
+    "3. Do not use plain Shadcn Cards. Use HTML/Tailwind to build custom glassmorphism containers (bg-white/5, backdrop-blur-2xl, border-white/10).",
+    "4. Add Framer Motion initial/animate logic for scroll reveals. Text must reveal line-by-line using a hidden/visible stagger pattern.",
+    "5. Avoid 'Inter' entirely. Import 'Unbounded' and 'Outfit' via Google Fonts.",
+    "6. Hero image overlay must be a gradient from black/80 at the bottom to transparent at the top, ensuring the car is visible but text is readable.",
+    "7. Include `data-testid` on ALL interactive elements (buttons, language toggles, accordion triggers, CTA).",
+    "8. CTA 'Entrar' in the nav should visually pop (e.g., glowing purple/blue border) and link to '#login'."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition like 'transition: all'. Apply to specific properties.",
+    "You MUST NOT center align the app container, avoid '.App { text-align: center; }'.",
+    "Always use modern button styles, pill-shaped or sharp with interaction animations.",
+    "NEVER use emoji characters for icons. Use the specified icon library.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "NEVER use placeholder URLs (via.placeholder.com). Use the provided image_urls."
+  ]
+}

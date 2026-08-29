@@ -37,6 +37,16 @@
       "runtimeArgs": ["--prefix", "C:/Users/fabio/.antigravity/production-guardian", "run", "dev"],
       "port": 8080,
       "autoPort": true
+    },
+    {
+      "name": "autoloc-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "C:/Users/fabio/.claude/Shin\u00e3/autoloc.shinaia.com.br-main/frontend",
+        "start"
+      ],
+      "port": 3007
     }
   ]
 }

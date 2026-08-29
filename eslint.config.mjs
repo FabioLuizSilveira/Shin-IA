@@ -10,6 +10,7 @@ export default [
       "**/build/**",
       "**/.turbo/**",
       ".changeset/**",
+      "autoloc.shinaia.com.br-main/**",
     ],
   },
 ];
