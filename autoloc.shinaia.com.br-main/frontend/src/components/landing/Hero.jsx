@@ -6,7 +6,9 @@ import { useLead } from "@/context/LeadContext";
 import { MaskedLines } from "@/components/landing/motion";
 import { trackEvent } from "@/lib/api";
 
-const HERO_CAR = "https://images.unsplash.com/photo-1666032956671-5cc9a6bcf7a4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwzfHxsdXh1cnklMjBzcG9ydHMlMjBjYXIlMjBkYXJrJTIwbmlnaHR8ZW58MHx8fHwxNzg3NjIwNDYwfDA&ixlib=rb-4.1.0&q=85";
+const HERO_VIDEO_WEBM = "/hero-nav.webm";
+const HERO_VIDEO_MP4 = "/hero-nav.mp4";
+const HERO_POSTER = "/hero-nav-poster.jpg";
 
 export function Hero() {
   const { t, lang } = useLang();
@@ -90,12 +92,19 @@ export function Hero() {
           className="relative">
           <motion.div style={{ y: carY, scale: carScale }} className="relative animate-float">
             <div className="absolute inset-0 -z-10 rounded-full bg-[#00E5FF]/20 blur-[100px]" />
-            <img
-              src={HERO_CAR}
-              alt={lang === "pt" ? "Carro esportivo de luxo à noite" : "Luxury sports car at night"}
-              loading="eager"
+            <video
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+              poster={HERO_POSTER}
+              aria-label={lang === "pt" ? "Navegação pelo painel de gestão e pelo app do cliente" : "Walkthrough of the management dashboard and the customer app"}
               className="w-full rounded-[2rem] border border-white/10 object-cover shadow-2xl [mask-image:linear-gradient(to_bottom,black_80%,transparent)]"
-            />
+            >
+              <source src={HERO_VIDEO_WEBM} type="video/webm" />
+              <source src={HERO_VIDEO_MP4} type="video/mp4" />
+            </video>
           </motion.div>
           <div className="glass absolute -bottom-4 left-4 flex items-center gap-3 rounded-2xl px-5 py-3">
             <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#00E5FF]" />
