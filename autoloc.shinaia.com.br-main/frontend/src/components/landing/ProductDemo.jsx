@@ -6,7 +6,7 @@ import { Reveal } from "@/components/landing/motion";
 import { trackEvent } from "@/lib/api";
 
 const SHOWROOM = "/veloz-lot-night.jpg";
-const DRIVER = "https://images.pexels.com/photos/28862374/pexels-photo-28862374.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
+const DRIVER = "/locatario-app.jpg";
 
 export function ProductDemo() {
   const { t, lang } = useLang();
