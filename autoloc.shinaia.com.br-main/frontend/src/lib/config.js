@@ -16,3 +16,13 @@ export const WHATSAPP = {
 };
 
 export const BRAND_LOGO = "/shina-mark.png";
+
+// Shinã hosted Supabase — leads and analytics are written straight to PostgREST.
+// The anon key is public by design (role: anon) and locked down by RLS: the
+// landing_* tables allow INSERT only, no reads. See supabase migration
+// 20260831000000_landing_lead_capture.sql in the Shinã monorepo.
+export const SUPABASE_URL =
+  process.env.REACT_APP_SUPABASE_URL || "https://wokoqmoulsvzikkdcmfc.supabase.co";
+export const SUPABASE_ANON_KEY =
+  process.env.REACT_APP_SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indva29xbW91bHN2emlra2RjbWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMTg5MzQsImV4cCI6MjA5Nzg5NDkzNH0.ooIrP6ruo95JkSay9N_IAnr6XDQU7hgs_YPBmU_F9js";
