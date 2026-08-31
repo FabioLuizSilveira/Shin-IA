@@ -311,6 +311,9 @@ importers:
       '@shina/commission-engine':
         specifier: workspace:*
         version: link:../../packages/commission-engine
+      '@shina/crm-engine':
+        specifier: workspace:*
+        version: link:../../packages/crm-engine
       '@shina/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
@@ -567,6 +570,21 @@ importers:
         version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
 
   packages/commission-engine:
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@vitest/coverage-v8':
+        specifier: ^1.0.0
+        version: 1.6.1(vitest@1.6.1)
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.0.0
+        version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
+
+  packages/crm-engine:
     devDependencies:
       '@shina/typescript-config':
         specifier: workspace:*

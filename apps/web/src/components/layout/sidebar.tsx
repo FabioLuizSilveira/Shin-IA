@@ -29,11 +29,13 @@ import {
   UserCog,
   ClipboardCheck,
   ShieldAlert,
+  Handshake,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const PLATFORM_NAV_ITEMS = [
   { href: "/platform/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/platform/crm", label: "CRM Comercial", icon: Handshake },
   { href: "/platform/tenants", label: "Tenants", icon: Building2 },
   { href: "/platform/billing", label: "Faturamento", icon: CreditCard },
   { href: "/platform/support", label: "Suporte", icon: Headphones },

@@ -18,6 +18,7 @@
     "@shina/charts": "workspace:*",
     "@shina/commercial-platform": "workspace:*",
     "@shina/commission-engine": "workspace:*",
+    "@shina/crm-engine": "workspace:*",
     "@shina/design-system": "workspace:*",
     "@shina/flow-engine": "workspace:*",
     "@shina/icons": "workspace:*",
