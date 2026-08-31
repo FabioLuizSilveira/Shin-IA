@@ -6,7 +6,8 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { CrmLeadDetail } from "@/components/ui/crm-lead-detail";
-import { Plus, X } from "lucide-react";
+import { CrmKanbanBoard } from "@/components/ui/crm-kanban-board";
+import { Plus, X, List, LayoutGrid } from "lucide-react";
 import type { LeadSource, LeadStatus } from "@shina/crm-engine";
 
 interface LeadRow {
@@ -76,6 +77,7 @@ export default function PlatformCrmPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<"list" | "kanban">("list");
 
   const [showForm, setShowForm] = useState(false);
   const [companyName, setCompanyName] = useState("");
@@ -100,8 +102,21 @@ export default function PlatformCrmPage() {
   }, []);
 
   useEffect(() => {
-    void load(filter);
-  }, [filter, load]);
+    // O kanban precisa enxergar todos os estágios ao mesmo tempo pra
+    // desenhar as colunas -- as abas de filtro só fazem sentido na lista.
+    void load(view === "kanban" ? "all" : filter);
+  }, [filter, view, load]);
+
+  async function handleMove(leadId: string, _from: LeadStatus, to: LeadStatus) {
+    const res = await fetch(`/api/platform-crm/leads/${leadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: to }),
+    });
+    const json = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) throw new Error(json.error ?? "Falha ao mover o lead.");
+    await load("all");
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -177,37 +192,72 @@ export default function PlatformCrmPage() {
         title="CRM Comercial"
         description="Funil de captação e evolução de leads comerciais da Shinã."
         action={
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-shina-blue hover:bg-blue-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" /> Novo Lead
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-slate-100 dark:bg-white/5 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => setView("list")}
+                title="Lista"
+                className={`p-1.5 rounded-md border-0 cursor-pointer ${
+                  view === "list"
+                    ? "bg-white dark:bg-slate-800 text-shina-blue shadow-sm"
+                    : "bg-transparent text-slate-500"
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("kanban")}
+                title="Kanban"
+                className={`p-1.5 rounded-md border-0 cursor-pointer ${
+                  view === "kanban"
+                    ? "bg-white dark:bg-slate-800 text-shina-blue shadow-sm"
+                    : "bg-transparent text-slate-500"
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-shina-blue hover:bg-blue-600 text-white text-xs font-semibold rounded-lg border-0 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Novo Lead
+            </button>
+          </div>
         }
       />
 
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilter(f.key)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg border-0 cursor-pointer transition-colors ${
-              filter === f.key
-                ? "bg-shina-blue text-white"
-                : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {view === "list" && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFilter(f.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg border-0 cursor-pointer transition-colors ${
+                filter === f.key
+                  ? "bg-shina-blue text-white"
+                  : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
-      <DataTable columns={columns} data={leads} loading={loading} />
-
-      {!loading && leads.length === 0 && (
-        <p className="text-sm text-slate-500 mt-4 text-center">Nenhum lead encontrado.</p>
+      {view === "list" ? (
+        <>
+          <DataTable columns={columns} data={leads} loading={loading} />
+          {!loading && leads.length === 0 && (
+            <p className="text-sm text-slate-500 mt-4 text-center">Nenhum lead encontrado.</p>
+          )}
+        </>
+      ) : (
+        <CrmKanbanBoard leads={leads} onSelect={setSelectedId} onMove={handleMove} />
       )}
 
       <CrmLeadDetail
