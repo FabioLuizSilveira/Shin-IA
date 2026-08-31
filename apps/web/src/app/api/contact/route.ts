@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { internalError } from "@/lib/api-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { sendEmail } from "@/lib/send-email";
+import { appUrl } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,10 @@ export const dynamic = "force-dynamic";
 const SYSTEM_ACTOR_ID = "00000000-0000-0000-0000-000000000000";
 
 const RATE_LIMIT = { maxRequests: 5, windowMs: 10 * 60 * 1000 }; // 5 per 10min per IP
+
+// Configurable so this doesn't need a code change if the inbox changes --
+// falls back to the address already shown on the contact page itself.
+const SALES_NOTIFICATION_EMAIL = process.env.SALES_NOTIFICATION_EMAIL ?? "diego@shinaia.com.br";
 
 interface ContactBody {
   name?: string;
@@ -96,6 +102,18 @@ export async function POST(req: NextRequest) {
       from_status: null,
       to_status: "new",
       created_by: SYSTEM_ACTOR_ID,
+    });
+
+    // Fire-and-forget -- a stuck/failed email must never delay or fail the
+    // visitor's own submission. Only on a genuinely new lead (item above),
+    // never on a re-submission appended to one already sitting in the CRM,
+    // so sales doesn't get a second email for the same person retrying.
+    void sendEmail(SALES_NOTIFICATION_EMAIL, "new_lead", {
+      company_name: company || name,
+      contact_name: name,
+      contact_email: email,
+      message,
+      lead_url: appUrl(`/platform/crm`),
     });
   }
 

@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 interface EmailPayload {
   to: string;
-  template: "welcome" | "invite" | "operation_alert" | "invoice_due";
+  template: "welcome" | "invite" | "operation_alert" | "invoice_due" | "new_lead";
   data: Record<string, string | number | boolean>;
 }
 
@@ -247,6 +247,47 @@ function templateInvoiceDue(data: Record<string, string | number | boolean>): {
   };
 }
 
+function templateNewLead(data: Record<string, string | number | boolean>): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const companyName = String(data.company_name ?? "");
+  const contactName = String(data.contact_name ?? "");
+  const contactEmail = String(data.contact_email ?? "");
+  const message = String(data.message ?? "");
+  const leadUrl = String(data.lead_url ?? `${APP_URL}/platform/crm`);
+
+  const body = `
+    <h1 style="margin:0 0 8px;font-size:24px;font-weight:800;color:#0f172a;">Novo lead pelo site 🎯</h1>
+    <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
+      Alguém preencheu o formulário de contato em shinaia.com.br e já caiu no CRM comercial.
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <p style="margin:0 0 10px;">
+        <span style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Empresa</span><br/>
+        <span style="font-size:15px;font-weight:600;color:#0f172a;">${companyName}</span>
+      </p>
+      <p style="margin:0 0 10px;">
+        <span style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Contato</span><br/>
+        <span style="font-size:15px;font-weight:600;color:#0f172a;">${contactName} · ${contactEmail}</span>
+      </p>
+      <p style="margin:0;">
+        <span style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Mensagem</span><br/>
+        <span style="font-size:14px;color:#334155;white-space:pre-wrap;">${message}</span>
+      </p>
+    </div>
+    <a href="${leadUrl}" style="display:inline-block;background:${BRAND_COLOR};color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:700;font-size:15px;">
+      Ver no CRM →
+    </a>`;
+
+  return {
+    subject: `Novo lead: ${companyName || contactName}`,
+    html: buildHtmlWrapper(`Novo lead — ${companyName}`, body),
+    text: `Novo lead pelo site: ${companyName} (${contactName}, ${contactEmail}). Mensagem: ${message}. Ver em: ${leadUrl}`,
+  };
+}
+
 // ─── Send via Resend API ───────────────────────────────────────────────────────
 
 async function sendEmail(
@@ -331,6 +372,9 @@ serve(async (req: Request) => {
       break;
     case "invoice_due":
       template = templateInvoiceDue(payload.data);
+      break;
+    case "new_lead":
+      template = templateNewLead(payload.data);
       break;
     default:
       return Response.json(
