@@ -321,13 +321,30 @@ async function sendEmail(
     }),
   });
 
-  const json = (await res.json()) as ResendResponse;
-
-  if (!res.ok || json.error) {
-    return { success: false, error: json.error?.message ?? "Resend API error" };
+  // Read as text first, not res.json() directly -- an error response shape
+  // Resend didn't document (or a non-JSON body on a 5xx) used to throw here
+  // uncaught and/or collapse into the generic "Resend API error" fallback
+  // below with zero diagnostic info, which is exactly what happened live
+  // the first time this template was tested (a real Resend failure came
+  // back as just "Resend API error", no way to tell why from the caller).
+  const rawBody = await res.text();
+  let json: ResendResponse | Record<string, unknown> = {};
+  try {
+    json = JSON.parse(rawBody) as ResendResponse;
+  } catch {
+    // non-JSON body -- rawBody itself becomes the error detail below
   }
 
-  return { success: true, id: json.id };
+  if (!res.ok || (json as ResendResponse).error) {
+    const detail =
+      (json as ResendResponse).error?.message ??
+      (json as { message?: string }).message ??
+      (rawBody ? rawBody.slice(0, 300) : `HTTP ${res.status}`);
+    console.error(`[send-email] Resend API error (status=${res.status}):`, rawBody);
+    return { success: false, error: `Resend API error: ${detail}` };
+  }
+
+  return { success: true, id: (json as ResendResponse).id };
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
