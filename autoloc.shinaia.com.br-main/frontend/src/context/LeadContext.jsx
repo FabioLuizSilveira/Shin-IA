@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Loader2, CheckCircle2, ArrowRight } from "lucide-react";
+import { X, Loader2, ArrowRight } from "lucide-react";
 import { useLang } from "@/context/LangContext";
 import { submitLead, trackEvent } from "@/lib/api";
 import { PLATFORM } from "@/lib/config";
@@ -32,10 +32,7 @@ export function LeadProvider({ children }) {
     try {
       await submitLead({ ...form, source, locale: lang });
       trackEvent("form_completed", { label: source, section: source, locale: lang });
-      setStatus("success");
-      setTimeout(() => {
-        window.open(PLATFORM.signup, "_blank", "noopener");
-      }, 1400);
+      window.location.assign(PLATFORM.signup);
     } catch (err) {
       setStatus("error");
     }
@@ -63,35 +60,26 @@ export function LeadProvider({ children }) {
                 <X size={20} />
               </button>
 
-              {status === "success" ? (
-                <div className="py-8 text-center" data-testid="lead-success">
-                  <CheckCircle2 className="mx-auto mb-4 text-[#00E5FF]" size={56} />
-                  <h3 className="font-display text-2xl font-bold">{m.success}</h3>
-                </div>
-              ) : (
-                <>
-                  <h3 className="font-display text-2xl font-bold">{m.title}</h3>
-                  <p className="mt-2 text-sm text-zinc-400">{m.sub}</p>
-                  <form onSubmit={onSubmit} className="mt-6 space-y-4">
-                    <input data-testid="lead-name" required value={form.name} onChange={upd("name")} placeholder={m.name}
-                      className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm outline-none focus:border-[#00E5FF]/60 transition-colors" />
-                    <input data-testid="lead-email" required type="email" value={form.email} onChange={upd("email")} placeholder={m.email}
-                      className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm outline-none focus:border-[#00E5FF]/60 transition-colors" />
-                    <input data-testid="lead-phone" value={form.phone} onChange={upd("phone")} placeholder={m.phone}
-                      className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm outline-none focus:border-[#00E5FF]/60 transition-colors" />
-                    <select data-testid="lead-profile" value={form.profile} onChange={upd("profile")}
-                      className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm outline-none focus:border-[#00E5FF]/60 transition-colors">
-                      <option value="locador" className="bg-[#3f3f52]">{m.locador}</option>
-                      <option value="locatario" className="bg-[#3f3f52]">{m.locatario}</option>
-                    </select>
-                    {status === "error" && <p className="text-sm text-red-400">{m.error}</p>}
-                    <button data-testid="lead-submit" type="submit" disabled={status === "loading"}
-                      className="btn-glow flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#00E5FF] to-[#7000FF] px-6 py-3.5 font-semibold text-white disabled:opacity-60">
-                      {status === "loading" ? <Loader2 className="animate-spin" size={18} /> : <>{m.submit} <ArrowRight size={16} /></>}
-                    </button>
-                  </form>
-                </>
-              )}
+              <h3 className="font-display text-2xl font-bold">{m.title}</h3>
+              <p className="mt-2 text-sm text-zinc-400">{m.sub}</p>
+              <form onSubmit={onSubmit} className="mt-6 space-y-4">
+                <input data-testid="lead-name" required value={form.name} onChange={upd("name")} placeholder={m.name}
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm outline-none focus:border-[#00E5FF]/60 transition-colors" />
+                <input data-testid="lead-email" required type="email" value={form.email} onChange={upd("email")} placeholder={m.email}
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm outline-none focus:border-[#00E5FF]/60 transition-colors" />
+                <input data-testid="lead-phone" value={form.phone} onChange={upd("phone")} placeholder={m.phone}
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm outline-none focus:border-[#00E5FF]/60 transition-colors" />
+                <select data-testid="lead-profile" value={form.profile} onChange={upd("profile")}
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm outline-none focus:border-[#00E5FF]/60 transition-colors">
+                  <option value="locador" className="bg-[#3f3f52]">{m.locador}</option>
+                  <option value="locatario" className="bg-[#3f3f52]">{m.locatario}</option>
+                </select>
+                {status === "error" && <p className="text-sm text-red-400">{m.error}</p>}
+                <button data-testid="lead-submit" type="submit" disabled={status === "loading"}
+                  className="btn-glow flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#00E5FF] to-[#7000FF] px-6 py-3.5 font-semibold text-white disabled:opacity-60">
+                  {status === "loading" ? <Loader2 className="animate-spin" size={18} /> : <>{m.submit} <ArrowRight size={16} /></>}
+                </button>
+              </form>
             </motion.div>
           </motion.div>
         )}
