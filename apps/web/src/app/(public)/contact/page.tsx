@@ -22,10 +22,20 @@ export default function ContactPage() {
     }
     setLoading(true);
     setError(null);
-    // Simulate send (replace with real API call)
-    await new Promise((r) => setTimeout(r, 1200));
-    setLoading(false);
-    setSent(true);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, company: company || undefined, message }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Falha ao enviar. Tente novamente.");
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao enviar. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
