@@ -30,6 +30,7 @@ import {
   ClipboardCheck,
   ShieldAlert,
   Handshake,
+  Wrench,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -52,6 +53,7 @@ const TENANT_NAV_ITEMS = [
   { href: "/tenant/assets", label: "Frota & Ativos", icon: Truck },
   { href: "/tenant/inspections", label: "Vistorias", icon: ClipboardCheck },
   { href: "/tenant/infractions", label: "Infrações", icon: ShieldAlert },
+  { href: "/tenant/maintenance", label: "Manutenção", icon: Wrench },
   { href: "/tenant/crm", label: "Clientes & Parceiros", icon: Users },
   { href: "/tenant/contracts", label: "Contratos", icon: FileText },
   { href: "/tenant/operators", label: "Operadores", icon: UserCog },
