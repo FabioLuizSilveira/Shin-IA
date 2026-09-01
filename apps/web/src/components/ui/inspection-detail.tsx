@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { X, Camera, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
+import { X, Camera, CheckCircle2, AlertTriangle, ArrowRight, Wrench } from "lucide-react";
 import type {
   HydratedInspectionTemplate,
   InspectionFindingStatus,
@@ -45,7 +45,10 @@ interface FindingRow {
   severity: string;
   status: InspectionFindingStatus;
   ai_suggested: boolean;
+  maintenance_order_id: string | null;
 }
+
+const CONVERTIBLE_FINDING_STATUSES = new Set(["confirmed", "chargeable", "resolved"]);
 
 interface DetailPayload {
   inspection: InspectionRow;
@@ -276,6 +279,25 @@ export function InspectionDetail({
       });
       const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json.error ?? "Falha ao revisar constatação.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function convertFindingToMaintenance(findingId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/findings/${findingId}/convert-to-maintenance`, {
+        method: "POST",
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok && res.status !== 409) {
+        throw new Error(json.error ?? "Falha ao gerar ordem de manutenção.");
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
@@ -734,6 +756,21 @@ export function InspectionDetail({
                             </button>
                           </div>
                         )}
+                        {CONVERTIBLE_FINDING_STATUSES.has(finding.status) &&
+                          (finding.maintenance_order_id ? (
+                            <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                              Ordem de manutenção gerada
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void convertFindingToMaintenance(finding.id)}
+                              className="px-2.5 py-1 bg-shina-blue/10 text-shina-blue text-xs font-medium rounded-lg border-0 cursor-pointer disabled:opacity-60 flex items-center gap-1"
+                            >
+                              <Wrench className="w-3.5 h-3.5" /> Gerar ordem de manutenção
+                            </button>
+                          ))}
                       </div>
                     ))}
                   </div>

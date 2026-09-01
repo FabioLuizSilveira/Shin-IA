@@ -59,7 +59,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     scope.db
       .from("inspection_findings")
       .select(
-        "id, item_id, description, severity, status, ai_suggested, preexisting_finding_id, overlay_region",
+        "id, item_id, description, severity, status, ai_suggested, preexisting_finding_id, overlay_region, maintenance_order_id",
       )
       .eq("inspection_id", id),
     scope.db
