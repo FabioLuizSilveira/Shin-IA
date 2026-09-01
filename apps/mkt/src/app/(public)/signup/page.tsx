@@ -45,19 +45,32 @@ export default function SignupPage() {
   );
 }
 
+export interface BillingAddress {
+  phone: string;
+  address: string;
+  addressNumber: string;
+  postalCode: string;
+  province: string;
+}
+
 function ContractAcceptModal({
   planVersionId,
   onAccepted,
   onClose,
 }: {
   planVersionId: string;
-  onAccepted: () => void;
+  onAccepted: (customerName: string, document: string, billing: BillingAddress) => void;
   onClose: () => void;
 }) {
   const [contract, setContract] = useState<ContractInfo | null>(null);
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [document, setDocument] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [addressNumber, setAddressNumber] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [province, setProvince] = useState("");
   const [declaredAuthority, setDeclaredAuthority] = useState(false);
   const [contractAccepted, setContractAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -73,8 +86,22 @@ function ContractAcceptModal({
   }, []);
 
   async function handleAccept() {
-    if (!name.trim() || !role.trim() || !declaredAuthority || !contractAccepted) {
-      setError("Preencha todos os campos e marque os dois checkboxes.");
+    if (
+      !name.trim() ||
+      !role.trim() ||
+      !document.trim() ||
+      !phone.trim() ||
+      !address.trim() ||
+      !addressNumber.trim() ||
+      !postalCode.trim() ||
+      !province.trim() ||
+      !declaredAuthority ||
+      !contractAccepted
+    ) {
+      // document went from optional to required here — the payment
+      // gateway (Asaas) rejects a checkout without a real CPF/CNPJ, live-
+      // verified during the Stripe -> Asaas migration's Fase A.
+      setError("Preencha todos os campos (incluindo CPF e endereço) e marque os dois checkboxes.");
       return;
     }
     setError(null);
@@ -87,7 +114,7 @@ function ContractAcceptModal({
           planVersionId,
           representativeName: name,
           representativeRole: role,
-          representativeDocument: document || undefined,
+          representativeDocument: document,
           declaredAuthority,
         }),
       });
@@ -95,7 +122,7 @@ function ContractAcceptModal({
         const json = (await res.json()) as { error?: string };
         throw new Error(json.error ?? "Erro ao aceitar o contrato.");
       }
-      onAccepted();
+      onAccepted(name, document, { phone, address, addressNumber, postalCode, province });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
     } finally {
@@ -136,9 +163,46 @@ function ContractAcceptModal({
           />
           <input
             type="text"
-            placeholder="CPF (opcional)"
+            placeholder="CPF"
             value={document}
             onChange={(e) => setDocument(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/40"
+          />
+          <input
+            type="text"
+            placeholder="Telefone (ex: 11999999999)"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/40"
+          />
+          <input
+            type="text"
+            placeholder="Endereço (rua/avenida)"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/40"
+          />
+          <div className="flex gap-3">
+            <input
+              type="text"
+              placeholder="Número"
+              value={addressNumber}
+              onChange={(e) => setAddressNumber(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/40"
+            />
+            <input
+              type="text"
+              placeholder="CEP"
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/40"
+            />
+          </div>
+          <input
+            type="text"
+            placeholder="Bairro"
+            value={province}
+            onChange={(e) => setProvince(e.target.value)}
             className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/40"
           />
 
@@ -202,6 +266,11 @@ function SignupForm() {
       : null,
   );
   const [pendingAcceptance, setPendingAcceptance] = useState<string | null>(null);
+  const [billingInfo, setBillingInfo] = useState<{
+    customerName: string;
+    document: string;
+    billing: BillingAddress;
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/commercial/plans")
@@ -231,14 +300,28 @@ function SignupForm() {
     // não precisa ser desfeito aqui.
   }
 
-  async function handleCheckout() {
+  async function handleCheckout(billing?: typeof billingInfo) {
     setError(null);
     setLoading("checkout");
     try {
+      const info = billing ?? billingInfo;
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({
+          plan,
+          ...(info
+            ? {
+                customerName: info.customerName,
+                document: info.document,
+                phone: info.billing.phone,
+                address: info.billing.address,
+                addressNumber: info.billing.addressNumber,
+                postalCode: info.billing.postalCode,
+                province: info.billing.province,
+              }
+            : {}),
+        }),
       });
       const data = (await res.json()) as { url?: string; error?: string; planVersionId?: string };
       if (res.status === 403 && data.error === "acceptance_required" && data.planVersionId) {
@@ -334,9 +417,11 @@ function SignupForm() {
         <ContractAcceptModal
           planVersionId={pendingAcceptance}
           onClose={() => setPendingAcceptance(null)}
-          onAccepted={() => {
+          onAccepted={(customerName, document, billing) => {
+            const info = { customerName, document, billing };
+            setBillingInfo(info);
             setPendingAcceptance(null);
-            void handleCheckout();
+            void handleCheckout(info);
           }}
         />
       )}

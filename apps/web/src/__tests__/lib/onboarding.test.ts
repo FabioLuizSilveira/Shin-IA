@@ -41,6 +41,15 @@ function validateStep4(d: Partial<OnboardingStep4>): string | null {
 function validateStep5(d: Partial<OnboardingStep5>): string | null {
   if (!d.representativeName?.trim()) return "Informe seu nome completo.";
   if (!d.representativeRole?.trim()) return "Informe seu cargo.";
+  if (
+    !d.billingPhone?.trim() ||
+    !d.billingAddress?.trim() ||
+    !d.billingAddressNumber?.trim() ||
+    !d.billingPostalCode?.trim() ||
+    !d.billingProvince?.trim()
+  ) {
+    return "Preencha o endereço de cobrança completo.";
+  }
   if (!d.declaredAuthority) return "É necessário declarar poderes de representação.";
   if (!d.contractAccepted) return "É necessário aceitar o contrato para continuar.";
   return null;
@@ -164,6 +173,11 @@ describe("validateStep5 — Contract", () => {
     representativeRole: "Sócio-diretor",
     declaredAuthority: true,
     contractAccepted: true,
+    billingPhone: "11999999999",
+    billingAddress: "Avenida Paulista",
+    billingAddressNumber: "1000",
+    billingPostalCode: "01310-000",
+    billingProvince: "Bela Vista",
   };
 
   it("passes with valid data", () => {
@@ -176,6 +190,14 @@ describe("validateStep5 — Contract", () => {
 
   it("requires representative role", () => {
     expect(validateStep5({ ...valid, representativeRole: "" })).toMatch(/cargo/i);
+  });
+
+  it("requires a complete billing address", () => {
+    expect(validateStep5({ ...valid, billingPhone: "" })).toMatch(/endereço/i);
+    expect(validateStep5({ ...valid, billingAddress: "" })).toMatch(/endereço/i);
+    expect(validateStep5({ ...valid, billingAddressNumber: "" })).toMatch(/endereço/i);
+    expect(validateStep5({ ...valid, billingPostalCode: "" })).toMatch(/endereço/i);
+    expect(validateStep5({ ...valid, billingProvince: "" })).toMatch(/endereço/i);
   });
 
   it("requires declared authority", () => {

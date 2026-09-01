@@ -86,6 +86,15 @@ export async function POST(request: NextRequest) {
       { status: 422 },
     );
   }
+  if (
+    !step5.billingPhone?.trim() ||
+    !step5.billingAddress?.trim() ||
+    !step5.billingAddressNumber?.trim() ||
+    !step5.billingPostalCode?.trim() ||
+    !step5.billingProvince?.trim()
+  ) {
+    return NextResponse.json({ error: "Endereço de cobrança incompleto." }, { status: 422 });
+  }
 
   const admin = createAdminClient();
   const tenantSlug = generateSlug(step1.companyName);
@@ -126,6 +135,14 @@ export async function POST(request: NextRequest) {
         },
         successUrlBase: appUrl("/onboarding/success"),
         cancelUrl: appUrl("/onboarding"),
+        document: step1.cnpj,
+        billingAddress: {
+          phone: step5.billingPhone,
+          address: step5.billingAddress,
+          addressNumber: step5.billingAddressNumber,
+          postalCode: step5.billingPostalCode,
+          province: step5.billingProvince,
+        },
       },
     });
 

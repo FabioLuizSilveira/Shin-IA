@@ -658,6 +658,60 @@ function Step5({
         />
       </div>
 
+      <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+          Endereço de cobrança <span className="text-red-500">*</span>
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <input
+              id="ob-billing-phone"
+              type="text"
+              placeholder="Telefone (ex: 11999999999)"
+              value={data.billingPhone ?? ""}
+              onChange={(e) => onChange({ ...data, billingPhone: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            />
+          </div>
+          <div className="col-span-2">
+            <input
+              id="ob-billing-address"
+              type="text"
+              placeholder="Endereço (rua/avenida)"
+              value={data.billingAddress ?? ""}
+              onChange={(e) => onChange({ ...data, billingAddress: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            />
+          </div>
+          <input
+            id="ob-billing-address-number"
+            type="text"
+            placeholder="Número"
+            value={data.billingAddressNumber ?? ""}
+            onChange={(e) => onChange({ ...data, billingAddressNumber: e.target.value })}
+            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+          />
+          <input
+            id="ob-billing-postal-code"
+            type="text"
+            placeholder="CEP"
+            value={data.billingPostalCode ?? ""}
+            onChange={(e) => onChange({ ...data, billingPostalCode: e.target.value })}
+            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+          />
+          <div className="col-span-2">
+            <input
+              id="ob-billing-province"
+              type="text"
+              placeholder="Bairro"
+              value={data.billingProvince ?? ""}
+              onChange={(e) => onChange({ ...data, billingProvince: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+            />
+          </div>
+        </div>
+      </div>
+
       <label className="flex items-start gap-2.5 cursor-pointer">
         <input
           id="ob-declared-authority"
@@ -690,6 +744,15 @@ function Step5({
 function validateStep5(d: Partial<OnboardingStep5>): string | null {
   if (!d.representativeName?.trim()) return "Informe seu nome completo.";
   if (!d.representativeRole?.trim()) return "Informe seu cargo.";
+  if (
+    !d.billingPhone?.trim() ||
+    !d.billingAddress?.trim() ||
+    !d.billingAddressNumber?.trim() ||
+    !d.billingPostalCode?.trim() ||
+    !d.billingProvince?.trim()
+  ) {
+    return "Preencha o endereço de cobrança completo.";
+  }
   if (!d.declaredAuthority) return "É necessário declarar poderes de representação.";
   if (!d.contractAccepted) return "É necessário aceitar o contrato para continuar.";
   return null;

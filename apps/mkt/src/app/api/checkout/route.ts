@@ -21,7 +21,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Faça login antes de continuar." }, { status: 401 });
   }
 
-  const { plan } = (await request.json()) as { plan?: string };
+  const body = (await request.json()) as {
+    plan?: string;
+    customerName?: string;
+    document?: string;
+    phone?: string;
+    address?: string;
+    addressNumber?: string;
+    postalCode?: string;
+    province?: string;
+  };
+  const { plan } = body;
   if (!plan) {
     return NextResponse.json({ error: "Plano inválido." }, { status: 400 });
   }
@@ -81,6 +91,13 @@ export async function POST(request: Request) {
       successUrl: `${appUrl}/signup/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${appUrl}/signup?plan=${plan}`,
       extraMetadata: { refundEligibleUntil: String(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+      customerName: body.customerName,
+      customerDocument: body.document,
+      phone: body.phone,
+      address: body.address,
+      addressNumber: body.addressNumber,
+      postalCode: body.postalCode,
+      province: body.province,
     });
     return NextResponse.json({ url });
   } catch (err) {

@@ -41,6 +41,20 @@ export interface CommercialOnboardingInput {
   /** tenantId is appended as ?tenant_id=... once known (created inside this function). */
   successUrlBase: string;
   cancelUrl: string;
+  /**
+   * The company's own CPF/CNPJ (Step 1's cnpj, not the individual
+   * representative's document) — the actual payer for a B2B subscription.
+   * Required by document-based gateways (Asaas); ignored by Stripe.
+   */
+  document?: string;
+  /** Billing address, collected once at signup — see CreateCommercialCheckoutInput's own comment for why this exists. */
+  billingAddress?: {
+    phone: string;
+    address: string;
+    addressNumber: string;
+    postalCode: string;
+    province: string;
+  };
 }
 
 export interface ProvisionTenantInput {
@@ -215,6 +229,13 @@ export async function provisionTenant(
       commercialTermsSnapshotId: acceptance.commercialTermsSnapshotId,
       successUrl: `${input.commercial.successUrlBase}?tenant_id=${tenantId}`,
       cancelUrl: input.commercial.cancelUrl,
+      customerName: input.commercial.representative.name,
+      customerDocument: input.commercial.document,
+      phone: input.commercial.billingAddress?.phone,
+      address: input.commercial.billingAddress?.address,
+      addressNumber: input.commercial.billingAddress?.addressNumber,
+      postalCode: input.commercial.billingAddress?.postalCode,
+      province: input.commercial.billingAddress?.province,
     });
 
     return { tenantId, slug: input.slug, inviteSent, checkoutUrl: url };

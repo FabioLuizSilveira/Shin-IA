@@ -83,4 +83,16 @@ export interface CreateCommercialCheckoutInput {
    */
   customerName?: string;
   customerDocument?: string;
+  /**
+   * Billing address — live-verified against the Asaas sandbox (Fase A of
+   * the Stripe -> Asaas migration) to be required for checkout creation.
+   * Optional here (Stripe never reads these); the caller collects them
+   * once at signup and threads them through regardless of which gateway
+   * ends up active.
+   */
+  phone?: string;
+  address?: string;
+  addressNumber?: string;
+  postalCode?: string;
+  province?: string;
 }

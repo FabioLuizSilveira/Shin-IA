@@ -45,6 +45,14 @@ export interface OnboardingStep5 {
   representativeDocument?: string;
   declaredAuthority: boolean;
   contractAccepted: boolean;
+  // Billing address — required by the payment gateway (Asaas) to create a
+  // checkout; collected once here rather than a separate step, since this
+  // is already the "who is legally responsible" step.
+  billingPhone: string;
+  billingAddress: string;
+  billingAddressNumber: string;
+  billingPostalCode: string;
+  billingProvince: string;
 }
 
 export interface OnboardingState {

@@ -209,15 +209,21 @@ export class AsaasBillingProvider implements BillingProvider {
         cycle: CYCLE_MAP[params.billingCycle],
         nextDueDate: nextDueDate.toISOString().slice(0, 10),
       },
-      // Asaas metadata equivalent — externalReference is the only free-text
-      // field this resource carries; our checkout_ref_id (the reconciliation
-      // anchor commercial-platform needs) is packed in here as JSON, same
-      // role Stripe's `metadata` object plays.
-      externalReference: JSON.stringify({
-        product: params.product,
-        plan: params.planKey,
-        ...params.metadata,
-      }),
+      // externalReference is the only free-text field this resource
+      // carries, and Asaas caps it at 200 chars -- live-verified: a
+      // Stripe-style JSON blob of the full metadata object (product, plan,
+      // tenant_id, plan_version_id, contract_acceptance_id,
+      // commercial_terms_snapshot_id, ...) blew straight past that limit
+      // and 400'd every real commercial-platform checkout. checkout_ref_id
+      // alone is enough for the webhook to reconcile everything else --
+      // commercial-platform already persisted the full context on the
+      // checkout_session_references row at insert time (see
+      // checkout-orchestration.ts) -- so that single id is all this needs
+      // to carry. Callers with no checkout_ref_id (a bare product+plan
+      // checkout, no commercial-platform layer above it) fall back to a
+      // short "product:plan" string instead of the full metadata object.
+      externalReference:
+        params.metadata?.checkout_ref_id ?? `${params.product}:${params.planKey}`.slice(0, 200),
     });
 
     // `link` was present on every live sandbox response during Fase A's
