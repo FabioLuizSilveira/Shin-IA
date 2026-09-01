@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { AppShell } from "@/components/layout/app-shell";
+import { MaintenanceInsightsPanel } from "@/components/ui/maintenance-insights-panel";
 import {
   Sparkles,
   TrendingUp,
@@ -373,6 +374,11 @@ export default function AIPage() {
           {INSIGHT_CARDS.map((card) => (
             <InsightWidget key={card.type} card={card} />
           ))}
+        </div>
+
+        {/* Shinã Insights (Maintenance Auditor) — deterministic, no LLM */}
+        <div className="mt-4">
+          <MaintenanceInsightsPanel />
         </div>
       </div>
     </AppShell>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Boxes, FileSignature, Receipt, CalendarClock } from "lucide-react";
+import { Activity, Boxes, FileSignature, Receipt, CalendarClock, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -54,6 +54,10 @@ function operationStatusToUi(
 export default function TenantDashboardPage() {
   const [metrics, setMetrics] = useState<TenantMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  // Etapa 15 ("Shinã Insights") — a teaser into the AI Center's
+  // Maintenance Auditor panel, not a second/parallel dashboard: this
+  // dashboard only ever shows a count and links out to the real panel.
+  const [openInsightsCount, setOpenInsightsCount] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/tenant-metrics")
@@ -61,6 +65,11 @@ export default function TenantDashboardPage() {
       .then((json: { data?: TenantMetrics }) => setMetrics(json.data ?? null))
       .catch(() => setMetrics(null))
       .finally(() => setLoading(false));
+
+    fetch("/api/maintenance/insights")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json: { data?: unknown[] } | null) => setOpenInsightsCount(json?.data?.length ?? 0))
+      .catch(() => setOpenInsightsCount(null));
   }, []);
 
   return (
@@ -70,7 +79,7 @@ export default function TenantDashboardPage() {
         description="Resumo das operações, ativos, contratos e faturas do seu tenant."
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <MetricCard
           title="Operações Ativas"
           value={loading ? "..." : String(metrics?.activeOperations ?? 0)}
@@ -110,6 +119,14 @@ export default function TenantDashboardPage() {
           icon={<Receipt className="w-5 h-5" />}
           trend={metrics && metrics.invoices.outstanding > 0 ? "down" : "neutral"}
           href="/tenant/billing"
+        />
+        <MetricCard
+          title="Insights de Manutenção"
+          value={openInsightsCount === null ? "..." : String(openInsightsCount)}
+          changeLabel={openInsightsCount !== null && openInsightsCount > 0 ? "abertos" : undefined}
+          icon={<Sparkles className="w-5 h-5" />}
+          trend={openInsightsCount && openInsightsCount > 0 ? "down" : "neutral"}
+          href="/tenant/ai"
         />
       </div>
 
