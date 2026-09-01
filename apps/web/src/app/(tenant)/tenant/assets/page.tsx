@@ -71,6 +71,13 @@ const ANOMALY_SEVERITY_CLASS: Record<AnomalyData["severity"], string> = {
   high: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
 };
 
+interface RecommendationData {
+  id: string;
+  message: string;
+  priority: "low" | "medium" | "high";
+  status: "pending" | "accepted" | "dismissed";
+}
+
 function statusToUi(status: AssetStatus): "active" | "inactive" | "pending" | "warning" {
   switch (status) {
     case "available":
@@ -92,6 +99,8 @@ export default function TenantAssetsPage() {
   const [healthScore, setHealthScore] = useState<HealthScoreData | null>(null);
   const [healthScoreLoading, setHealthScoreLoading] = useState(false);
   const [anomalies, setAnomalies] = useState<AnomalyData[] | null>(null);
+  const [recommendations, setRecommendations] = useState<RecommendationData[] | null>(null);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
@@ -123,12 +132,14 @@ export default function TenantAssetsPage() {
     if (!selected) {
       setHealthScore(null);
       setAnomalies(null);
+      setRecommendations(null);
       return;
     }
     let cancelled = false;
     setHealthScoreLoading(true);
     setHealthScore(null);
     setAnomalies(null);
+    setRecommendations(null);
     fetch(`/api/assets/${selected.id}/health-score`)
       .then((res) => (res.ok ? res.json() : null))
       .then((json: { data?: HealthScoreData } | null) => {
@@ -148,10 +159,36 @@ export default function TenantAssetsPage() {
       .catch(() => {
         if (!cancelled) setAnomalies([]);
       });
+    fetch(`/api/assets/${selected.id}/recommendations`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: { data?: RecommendationData[] } | null) => {
+        if (!cancelled) setRecommendations(json?.data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setRecommendations([]);
+      });
     return () => {
       cancelled = true;
     };
   }, [selected]);
+
+  async function decideRecommendation(id: string, status: "accepted" | "dismissed") {
+    setDecidingId(id);
+    try {
+      const res = await fetch(`/api/maintenance/recommendations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        setRecommendations((prev) =>
+          prev ? prev.map((r) => (r.id === id ? { ...r, status } : r)) : prev,
+        );
+      }
+    } finally {
+      setDecidingId(null);
+    }
+  }
 
   async function openForm() {
     setFormError(null);
@@ -421,6 +458,39 @@ export default function TenantAssetsPage() {
                       {a.message}
                     </div>
                   ))}
+                </div>
+              )}
+              {recommendations && recommendations.some((r) => r.status === "pending") && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-slate-500">Recomendações</p>
+                  {recommendations
+                    .filter((r) => r.status === "pending")
+                    .map((r) => (
+                      <div
+                        key={r.id}
+                        className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 space-y-2"
+                      >
+                        <p className="text-xs text-slate-700 dark:text-slate-200">{r.message}</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={decidingId === r.id}
+                            onClick={() => void decideRecommendation(r.id, "accepted")}
+                            className="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:opacity-80 disabled:opacity-50 border-0 cursor-pointer"
+                          >
+                            Aceitar
+                          </button>
+                          <button
+                            type="button"
+                            disabled={decidingId === r.id}
+                            onClick={() => void decideRecommendation(r.id, "dismissed")}
+                            className="px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:opacity-80 disabled:opacity-50 border-0 cursor-pointer"
+                          >
+                            Dispensar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                 </div>
               )}
             </div>

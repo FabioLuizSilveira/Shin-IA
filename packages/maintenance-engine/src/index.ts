@@ -21,3 +21,10 @@ export type {
   MaintenanceAnomaly,
   AnomalyOrderInput,
 } from "./anomaly-detection.js";
+export { deriveRecommendations } from "./recommendations.js";
+export type {
+  RecommendationType,
+  RecommendationPriority,
+  RecommendationDraft,
+  DeriveRecommendationsInput,
+} from "./recommendations.js";
