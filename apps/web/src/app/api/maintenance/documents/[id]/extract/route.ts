@@ -1,8 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { headers } from "next/headers";
 import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, hasTenantPermission } from "@/lib/tenant-context";
 import { createClient } from "@/lib/supabase/server";
 import { sanitizeDocumentDraft, computeExtractionCompleteness } from "@shina/maintenance-engine";
+
+// Same two-transport resolution as requireTenantScope() itself (see
+// tenant-context.ts): a real Bearer token for cookie-less callers (the
+// mobile app, API scripts), cookie-based getSession() for the browser.
+// The Edge Function needs an actual user access token (not the scope's
+// admin-client db, which never carries one) to authenticate itself.
+async function resolveAccessToken(): Promise<string | null> {
+  const headerStore = await headers();
+  const authHeader = headerStore.get("authorization");
+  if (authHeader?.toLowerCase().startsWith("bearer ")) {
+    return authHeader.slice("bearer ".length).trim();
+  }
+  const sessionClient = await createClient();
+  const {
+    data: { session },
+  } = await sessionClient.auth.getSession();
+  return session?.access_token ?? null;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -43,17 +62,21 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     .eq("tenant_id", scope.tenantId);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const sessionClient = await createClient();
-  const {
-    data: { session },
-  } = await sessionClient.auth.getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const accessToken = await resolveAccessToken();
+  if (!accessToken) {
+    await scope.db
+      .from("maintenance_documents")
+      .update({ extraction_status: "failed", extraction_error: "Unauthorized" })
+      .eq("id", id)
+      .eq("tenant_id", scope.tenantId);
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   try {
     const fnRes = await fetch(`${supabaseUrl}/functions/v1/extract-maintenance-document`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ storagePath: document.storage_path, mimeType: document.mime_type }),
