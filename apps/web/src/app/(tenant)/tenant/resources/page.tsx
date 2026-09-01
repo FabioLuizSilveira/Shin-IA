@@ -16,7 +16,13 @@ interface Resource {
   name: string;
   type: ResourceType;
   status: ResourceStatus;
+  asset_id: string | null;
   created_at: string;
+}
+
+interface AssetOption {
+  id: string;
+  name: string;
 }
 
 type ResourceRow = Resource & Record<string, unknown>;
@@ -54,6 +60,8 @@ export default function TenantResourcesPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [changingId, setChangingId] = useState<string | null>(null);
+  const [assets, setAssets] = useState<AssetOption[]>([]);
+  const [linkingId, setLinkingId] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -75,6 +83,13 @@ export default function TenantResourcesPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    fetch("/api/assets")
+      .then((res) => res.json())
+      .then((json: { data?: AssetOption[] }) => setAssets(json.data ?? []))
+      .catch(() => setAssets([]));
+  }, []);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -112,6 +127,20 @@ export default function TenantResourcesPage() {
     }
   }
 
+  async function handleAssetLinkChange(id: string, assetId: string) {
+    setLinkingId(id);
+    try {
+      await fetch(`/api/resources/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetId: assetId || null }),
+      });
+      await load();
+    } finally {
+      setLinkingId(null);
+    }
+  }
+
   const columns = [
     { key: "name", label: "Nome" },
     {
@@ -139,6 +168,25 @@ export default function TenantResourcesPage() {
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>
               {STATUS_LABEL[s]}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      key: "asset_link",
+      label: "Ativo vinculado (rastreamento)",
+      render: (row: ResourceRow) => (
+        <select
+          value={row.asset_id ?? ""}
+          disabled={linkingId === row.id}
+          onChange={(e) => void handleAssetLinkChange(row.id, e.target.value)}
+          className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs disabled:opacity-60"
+        >
+          <option value="">Nenhum</option>
+          {assets.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
             </option>
           ))}
         </select>

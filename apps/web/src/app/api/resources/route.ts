@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await scope.db
     .from("resources")
-    .select("id, name, type, status, created_at")
+    .select("id, name, type, status, asset_id, created_at")
     .eq("tenant_id", scope.tenantId)
     .is("deleted_at", null)
     .order("name", { ascending: true });

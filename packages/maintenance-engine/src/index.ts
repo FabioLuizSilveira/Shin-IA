@@ -38,3 +38,10 @@ export type {
 } from "./predictive-risk.js";
 export { computeAssetEconomics } from "./economics.js";
 export type { AssetEconomicsResult } from "./economics.js";
+export { haversineDistanceKm, computeOdometerDelta } from "./tracking-integration.js";
+export type {
+  Coordinates,
+  TimestampedFix,
+  OdometerDeltaRejectionReason,
+  OdometerDeltaResult,
+} from "./tracking-integration.js";

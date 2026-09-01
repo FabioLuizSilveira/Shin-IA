@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { internalError } from "@/lib/api-error";
 import { GeofenceEngine } from "@shina/tracking-engine";
+import { computeOdometerDelta } from "@shina/maintenance-engine";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createGeofenceRepository, createTrackingEventRepository } from "@/lib/geofence-repository";
 
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
   const { data: resource } = await admin
     .from("resources")
-    .select("id")
+    .select("id, asset_id")
     .eq("id", body.resource_id)
     .eq("tenant_id", integration.tenant_id)
     .maybeSingle();
@@ -159,6 +160,35 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       ? toTrackingPosition(previous.latitude, previous.longitude, previous.recorded_at)
       : null,
   );
+
+  // Etapa 10 (Tracking -> Manutenção): opt-in odometer sync -- only for
+  // resources a tenant has explicitly linked to a fleet asset (resources
+  // and assets are separate entities with no other bridge, see the
+  // migration's comment). computeOdometerDelta() rejects GPS noise and
+  // implausible jumps on its own; this route only ever adds an accepted
+  // delta, never a raw/unfiltered one.
+  if (resource.asset_id && previous) {
+    const delta = computeOdometerDelta(
+      { latitude: previous.latitude, longitude: previous.longitude, fixedAt: previous.recorded_at },
+      { latitude: body.latitude, longitude: body.longitude, fixedAt: recordedAt },
+    );
+    if (delta.accepted) {
+      const { data: asset } = await admin
+        .from("assets")
+        .select("odometer")
+        .eq("id", resource.asset_id)
+        .eq("tenant_id", integration.tenant_id)
+        .maybeSingle();
+      if (asset) {
+        const nextOdometer = (asset.odometer ?? 0) + delta.distanceKm;
+        await admin
+          .from("assets")
+          .update({ odometer: nextOdometer, updated_at: new Date().toISOString() })
+          .eq("id", resource.asset_id)
+          .eq("tenant_id", integration.tenant_id);
+      }
+    }
+  }
 
   return NextResponse.json({ data: { ok: true } }, { status: 201 });
 }
