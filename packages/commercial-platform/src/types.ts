@@ -75,4 +75,12 @@ export interface CreateCommercialCheckoutInput {
   cancelUrl: string;
   /** Extra provider metadata a caller needs (e.g. MKT's refund-guarantee deadline). */
   extraMetadata?: Record<string, string>;
+  /**
+   * Passed straight through to the gateway for providers that need them
+   * (Asaas's checkout `customerData`, no separate createCustomer() call in
+   * that flow) — sourced from the same RepresentativeInfo already
+   * collected at contract acceptance. Ignored by the Stripe provider.
+   */
+  customerName?: string;
+  customerDocument?: string;
 }

@@ -32,6 +32,14 @@ export interface PlatformSubscription {
 export interface CreateCustomerParams {
   authUserId: string;
   email: string;
+  /**
+   * CPF/CNPJ — required by document-based gateways (Asaas rejects customer
+   * creation without one); Stripe ignores it entirely. Optional here so the
+   * Stripe provider's signature doesn't change; the Asaas provider throws
+   * an explicit error rather than inventing a placeholder document when
+   * this is missing.
+   */
+  document?: string;
 }
 
 export interface CreateCheckoutParams {
@@ -39,7 +47,38 @@ export interface CreateCheckoutParams {
   email: string;
   product: SubscriptionProduct;
   planKey: string;
-  priceId: string;
+  /** Stripe Price id — only the Stripe provider needs this. */
+  priceId?: string;
+  /**
+   * Charge amount in cents and its billing cycle — needed by gateways with
+   * no reusable "price" resource to reference by id (Asaas takes the value
+   * directly on the checkout/subscription request). Sourced from
+   * plan_versions.price_cents/billing_cycle by the caller.
+   */
+  amountCents?: number;
+  billingCycle?: "monthly" | "yearly";
+  /** Human-readable plan name for the gateway's own checkout line item. */
+  planName?: string;
+  /**
+   * Customer name and CPF/CNPJ — required by gateways that prefill/create
+   * the customer directly on the checkout request instead of via a
+   * separate createCustomer() call (Asaas's `customerData`).
+   */
+  customerName?: string;
+  document?: string;
+  /**
+   * Postal address — confirmed LIVE against the Asaas sandbox (docs
+   * under-specified this) to be required for checkout creation: phone,
+   * address, addressNumber, postalCode, province are all mandatory or the
+   * gateway returns 422. No current signup/checkout flow in this codebase
+   * collects a subscriber's address — wiring this into a real checkout
+   * call needs that collected first; never pass a placeholder value here.
+   */
+  phone?: string;
+  address?: string;
+  addressNumber?: string;
+  postalCode?: string;
+  province?: string;
   successUrl: string;
   cancelUrl: string;
   /** Extra metadata forwarded to the gateway (e.g. refundEligibleUntil). */
@@ -80,7 +119,10 @@ export interface BillingProvider {
    * once this resolves, same "gateway confirms, then we sync" posture as
    * cancelSubscription.
    */
-  updateSubscription(subscriptionId: string, params: { priceId: string }): Promise<void>;
+  updateSubscription(
+    subscriptionId: string,
+    params: { priceId?: string; amountCents?: number },
+  ): Promise<void>;
   /** Verifies + processes a raw webhook payload idempotently. */
   syncWebhook(rawBody: string, signature: string): Promise<SyncWebhookResult>;
 }

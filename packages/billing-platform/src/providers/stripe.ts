@@ -63,6 +63,7 @@ export class StripeBillingProvider implements BillingProvider {
   }
 
   async createCheckout(params: CreateCheckoutParams): Promise<{ url: string }> {
+    if (!params.priceId) throw new Error("StripeBillingProvider.createCheckout requires priceId");
     const session = await this.stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: params.priceId, quantity: 1 }],
@@ -115,7 +116,13 @@ export class StripeBillingProvider implements BillingProvider {
     await this.stripe.subscriptions.cancel(sub.stripe_subscription_id);
   }
 
-  async updateSubscription(subscriptionId: string, params: { priceId: string }): Promise<void> {
+  async updateSubscription(
+    subscriptionId: string,
+    params: { priceId?: string; amountCents?: number },
+  ): Promise<void> {
+    if (!params.priceId) {
+      throw new Error("StripeBillingProvider.updateSubscription requires priceId");
+    }
     const { data: sub } = await this.db
       .from("platform_subscriptions")
       .select("stripe_subscription_id")

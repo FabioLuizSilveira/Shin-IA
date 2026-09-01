@@ -16,11 +16,11 @@ export async function createCommercialCheckout(
   input: CreateCommercialCheckoutInput,
 ): Promise<{ url: string; checkoutRefId: string }> {
   const planVersion = await resolvePlanVersion(db, input.planVersionId);
-  if (!planVersion.stripe_price_id) {
-    throw new Error(
-      `plan version ${input.planVersionId} has no stripe_price_id configured — cannot checkout`,
-    );
-  }
+  // stripe_price_id is only required for the Stripe provider (which
+  // validates it itself, StripeBillingProvider.createCheckout throws a
+  // clear error if missing) — a gateway without a reusable "price"
+  // resource (Asaas) uses amountCents/billingCycle below instead, so this
+  // layer no longer hard-requires stripe_price_id for every provider.
 
   const { data: ref, error } = await db
     .from("checkout_session_references")
@@ -31,7 +31,7 @@ export async function createCommercialCheckout(
       plan_version_id: input.planVersionId,
       commercial_terms_snapshot_id: input.commercialTermsSnapshotId,
       contract_acceptance_id: input.contractAcceptanceId,
-      provider: "stripe",
+      provider: process.env.BILLING_PROVIDER ?? "stripe",
       status: "open",
     })
     .select("id")
@@ -43,7 +43,12 @@ export async function createCommercialCheckout(
     email: input.email,
     product: input.product,
     planKey: planVersion.plans?.key ?? "unknown",
-    priceId: planVersion.stripe_price_id,
+    priceId: planVersion.stripe_price_id ?? undefined,
+    amountCents: planVersion.price_cents,
+    billingCycle: planVersion.billing_cycle,
+    planName: planVersion.name,
+    customerName: input.customerName,
+    document: input.customerDocument,
     successUrl: input.successUrl,
     cancelUrl: input.cancelUrl,
     trialPeriodDays: planVersion.trial_days > 0 ? planVersion.trial_days : undefined,
