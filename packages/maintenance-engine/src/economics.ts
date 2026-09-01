@@ -29,8 +29,13 @@ export function computeAssetEconomics(input: {
   odometer: number | null;
   hourMeter: number | null;
 }): AssetEconomicsResult {
+  // Requires at least a full day of ownership -- a fresh asset (a few
+  // seconds/minutes old) dividing by a near-zero ownershipDays would
+  // otherwise produce an astronomically large, meaningless number
+  // instead of no answer. Same "never present false precision"
+  // discipline as costPerUnit() and resolvePlanDue().
   const maintenanceCostPerDayCents =
-    input.ownershipDays !== null && input.ownershipDays > 0
+    input.ownershipDays !== null && input.ownershipDays >= 1
       ? input.totalMaintenanceCostCents / input.ownershipDays
       : null;
 

@@ -76,6 +76,21 @@ describe("computeAssetEconomics", () => {
     ).toBeNull();
   });
 
+  it("returns a null cost-per-day for a fresh asset less than a full day old, instead of an astronomically large number", () => {
+    // Regression: a freshly-created asset (a few minutes old) has an
+    // ownershipDays fraction near 0 -- dividing by it used to produce a
+    // meaningless, huge value (caught live: 50000 / 0.0000000338 days ≈
+    // 1.5 billion cents/day for an asset seconds old).
+    const result = computeAssetEconomics({
+      totalMaintenanceCostCents: 50000,
+      acquisitionCostCents: null,
+      ownershipDays: 0.0000000338,
+      odometer: null,
+      hourMeter: null,
+    });
+    expect(result.maintenanceCostPerDayCents).toBeNull();
+  });
+
   it("reuses costPerUnit's own null-on-missing-denominator behavior for odometer/hour meter", () => {
     const result = computeAssetEconomics({
       totalMaintenanceCostCents: 1000,
