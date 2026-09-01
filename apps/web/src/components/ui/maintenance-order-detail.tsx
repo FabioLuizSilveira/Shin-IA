@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { X, Wrench, Plus, ArrowRightCircle } from "lucide-react";
+import { X, Wrench, Plus, ArrowRightCircle, Upload, Sparkles, Check } from "lucide-react";
 import { ALLOWED_ORDER_TRANSITIONS, type MaintenanceOrderStatus } from "@shina/maintenance-engine";
 
 interface OrderRow {
@@ -29,10 +29,27 @@ interface ItemRow {
   unit_cost_cents: number | null;
 }
 
+interface DocumentDraft {
+  documentDate: string | null;
+  supplierName: string | null;
+  totalAmountCents: number | null;
+  description: string | null;
+}
+
+interface DocumentRow {
+  id: string;
+  original_filename: string | null;
+  kind: string;
+  extraction_status: "none" | "pending" | "extracted" | "failed" | "confirmed";
+  extraction_draft: DocumentDraft | null;
+  extraction_confidence: number | null;
+  extraction_error: string | null;
+}
+
 interface DetailPayload {
   order: OrderRow;
   items: ItemRow[];
-  documents: unknown[];
+  documents: DocumentRow[];
 }
 
 const STATUS_LABEL: Record<MaintenanceOrderStatus, string> = {
@@ -93,6 +110,11 @@ export function MaintenanceOrderDetail({
   const [itemServiceType, setItemServiceType] = useState("");
   const [itemDescription, setItemDescription] = useState("");
 
+  const [uploading, setUploading] = useState(false);
+  const [extractingId, setExtractingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [draftEdits, setDraftEdits] = useState<Record<string, DocumentDraft>>({});
+
   const load = useCallback(async () => {
     if (!orderId) return;
     setLoading(true);
@@ -126,6 +148,53 @@ export function MaintenanceOrderDetail({
       setActionError(err instanceof Error ? err.message : "Erro inesperado.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleUpload(file: File) {
+    setUploading(true);
+    setActionError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("kind", "other");
+      const res = await fetch(`/api/maintenance/${orderId}/documents`, {
+        method: "POST",
+        body: form,
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Falha no upload.");
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleExtract(documentId: string) {
+    setExtractingId(documentId);
+    setActionError(null);
+    try {
+      await postJson(`/api/maintenance/documents/${documentId}/extract`, {});
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setExtractingId(null);
+    }
+  }
+
+  async function handleConfirm(documentId: string, draft: DocumentDraft) {
+    setConfirmingId(documentId);
+    setActionError(null);
+    try {
+      await patchJson(`/api/maintenance/documents/${documentId}/confirm`, draft);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setConfirmingId(null);
     }
   }
 
@@ -323,6 +392,142 @@ export function MaintenanceOrderDetail({
                   ))}
                   {data.items.length === 0 && (
                     <p className="text-sm text-slate-500">Nenhum item registrado.</p>
+                  )}
+                </ul>
+              </section>
+
+              <section className="border-t border-slate-100 dark:border-slate-700 pt-4">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase mb-2">Documentos</h3>
+                <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-500 cursor-pointer hover:border-shina-blue">
+                  <Upload className="w-3.5 h-3.5" />
+                  {uploading ? "Enviando..." : "Enviar orçamento, nota fiscal ou recibo"}
+                  <input
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleUpload(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+
+                <ul className="space-y-2 mt-3">
+                  {data.documents.map((doc) => {
+                    const edited = draftEdits[doc.id] ?? doc.extraction_draft;
+                    return (
+                      <li
+                        key={doc.id}
+                        className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-slate-700 dark:text-slate-200 truncate">
+                            {doc.original_filename}
+                          </span>
+                          {doc.extraction_status === "none" && (
+                            <button
+                              type="button"
+                              disabled={extractingId === doc.id}
+                              onClick={() => void handleExtract(doc.id)}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-shina-blue/10 text-shina-blue hover:opacity-80 disabled:opacity-50 border-0 cursor-pointer whitespace-nowrap"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              {extractingId === doc.id ? "Extraindo..." : "Extrair dados (IA)"}
+                            </button>
+                          )}
+                          {doc.extraction_status === "confirmed" && (
+                            <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                              <Check className="w-3.5 h-3.5" /> Confirmado
+                            </span>
+                          )}
+                        </div>
+
+                        {doc.extraction_status === "failed" && (
+                          <p className="text-xs text-red-600 dark:text-red-400">
+                            Falha na extração: {doc.extraction_error ?? "erro desconhecido"}
+                          </p>
+                        )}
+
+                        {doc.extraction_status === "extracted" && edited && (
+                          <div className="space-y-2 bg-slate-50 dark:bg-slate-800 rounded-lg p-3">
+                            <p className="text-[11px] text-slate-500">
+                              Rascunho extraído por IA — revise antes de confirmar. Campos não
+                              identificados no documento aparecem em branco (nunca inventados).
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                placeholder="Data (AAAA-MM-DD)"
+                                value={edited.documentDate ?? ""}
+                                onChange={(e) =>
+                                  setDraftEdits((prev) => ({
+                                    ...prev,
+                                    [doc.id]: { ...edited, documentDate: e.target.value || null },
+                                  }))
+                                }
+                                className="px-2 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                              />
+                              <input
+                                placeholder="Fornecedor"
+                                value={edited.supplierName ?? ""}
+                                onChange={(e) =>
+                                  setDraftEdits((prev) => ({
+                                    ...prev,
+                                    [doc.id]: { ...edited, supplierName: e.target.value || null },
+                                  }))
+                                }
+                                className="px-2 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                              />
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="Valor total (R$)"
+                                value={
+                                  edited.totalAmountCents !== null
+                                    ? String(edited.totalAmountCents / 100)
+                                    : ""
+                                }
+                                onChange={(e) =>
+                                  setDraftEdits((prev) => ({
+                                    ...prev,
+                                    [doc.id]: {
+                                      ...edited,
+                                      totalAmountCents: e.target.value
+                                        ? Math.round(Number(e.target.value) * 100)
+                                        : null,
+                                    },
+                                  }))
+                                }
+                                className="px-2 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                              />
+                              <input
+                                placeholder="Descrição"
+                                value={edited.description ?? ""}
+                                onChange={(e) =>
+                                  setDraftEdits((prev) => ({
+                                    ...prev,
+                                    [doc.id]: { ...edited, description: e.target.value || null },
+                                  }))
+                                }
+                                className="px-2 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              disabled={confirmingId === doc.id}
+                              onClick={() => void handleConfirm(doc.id, edited)}
+                              className="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:opacity-80 disabled:opacity-50 border-0 cursor-pointer"
+                            >
+                              {confirmingId === doc.id ? "Confirmando..." : "Confirmar dados"}
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                  {data.documents.length === 0 && (
+                    <p className="text-sm text-slate-500">Nenhum documento anexado.</p>
                   )}
                 </ul>
               </section>

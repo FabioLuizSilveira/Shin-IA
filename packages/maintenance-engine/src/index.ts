@@ -28,3 +28,5 @@ export type {
   RecommendationDraft,
   DeriveRecommendationsInput,
 } from "./recommendations.js";
+export { sanitizeDocumentDraft, computeExtractionCompleteness } from "./document-ai.js";
+export type { MaintenanceDocumentDraft } from "./document-ai.js";
