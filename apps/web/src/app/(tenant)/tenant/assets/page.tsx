@@ -78,6 +78,26 @@ interface RecommendationData {
   status: "pending" | "accepted" | "dismissed";
 }
 
+interface PredictiveRiskData {
+  score: number;
+  tier: "low" | "moderate" | "elevated" | "high";
+  disclaimer: string;
+}
+
+const RISK_TIER_LABEL: Record<PredictiveRiskData["tier"], string> = {
+  low: "Baixo",
+  moderate: "Moderado",
+  elevated: "Elevado",
+  high: "Alto",
+};
+
+const RISK_TIER_CLASS: Record<PredictiveRiskData["tier"], string> = {
+  low: "text-emerald-600 dark:text-emerald-400",
+  moderate: "text-amber-600 dark:text-amber-400",
+  elevated: "text-orange-600 dark:text-orange-400",
+  high: "text-red-600 dark:text-red-400",
+};
+
 function statusToUi(status: AssetStatus): "active" | "inactive" | "pending" | "warning" {
   switch (status) {
     case "available":
@@ -101,6 +121,7 @@ export default function TenantAssetsPage() {
   const [anomalies, setAnomalies] = useState<AnomalyData[] | null>(null);
   const [recommendations, setRecommendations] = useState<RecommendationData[] | null>(null);
   const [decidingId, setDecidingId] = useState<string | null>(null);
+  const [predictiveRisk, setPredictiveRisk] = useState<PredictiveRiskData | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
@@ -133,6 +154,7 @@ export default function TenantAssetsPage() {
       setHealthScore(null);
       setAnomalies(null);
       setRecommendations(null);
+      setPredictiveRisk(null);
       return;
     }
     let cancelled = false;
@@ -140,6 +162,15 @@ export default function TenantAssetsPage() {
     setHealthScore(null);
     setAnomalies(null);
     setRecommendations(null);
+    setPredictiveRisk(null);
+    fetch(`/api/assets/${selected.id}/predictive-risk`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: { data?: PredictiveRiskData } | null) => {
+        if (!cancelled) setPredictiveRisk(json?.data ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setPredictiveRisk(null);
+      });
     fetch(`/api/assets/${selected.id}/health-score`)
       .then((res) => (res.ok ? res.json() : null))
       .then((json: { data?: HealthScoreData } | null) => {
@@ -445,6 +476,17 @@ export default function TenantAssetsPage() {
                         .join(" · ")}
                     </p>
                   )}
+                </div>
+              )}
+              {predictiveRisk && (
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 space-y-1 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Risco preditivo</span>
+                    <span className={`font-bold ${RISK_TIER_CLASS[predictiveRisk.tier]}`}>
+                      {predictiveRisk.score}/100 · {RISK_TIER_LABEL[predictiveRisk.tier]}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">{predictiveRisk.disclaimer}</p>
                 </div>
               )}
               {anomalies && anomalies.length > 0 && (

@@ -30,3 +30,11 @@ export type {
 } from "./recommendations.js";
 export { sanitizeDocumentDraft, computeExtractionCompleteness } from "./document-ai.js";
 export type { MaintenanceDocumentDraft } from "./document-ai.js";
+export { computePredictiveRisk, PREDICTIVE_RISK_DISCLAIMER } from "./predictive-risk.js";
+export type {
+  PredictiveRiskTier,
+  PredictiveRiskResult,
+  PredictiveRiskPlanContext,
+} from "./predictive-risk.js";
+export { computeAssetEconomics } from "./economics.js";
+export type { AssetEconomicsResult } from "./economics.js";
