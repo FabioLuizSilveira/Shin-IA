@@ -59,6 +59,18 @@ const HEALTH_BAND_CLASS: Record<HealthScoreData["band"], string> = {
   critical: "text-red-600 dark:text-red-400",
 };
 
+interface AnomalyData {
+  type: string;
+  severity: "low" | "medium" | "high";
+  message: string;
+}
+
+const ANOMALY_SEVERITY_CLASS: Record<AnomalyData["severity"], string> = {
+  low: "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300",
+  medium: "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300",
+  high: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
+};
+
 function statusToUi(status: AssetStatus): "active" | "inactive" | "pending" | "warning" {
   switch (status) {
     case "available":
@@ -79,6 +91,7 @@ export default function TenantAssetsPage() {
   const [changingStatus, setChangingStatus] = useState(false);
   const [healthScore, setHealthScore] = useState<HealthScoreData | null>(null);
   const [healthScoreLoading, setHealthScoreLoading] = useState(false);
+  const [anomalies, setAnomalies] = useState<AnomalyData[] | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
@@ -109,11 +122,13 @@ export default function TenantAssetsPage() {
   useEffect(() => {
     if (!selected) {
       setHealthScore(null);
+      setAnomalies(null);
       return;
     }
     let cancelled = false;
     setHealthScoreLoading(true);
     setHealthScore(null);
+    setAnomalies(null);
     fetch(`/api/assets/${selected.id}/health-score`)
       .then((res) => (res.ok ? res.json() : null))
       .then((json: { data?: HealthScoreData } | null) => {
@@ -124,6 +139,14 @@ export default function TenantAssetsPage() {
       })
       .finally(() => {
         if (!cancelled) setHealthScoreLoading(false);
+      });
+    fetch(`/api/assets/${selected.id}/anomalies`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: { data?: AnomalyData[] } | null) => {
+        if (!cancelled) setAnomalies(json?.data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setAnomalies([]);
       });
     return () => {
       cancelled = true;
@@ -385,6 +408,19 @@ export default function TenantAssetsPage() {
                         .join(" · ")}
                     </p>
                   )}
+                </div>
+              )}
+              {anomalies && anomalies.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-slate-500">Anomalias detectadas</p>
+                  {anomalies.map((a, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-lg px-3 py-2 text-xs ${ANOMALY_SEVERITY_CLASS[a.severity]}`}
+                    >
+                      {a.message}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

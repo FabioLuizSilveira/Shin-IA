@@ -13,3 +13,11 @@ export type {
   AssetHealthScoreDeductions,
   AssetHealthScoreResult,
 } from "./health-score.js";
+export { detectAssetAnomalies } from "./anomaly-detection.js";
+
+export type {
+  AnomalyType,
+  AnomalySeverity,
+  MaintenanceAnomaly,
+  AnomalyOrderInput,
+} from "./anomaly-detection.js";
