@@ -45,3 +45,10 @@ export type {
   OdometerDeltaRejectionReason,
   OdometerDeltaResult,
 } from "./tracking-integration.js";
+export { auditFleet } from "./maintenance-auditor.js";
+export type {
+  MaintenanceInsightType,
+  MaintenanceInsightSeverity,
+  MaintenanceInsightDraft,
+  FleetAssetSignal,
+} from "./maintenance-auditor.js";
