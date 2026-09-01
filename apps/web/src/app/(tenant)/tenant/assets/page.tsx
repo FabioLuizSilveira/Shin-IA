@@ -35,6 +35,30 @@ const STATUS_LABEL: Record<AssetStatus, string> = {
 
 const STATUS_OPTIONS: AssetStatus[] = ["available", "in_use", "maintenance", "decommissioned"];
 
+interface HealthScoreData {
+  version: number;
+  score: number;
+  band: "healthy" | "attention" | "critical";
+  deductions: {
+    overduePreventive: number;
+    correctiveFrequency: number;
+    downtime: number;
+    staleOpenOrders: number;
+  };
+}
+
+const HEALTH_BAND_LABEL: Record<HealthScoreData["band"], string> = {
+  healthy: "Saudável",
+  attention: "Atenção",
+  critical: "Crítico",
+};
+
+const HEALTH_BAND_CLASS: Record<HealthScoreData["band"], string> = {
+  healthy: "text-emerald-600 dark:text-emerald-400",
+  attention: "text-amber-600 dark:text-amber-400",
+  critical: "text-red-600 dark:text-red-400",
+};
+
 function statusToUi(status: AssetStatus): "active" | "inactive" | "pending" | "warning" {
   switch (status) {
     case "available":
@@ -53,6 +77,8 @@ export default function TenantAssetsPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Asset | null>(null);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [healthScore, setHealthScore] = useState<HealthScoreData | null>(null);
+  const [healthScoreLoading, setHealthScoreLoading] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
@@ -79,6 +105,30 @@ export default function TenantAssetsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!selected) {
+      setHealthScore(null);
+      return;
+    }
+    let cancelled = false;
+    setHealthScoreLoading(true);
+    setHealthScore(null);
+    fetch(`/api/assets/${selected.id}/health-score`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: { data?: HealthScoreData } | null) => {
+        if (!cancelled) setHealthScore(json?.data ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setHealthScore(null);
+      })
+      .finally(() => {
+        if (!cancelled) setHealthScoreLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
 
   async function openForm() {
     setFormError(null);
@@ -306,6 +356,37 @@ export default function TenantAssetsPage() {
                   </div>
                 )}
               </div>
+              {healthScoreLoading && (
+                <p className="text-xs text-slate-400">Calculando saúde do ativo…</p>
+              )}
+              {healthScore && (
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Saúde do ativo</span>
+                    <span className={`font-bold ${HEALTH_BAND_CLASS[healthScore.band]}`}>
+                      {healthScore.score}/100 · {HEALTH_BAND_LABEL[healthScore.band]}
+                    </span>
+                  </div>
+                  {(healthScore.deductions.overduePreventive > 0 ||
+                    healthScore.deductions.correctiveFrequency > 0 ||
+                    healthScore.deductions.downtime > 0 ||
+                    healthScore.deductions.staleOpenOrders > 0) && (
+                    <p className="text-xs text-slate-500">
+                      {[
+                        healthScore.deductions.overduePreventive > 0 &&
+                          "manutenção preventiva vencida",
+                        healthScore.deductions.correctiveFrequency > 0 &&
+                          "alta frequência de corretivas",
+                        healthScore.deductions.downtime > 0 && "tempo parado recente",
+                        healthScore.deductions.staleOpenOrders > 0 &&
+                          "ordens em aberto há muito tempo",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             {selected.status !== "decommissioned" && (
               <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700 space-y-2">
