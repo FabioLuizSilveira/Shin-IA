@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { activateFromWebhook, type WebhookEventLike } from "@shina/commercial-platform";
+import { activateFromWebhook } from "@shina/commercial-platform";
+import { mapStripeEventToNormalized } from "@shina/billing-platform";
 import { stripe } from "@/lib/stripe/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type Stripe from "stripe";
@@ -34,9 +35,8 @@ export async function POST(request: Request) {
   // Provisionamento/sincronização de assinatura (idempotente).
   const admin = createAdminClient();
   try {
-    const sync = await activateFromWebhook(admin, event as unknown as WebhookEventLike, {
-      defaultProduct: "mkt",
-    });
+    const normalized = mapStripeEventToNormalized(event, { defaultProduct: "mkt" });
+    const sync = await activateFromWebhook(admin, normalized);
     if (sync.duplicate) {
       return NextResponse.json({ received: true, duplicate: true });
     }

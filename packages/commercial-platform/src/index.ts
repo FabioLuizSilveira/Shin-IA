@@ -4,7 +4,7 @@ export { resolveRequiredContract, resolvePlanVersion } from "./contract-requirem
 export { createCommercialTermsSnapshot } from "./snapshot.js";
 export { recordContractAcceptance, hasAcceptedCurrentContract } from "./acceptance.js";
 export { createCommercialCheckout } from "./checkout-orchestration.js";
-export { activateFromWebhook, type WebhookEventLike } from "./webhook-orchestration.js";
+export { activateFromWebhook } from "./webhook-orchestration.js";
 export { getEntitlements } from "./entitlements.js";
 export { changePlan, type ChangePlanInput, type ChangePlanResult } from "./plan-change.js";
 export {

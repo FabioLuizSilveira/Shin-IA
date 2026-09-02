@@ -4,10 +4,13 @@ import type {
   CreateCheckoutParams,
   CreateCustomerParams,
   CreatePortalParams,
+  NormalizedBillingEvent,
   PlatformSubscription,
   SubscriptionProduct,
+  SubscriptionStatus,
   SyncWebhookResult,
 } from "../types.js";
+import { applyBillingEvent } from "../sync-webhook.js";
 
 // Asaas billing provider (Fase A of the Stripe -> Asaas migration). Every
 // call is authenticated via the `access_token` header (NOT a Bearer
@@ -53,6 +56,100 @@ const CYCLE_MAP: Record<NonNullable<CreateCheckoutParams["billingCycle"]>, strin
 
 interface AsaasErrorBody {
   errors?: { code?: string; description?: string }[];
+}
+
+// Webhook envelope, live-confirmed against docs.asaas.com/docs/webhook-
+// para-cobrancas and .../eventos-para-assinaturas (not guessed): every
+// delivery has a top-level `id` (the delivery id -- Asaas's own docs say
+// "utilize o campo id do evento para evitar processamento duplicado",
+// this is our idempotency key) and `event` (the event name), with the
+// actual resource nested under `subscription` or `payment` depending on
+// which fired.
+interface AsaasWebhookEnvelope {
+  id: string;
+  event: string;
+  subscription?: { id: string; customer: string; status: string; externalReference: string | null };
+  payment?: { id: string; subscription?: string; status: string; externalReference: string | null };
+}
+
+const ASAAS_SUBSCRIPTION_STATUS_MAP: Record<string, SubscriptionStatus> = {
+  ACTIVE: "active",
+  INACTIVE: "suspended",
+  EXPIRED: "cancelled",
+};
+
+// Maps a verified Asaas webhook delivery into the same normalized shape
+// StripeBillingProvider produces (mapStripeEventToNormalized). Exported
+// standalone (not just a class method) so a raw webhook route that
+// already has its own verified payload -- same pattern as the existing
+// Stripe commercial webhook routes -- can normalize it without going
+// through the class.
+//
+// Deliberately scoped: only SUBSCRIPTION_* events drive activation/status
+// changes this round. PAYMENT_* events are logged (kind: null) but not
+// acted on -- Asaas's own guidance says payment events are a separate
+// per-charge stream correlated via `payment.subscription`, and mapping
+// PAYMENT_OVERDUE into a "past_due" status transition needs its own
+// verification pass, not bundled into this phase (documented gap, not a
+// silent omission -- see the migration plan's Fase B).
+//
+// One thing this mapper canNOT resolve on its own: authUserId. Asaas's
+// subscription object carries `externalReference` (our checkout_ref_id,
+// see AsaasBillingProvider.createCheckout's own comment on why it's just
+// that one id, not a full metadata blob) but never our internal user id
+// directly -- commercial-platform's activateFromWebhook() resolves that
+// via checkout_session_references before calling applyBillingEvent(),
+// since only that package's schema has that table. authUserId is left
+// null here on purpose, not guessed.
+export function mapAsaasEventToNormalized(envelope: AsaasWebhookEnvelope): NormalizedBillingEvent {
+  const base = {
+    provider: "asaas" as const,
+    gatewayEventId: envelope.id,
+    eventType: envelope.event,
+    rawPayload: (envelope.subscription ?? envelope.payment ?? {}) as unknown as Record<
+      string,
+      unknown
+    >,
+  };
+
+  switch (envelope.event) {
+    case "SUBSCRIPTION_CREATED": {
+      const sub = envelope.subscription;
+      if (!sub) return { ...base, kind: null };
+      return {
+        ...base,
+        kind: "checkout_completed",
+        authUserId: null, // resolved by commercial-platform via checkoutRefId
+        gatewayCustomerId: sub.customer,
+        gatewaySubscriptionId: sub.id,
+        checkoutRefId: sub.externalReference,
+      };
+    }
+
+    case "SUBSCRIPTION_UPDATED": {
+      const sub = envelope.subscription;
+      if (!sub) return { ...base, kind: null };
+      return {
+        ...base,
+        kind: "subscription_updated",
+        gatewaySubscriptionId: sub.id,
+        status: ASAAS_SUBSCRIPTION_STATUS_MAP[sub.status] ?? "pending",
+        // Asaas doesn't expose a period_start/end pair the way Stripe
+        // does -- never inventing one from nextDueDate (that's a due
+        // date, not a period boundary). Left undefined, not guessed.
+      };
+    }
+
+    case "SUBSCRIPTION_INACTIVATED":
+    case "SUBSCRIPTION_DELETED": {
+      const sub = envelope.subscription;
+      if (!sub) return { ...base, kind: null };
+      return { ...base, kind: "subscription_cancelled", gatewaySubscriptionId: sub.id };
+    }
+
+    default:
+      return { ...base, kind: null };
+  }
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -294,7 +391,7 @@ export class AsaasBillingProvider implements BillingProvider {
     });
   }
 
-  async syncWebhook(_rawBody: string, signature: string): Promise<SyncWebhookResult> {
+  async syncWebhook(rawBody: string, signature: string): Promise<SyncWebhookResult> {
     if (!this.webhookAuthToken) throw new Error("ASAAS_WEBHOOK_AUTH_TOKEN not configured");
     // Asaas's webhook auth is a static shared-secret header comparison
     // (asaas-access-token), not an HMAC over the body — confirmed against
@@ -304,10 +401,22 @@ export class AsaasBillingProvider implements BillingProvider {
     if (!timingSafeEqual(signature, this.webhookAuthToken)) {
       throw new Error("Invalid Asaas webhook token");
     }
-    // Fase B wires this into applyBillingEvent() via the normalized event
-    // mapper -- left unimplemented here on purpose so Fase A's scope
-    // (customer/checkout/cancel/update against the real sandbox) can ship
-    // and be verified independently of the webhook/idempotency work.
-    throw new Error("AsaasBillingProvider.syncWebhook not implemented yet (Fase B)");
+    const envelope = JSON.parse(rawBody) as AsaasWebhookEnvelope;
+    const normalized = mapAsaasEventToNormalized(envelope);
+    // NOTE (matches StripeBillingProvider's own real-world usage): the
+    // real webhook routes (api/webhooks/asaas-commercial,
+    // apps/mkt/api/webhooks/asaas) do NOT call this method directly --
+    // same as the existing Stripe webhook routes never call
+    // StripeBillingProvider.syncWebhook() either. They verify the payload
+    // themselves and call commercial-platform's activateFromWebhook()
+    // directly with mapAsaasEventToNormalized()'s output, because only
+    // that layer can resolve authUserId from checkoutRefId (see this
+    // file's own mapAsaasEventToNormalized comment). Calling
+    // applyBillingEvent() here directly means a checkout_completed event
+    // is a no-op (authUserId is null) -- this method exists for
+    // BillingProvider interface completeness and any future generic
+    // caller that doesn't need the commercial-platform reconciliation
+    // step, not as the production activation path.
+    return applyBillingEvent(this.db, normalized);
   }
 }

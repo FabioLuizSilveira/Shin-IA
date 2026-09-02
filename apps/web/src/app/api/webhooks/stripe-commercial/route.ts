@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { activateFromWebhook, type WebhookEventLike } from "@shina/commercial-platform";
+import { activateFromWebhook } from "@shina/commercial-platform";
+import { mapStripeEventToNormalized } from "@shina/billing-platform";
 import { stripe } from "@/lib/stripe/client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logActivity } from "@/lib/activity-log";
@@ -33,20 +34,18 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+  const normalized = mapStripeEventToNormalized(event, { defaultProduct: "platform" });
   try {
-    const result = await activateFromWebhook(admin, event as unknown as WebhookEventLike, {
-      defaultProduct: "platform",
-    });
+    const result = await activateFromWebhook(admin, normalized);
     if (result.duplicate) {
       return NextResponse.json({ received: true, duplicate: true });
     }
 
-    // syncStripeEvent (inside activateFromWebhook) writes platform_subscriptions
+    // applyBillingEvent (inside activateFromWebhook) writes platform_subscriptions
     // but has no notion of tenants.status — that flip is Platform-specific,
     // so it happens here, not in the shared commercial-platform package.
-    if (result.handled && event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const checkoutRefId = session.metadata?.checkout_ref_id;
+    if (result.handled && normalized.kind === "checkout_completed") {
+      const checkoutRefId = normalized.checkoutRefId;
       if (checkoutRefId) {
         const { data: ref } = await admin
           .from("checkout_session_references")

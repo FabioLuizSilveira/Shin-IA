@@ -92,6 +92,40 @@ export interface CreatePortalParams {
   returnUrl: string;
 }
 
+// Fase B of the Stripe -> Asaas migration: sync-webhook.ts's core DB-
+// writing logic (applyBillingEvent) is gateway-agnostic, consuming this
+// shape instead of a raw Stripe.Event. Each provider's syncWebhook() maps
+// its own gateway's payload into this before calling applyBillingEvent —
+// StripeBillingProvider's mapping is exactly the field-extraction logic
+// that used to live directly in the old syncStripeEvent().
+export type NormalizedEventKind =
+  | "checkout_completed"
+  | "subscription_updated"
+  | "subscription_cancelled";
+
+export interface NormalizedBillingEvent {
+  provider: "stripe" | "asaas";
+  gatewayEventId: string;
+  eventType: string;
+  /** null = an event type this layer doesn't act on (still logged for idempotency/audit). */
+  kind: NormalizedEventKind | null;
+  // checkout_completed
+  authUserId?: string | null;
+  email?: string | null;
+  product?: SubscriptionProduct;
+  planKey?: string;
+  gatewayCustomerId?: string | null;
+  gatewaySubscriptionId?: string | null;
+  /** commercial-platform's reconciliation anchor — see checkout-orchestration.ts. */
+  checkoutRefId?: string | null;
+  // subscription_updated / subscription_cancelled
+  status?: SubscriptionStatus;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  cancelAtPeriodEnd?: boolean;
+  rawPayload: Record<string, unknown>;
+}
+
 export interface SyncWebhookResult {
   /** True when the event id was already processed — nothing was changed. */
   duplicate: boolean;
