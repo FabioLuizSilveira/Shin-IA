@@ -3,10 +3,11 @@
 export const PLATFORM = {
   login: "https://app.shinaia.com.br/login",
   signup: "https://app.shinaia.com.br/login",
-  // ProductDemo "Ver como…" CTAs — the platform has no one-click demo URL,
-  // so each tab points at its own entry: staff login vs the customer portal.
-  demoTeam: "https://app.shinaia.com.br/login",
-  demoCustomer: "https://app.shinaia.com.br/rentals",
+  // ProductDemo "Ver como…" CTAs — one-click demo entry on the platform
+  // (app/(public)/demo/[persona]): signs in as the demo account, no login
+  // screen, and "Sair" returns here. See NEXT_PUBLIC_LANDING_URL there.
+  demoTeam: "https://app.shinaia.com.br/demo/tenant",
+  demoCustomer: "https://app.shinaia.com.br/demo/customer",
 };
 
 // WhatsApp do especialista. Troque pelo número real (formato internacional, só dígitos).
