@@ -1,18 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireMobileContext } from "@/lib/mobile-context";
 import { internalError } from "@/lib/api-error";
-import { stripe, isStripeConfigured } from "@/lib/stripe/client";
+import {
+  isAsaasConfigured,
+  findOrCreateAsaasCustomer,
+  createOneOffCharge,
+  ASAAS_MIN_CHARGE_CENTS,
+} from "@/lib/asaas/client";
 
 export const dynamic = "force-dynamic";
 
 const DEPOSIT_RATIO = 0.2;
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
-
-function paymentReturnUrl(status: "success" | "cancelled", kind: string) {
-  const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "shinaia.com.br";
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? `https://app.${root}`;
-  return `${base}/mobile/payment-complete?status=${status}&kind=${kind}`;
-}
 
 // GET — lists the caller's own reservations. Part of the web customer
 // portal's RLS→API migration (rentals-portal.ts's fetchMyReservations):
@@ -47,8 +46,8 @@ export async function GET() {
 // guard against double-booking — this route's own overlap check is just a
 // friendlier 409 before that constraint would reject the insert anyway.
 export async function POST(req: NextRequest) {
-  if (!isStripeConfigured) {
-    return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });
+  if (!isAsaasConfigured) {
+    return NextResponse.json({ error: "Asaas not configured" }, { status: 503 });
   }
 
   const context = await requireMobileContext();
@@ -107,6 +106,13 @@ export async function POST(req: NextRequest) {
   const deposit = Math.round(total * DEPOSIT_RATIO * 100) / 100;
   const balance = Math.round((total - deposit) * 100) / 100;
   const currency = "BRL";
+  const depositCents = Math.round(deposit * 100);
+  if (depositCents < ASAAS_MIN_CHARGE_CENTS) {
+    return NextResponse.json(
+      { error: "deposit is below Asaas's minimum chargeable value (R$5,00)" },
+      { status: 422 },
+    );
+  }
 
   const { data: reservation, error: resErr } = await context.db
     .from("rental_reservations")
@@ -133,7 +139,7 @@ export async function POST(req: NextRequest) {
 
   let { data: billingAccount } = await context.db
     .from("billing_accounts")
-    .select("id, stripe_customer_id")
+    .select("id, stripe_customer_id, organizations(name, email, document, phone)")
     .eq("organization_id", tenantOrg.organizationId)
     .eq("tenant_id", asset.tenant_id)
     .maybeSingle();
@@ -151,11 +157,19 @@ export async function POST(req: NextRequest) {
         balance_amount: 0,
         balance_currency: currency,
       })
-      .select("id, stripe_customer_id")
+      .select("id, stripe_customer_id, organizations(name, email, document, phone)")
       .single();
     if (baErr) return internalError(baErr);
     billingAccount = created;
   }
+  const org = billingAccount.organizations as unknown as {
+    name: string;
+    email: string | null;
+    document: string;
+    phone: string | null;
+  } | null;
+  if (!org)
+    return NextResponse.json({ error: "Billing account has no organization" }, { status: 500 });
 
   const { data: invoice, error: invErr } = await context.db
     .from("invoices")
@@ -188,43 +202,35 @@ export async function POST(req: NextRequest) {
     .update({ deposit_invoice_id: invoice.id })
     .eq("id", reservation.id);
 
-  let customerId = billingAccount.stripe_customer_id ?? null;
-  if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: context.email ?? undefined,
-      metadata: { billing_account_id: billingAccount.id },
-    });
-    customerId = customer.id;
+  const customerId = await findOrCreateAsaasCustomer({
+    existingCustomerId: billingAccount.stripe_customer_id,
+    name: org.name,
+    document: org.document,
+    email: org.email ?? context.email,
+    phone: org.phone,
+  });
+  if (!billingAccount.stripe_customer_id) {
     await context.db
       .from("billing_accounts")
       .update({ stripe_customer_id: customerId })
       .eq("id", billingAccount.id);
   }
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    customer: customerId,
-    line_items: [
-      {
-        price_data: {
-          currency: currency.toLowerCase(),
-          product_data: { name: `Sinal (20%) — ${asset.name}` },
-          unit_amount: Math.round(deposit * 100),
-        },
-        quantity: 1,
-      },
-    ],
-    success_url: paymentReturnUrl("success", "deposit"),
-    cancel_url: paymentReturnUrl("cancelled", "deposit"),
-    metadata: { invoice_id: invoice.id, action: "deposit", reservation_id: reservation.id },
+  const payment = await createOneOffCharge({
+    customerId,
+    valueCents: depositCents,
+    description: `Sinal (20%) — ${asset.name}`,
+    action: "deposit",
+    invoiceId: invoice.id,
+    refId: reservation.id,
   });
 
   await context.db
     .from("invoices")
-    .update({ stripe_checkout_session_id: session.id })
+    .update({ stripe_checkout_session_id: payment.id })
     .eq("id", invoice.id);
 
   return NextResponse.json({
-    data: { url: session.url, reservationId: reservation.id, deposit, balance, total },
+    data: { url: payment.invoiceUrl, reservationId: reservation.id, deposit, balance, total },
   });
 }
