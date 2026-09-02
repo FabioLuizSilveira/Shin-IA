@@ -3,7 +3,10 @@
 export const PLATFORM = {
   login: "https://app.shinaia.com.br/login",
   signup: "https://app.shinaia.com.br/login",
-  demo: "https://app.shinaia.com.br/login",
+  // ProductDemo "Ver como…" CTAs — the platform has no one-click demo URL,
+  // so each tab points at its own entry: staff login vs the customer portal.
+  demoTeam: "https://app.shinaia.com.br/login",
+  demoCustomer: "https://app.shinaia.com.br/rentals",
 };
 
 // WhatsApp do especialista. Troque pelo número real (formato internacional, só dígitos).

@@ -16,6 +16,7 @@ export function ProductDemo() {
   const items = tab === "owner" ? p.owner : p.renter;
   const img = tab === "owner" ? SHOWROOM : DRIVER;
   const ctaLabel = tab === "owner" ? p.ctaOwner : p.ctaRenter;
+  const ctaHref = tab === "owner" ? PLATFORM.demoTeam : PLATFORM.demoCustomer;
 
   const switchTab = (v) => { setTab(v); trackEvent("product_tab", { label: v, section: "product", locale: lang }); };
   const openDemo = () => trackEvent("cta_click", { label: `demo_${tab}`, section: "product", locale: lang });
@@ -60,7 +61,7 @@ export function ProductDemo() {
               </ul>
               <a
                 data-testid="product-demo-cta"
-                href={PLATFORM.demo}
+                href={ctaHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={openDemo}
