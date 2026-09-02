@@ -1,10 +1,10 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { TrendingUp, ShieldCheck, Zap, Heart } from "lucide-react";
+import { Wrench, ShieldCheck, Zap, Heart } from "lucide-react";
 import { useLang } from "@/context/LangContext";
 import { Reveal, Stagger, staggerItem } from "@/components/landing/motion";
 
-const icons = [TrendingUp, ShieldCheck, Zap, Heart];
+const icons = [Wrench, ShieldCheck, Zap, Heart];
 
 export function Benefits() {
   const { t } = useLang();

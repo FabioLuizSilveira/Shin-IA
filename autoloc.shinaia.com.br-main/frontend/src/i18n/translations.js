@@ -16,8 +16,8 @@ export const translations = {
       sub: "A Shinã é a plataforma que gerencia toda a operação do locador e entrega uma experiência premium de aluguel para o cliente — contratos, pagamentos, vistorias e inteligência artificial, em um só lugar.",
       ctaPrimary: "Conheça a plataforma",
       ctaSecondary: "Ver como funciona",
-      stat1: "+38%",
-      stat1l: "de receita por veículo",
+      stat1: "+22%",
+      stat1l: "de disponibilidade da frota",
       stat2: "-71%",
       stat2l: "de tempo em burocracia",
       stat3: "4,9/5",
@@ -48,7 +48,7 @@ export const translations = {
       title: "Do cadastro ao lucro em 4 passos",
       cta: "Descubra a plataforma",
       steps: [
-        { n: "01", t: "Cadastre sua frota", d: "Suba veículos, fotos e documentos. A IA organiza tudo e sugere o preço ideal por temporada e demanda." },
+        { n: "01", t: "Cadastre sua frota", d: "Suba veículos, fotos e documentos. A IA organiza tudo e já conecta cada carro à vistoria, à manutenção e ao rastreador." },
         { n: "02", t: "Publique e receba reservas", d: "Seu catálogo fica disponível para os locatários com reserva, contrato e assinatura 100% digitais." },
         { n: "03", t: "Entregue com vistoria digital", d: "Check-in e check-out com fotos, laudo e caução automatizados. Zero discussão, zero prejuízo." },
         { n: "04", t: "Receba e acompanhe", d: "Pagamentos automáticos, repasses e um painel que mostra a margem real de cada veículo em tempo real." },
@@ -58,7 +58,7 @@ export const translations = {
       overline: "Benefícios",
       title: "Resultados que você sente no caixa",
       items: [
-        { t: "Mais receita por carro", d: "Precificação dinâmica com IA aumenta a ocupação e o ticket médio da sua frota.", k: "+38%", kl: "receita/veículo" },
+        { t: "Manutenção que se antecipa", d: "Vistoria e telemetria abrem ordens de serviço sozinhas, a IA prioriza o que é urgente e o Auditor de Manutenção barra gasto indevido em peças e mão de obra.", k: "-34%", kl: "tempo de carro parado" },
         { t: "Menos inadimplência", d: "Cobrança automática, caução inteligente e score de risco em cada locação.", k: "-64%", kl: "calotes" },
         { t: "Operação no automático", d: "Contratos, vistorias e repasses sem toque humano. Sua equipe foca no que importa.", k: "12h", kl: "economizadas/semana" },
         { t: "Cliente que volta", d: "Experiência de reserva premium que transforma locatário em cliente recorrente.", k: "4,9/5", kl: "satisfação" },
@@ -66,10 +66,10 @@ export const translations = {
     },
     diff: {
       overline: "Diferenciais",
-      marquee: ["IA de precificação", "Vistoria digital", "Contrato eletrônico", "Antifraude", "Repasse automático", "Painel em tempo real"],
+      marquee: ["Rastreamento via API", "Vistoria digital", "Contrato eletrônico", "Antifraude", "Repasse automático", "Painel em tempo real"],
       title: "Inteligência artificial trabalhando por você",
       items: [
-        { t: "Precificação preditiva", d: "A IA analisa demanda, sazonalidade e concorrência para sugerir o preço que maximiza seu lucro." },
+        { t: "Rastreamento por API aberta", d: "Aponte o provedor de GPS que sua frota já usa para o nosso webhook — sem trocar de hardware. Posição em tempo real, cercas virtuais com alerta e cada requisição assinada com HMAC." },
         { t: "Antifraude embarcado", d: "Verificação de identidade, CNH e score de risco antes de qualquer entrega de chave." },
         { t: "Vistoria com visão computacional", d: "Fotos analisadas automaticamente detectam avarias e protegem o seu patrimônio." },
       ],
@@ -80,6 +80,8 @@ export const translations = {
       d: "Dois aplicativos, uma inteligência. O painel de gestão para você e uma experiência de reserva impecável para o seu cliente.",
       tabOwner: "Para o locador",
       tabRenter: "Para o locatário",
+      ctaOwner: "Ver como Cliente",
+      ctaRenter: "Ver como Equipe",
       owner: [
         "Painel financeiro com margem por veículo",
         "Contratos e assinatura digital",
@@ -100,11 +102,11 @@ export const translations = {
       stats: [
         { k: 12000, suffix: "+", l: "locações processadas" },
         { k: 320, suffix: "+", l: "frotas ativas" },
-        { k: 38, suffix: "%", l: "aumento médio de receita" },
+        { k: 31, suffix: "%", l: "menos custo de manutenção" },
         { k: 49, suffix: "", l: "nota média (de 50)" },
       ],
       testimonials: [
-        { q: "Em 3 meses aumentei a ocupação da frota em 40%. A precificação com IA é surreal.", n: "Marina Alves", r: "CEO, MoveCar Locadora" },
+        { q: "Em 3 meses o tempo de carro parado caiu quase pela metade. A manutenção preditiva com IA é surreal.", n: "Marina Alves", r: "CEO, MoveCar Locadora" },
         { q: "Acabou a papelada. Meus clientes fecham o contrato pelo celular e eu recebo automático.", n: "Rafael Muniz", r: "Sócio, DriveNow" },
         { q: "A vistoria digital eliminou 100% das brigas por avaria. Melhor decisão do ano.", n: "Camila Torres", r: "Gestora de Frota, UrbanRent" },
       ],
@@ -128,7 +130,7 @@ export const translations = {
       note: "14 dias grátis · sem cartão · sem fidelidade",
       plans: [
         { name: "Start", price: "R$ 149", period: "/mês", d: "Para quem está começando a profissionalizar a frota.", feats: ["Até 10 veículos", "Contrato digital", "Pagamentos automáticos", "App do locatário"] },
-        { name: "Pro", price: "R$ 399", period: "/mês", d: "Para locadoras em crescimento que querem escalar com IA.", feats: ["Até 50 veículos", "Precificação com IA", "Vistoria com visão computacional", "Antifraude e caução inteligente", "Painel financeiro avançado"], highlight: true },
+        { name: "Pro", price: "R$ 399", period: "/mês", d: "Para locadoras em crescimento que querem escalar com IA.", feats: ["Até 50 veículos", "Manutenção preditiva com IA", "Vistoria com visão computacional", "Antifraude e caução inteligente", "Painel financeiro avançado"], highlight: true },
         { name: "Scale", price: "Sob consulta", period: "", d: "Para operações grandes e multi-unidades.", feats: ["Veículos ilimitados", "Multi-filial", "API e integrações", "Gerente de conta dedicado"] },
       ],
     },
@@ -178,8 +180,8 @@ export const translations = {
       sub: "Shinã is the platform that runs the entire rental operation for owners and delivers a premium rental experience for customers — contracts, payments, inspections and AI, all in one place.",
       ctaPrimary: "Explore the platform",
       ctaSecondary: "See how it works",
-      stat1: "+38%",
-      stat1l: "revenue per vehicle",
+      stat1: "+22%",
+      stat1l: "fleet availability",
       stat2: "-71%",
       stat2l: "less paperwork time",
       stat3: "4.9/5",
@@ -198,7 +200,7 @@ export const translations = {
       title: "From signup to profit in 4 steps",
       cta: "Discover the platform",
       steps: [
-        { n: "01", t: "Register your fleet", d: "Upload vehicles, photos and documents. AI organizes everything and suggests the ideal price per season and demand." },
+        { n: "01", t: "Register your fleet", d: "Upload vehicles, photos and documents. AI organizes everything and links each car to inspections, maintenance and its GPS tracker." },
         { n: "02", t: "Publish and get bookings", d: "Your catalog goes live for renters with 100% digital booking, contract and signature." },
         { n: "03", t: "Hand over with digital inspection", d: "Check-in and check-out with photos, report and automated deposit. Zero disputes, zero loss." },
         { n: "04", t: "Get paid and track", d: "Automatic payments, payouts and a dashboard showing the real margin of every vehicle in real time." },
@@ -208,7 +210,7 @@ export const translations = {
       overline: "Benefits",
       title: "Results you feel in your cash flow",
       items: [
-        { t: "More revenue per car", d: "AI dynamic pricing increases occupancy and average ticket across your fleet.", k: "+38%", kl: "revenue/vehicle" },
+        { t: "Maintenance that stays ahead", d: "Inspections and telemetry open work orders on their own, AI triages what's urgent, and the Maintenance Auditor blocks overspend on parts and labor.", k: "-34%", kl: "vehicle downtime" },
         { t: "Less default", d: "Automatic billing, smart deposits and a risk score on every rental.", k: "-64%", kl: "defaults" },
         { t: "Operation on autopilot", d: "Contracts, inspections and payouts with no human touch. Your team focuses on what matters.", k: "12h", kl: "saved/week" },
         { t: "Customers who return", d: "A premium booking experience that turns renters into recurring customers.", k: "4.9/5", kl: "satisfaction" },
@@ -216,10 +218,10 @@ export const translations = {
     },
     diff: {
       overline: "Differentiators",
-      marquee: ["AI pricing", "Digital inspection", "E-contract", "Anti-fraud", "Auto payouts", "Real-time dashboard"],
+      marquee: ["API GPS tracking", "Digital inspection", "E-contract", "Anti-fraud", "Auto payouts", "Real-time dashboard"],
       title: "Artificial intelligence working for you",
       items: [
-        { t: "Predictive pricing", d: "AI analyzes demand, seasonality and competition to suggest the price that maximizes your profit." },
+        { t: "Open-API GPS tracking", d: "Point the GPS provider your fleet already uses at our webhook — no new hardware. Live position, geofence alerts, and every request signed with HMAC." },
         { t: "Built-in anti-fraud", d: "Identity, driver's license and risk-score verification before any key handover." },
         { t: "Computer-vision inspection", d: "Photos are automatically analyzed to detect damage and protect your assets." },
       ],
@@ -230,6 +232,8 @@ export const translations = {
       d: "Two apps, one intelligence. A management dashboard for you and a flawless booking experience for your customer.",
       tabOwner: "For owners",
       tabRenter: "For renters",
+      ctaOwner: "View as Customer",
+      ctaRenter: "View as Team",
       owner: [
         "Financial dashboard with margin per vehicle",
         "Contracts and digital signature",
@@ -250,11 +254,11 @@ export const translations = {
       stats: [
         { k: 12000, suffix: "+", l: "rentals processed" },
         { k: 320, suffix: "+", l: "active fleets" },
-        { k: 38, suffix: "%", l: "average revenue increase" },
+        { k: 31, suffix: "%", l: "lower maintenance cost" },
         { k: 49, suffix: "", l: "average score (of 50)" },
       ],
       testimonials: [
-        { q: "In 3 months I raised fleet occupancy by 40%. The AI pricing is surreal.", n: "Marina Alves", r: "CEO, MoveCar Rentals" },
+        { q: "In 3 months vehicle downtime dropped by almost half. The AI predictive maintenance is surreal.", n: "Marina Alves", r: "CEO, MoveCar Rentals" },
         { q: "Paperwork is gone. My customers sign on their phone and I get paid automatically.", n: "Rafael Muniz", r: "Partner, DriveNow" },
         { q: "Digital inspection eliminated 100% of damage disputes. Best decision of the year.", n: "Camila Torres", r: "Fleet Manager, UrbanRent" },
       ],
@@ -278,7 +282,7 @@ export const translations = {
       note: "14 days free · no card · no lock-in",
       plans: [
         { name: "Start", price: "$29", period: "/mo", d: "For those starting to professionalize their fleet.", feats: ["Up to 10 vehicles", "Digital contract", "Automatic payments", "Renter app"] },
-        { name: "Pro", price: "$79", period: "/mo", d: "For growing rentals that want to scale with AI.", feats: ["Up to 50 vehicles", "AI pricing", "Computer-vision inspection", "Anti-fraud and smart deposit", "Advanced financial dashboard"], highlight: true },
+        { name: "Pro", price: "$79", period: "/mo", d: "For growing rentals that want to scale with AI.", feats: ["Up to 50 vehicles", "AI predictive maintenance", "Computer-vision inspection", "Anti-fraud and smart deposit", "Advanced financial dashboard"], highlight: true },
         { name: "Scale", price: "Custom", period: "", d: "For large, multi-unit operations.", feats: ["Unlimited vehicles", "Multi-branch", "API and integrations", "Dedicated account manager"] },
       ],
     },

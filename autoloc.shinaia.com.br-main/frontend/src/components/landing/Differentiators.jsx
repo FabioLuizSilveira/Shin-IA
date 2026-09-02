@@ -1,11 +1,11 @@
 import React from "react";
 import Marquee from "react-fast-marquee";
-import { Brain, Fingerprint, ScanLine } from "lucide-react";
+import { Satellite, Fingerprint, ScanLine } from "lucide-react";
 import { useLang } from "@/context/LangContext";
 import { Reveal, Stagger, staggerItem } from "@/components/landing/motion";
 import { motion } from "framer-motion";
 
-const icons = [Brain, Fingerprint, ScanLine];
+const icons = [Satellite, Fingerprint, ScanLine];
 
 export function Differentiators() {
   const { t } = useLang();
