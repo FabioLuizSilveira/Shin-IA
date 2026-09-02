@@ -16,43 +16,57 @@ Instructions and context for Claude Code when working on this project.
 > audit (2026-07-31) found real drift between what's listed here as "complete" and what's actually
 > wired into the apps — several milestones below were 3-line stub pages with zero backing API as
 > late as this year, and a few "complete" claims are still false today (see caveats inline and the
-> published audit for full evidence). **Before assuming any milestone below is real, verify the
-> actual code** — do not treat this list as ground truth.
+> published audit for full evidence). A follow-up import-grep spot-check (2026-09-02, `grep -rl
+"@shina/<pkg>" apps/*/src` per package) found the 2026-07-31 audit itself had already drifted —
+> see the corrected package list and M23/M25 notes below. **Before assuming any milestone below is
+> real, verify the actual code** — do not treat this list as ground truth.
 
 All milestones through M19 are complete and merged to `main`. The platform is feature-complete for the core product loop.
 
 **Completed:**
 
 - M1: Foundation (monorepo, tooling, CI/CD) — verified solid.
-- M2–M20: Core domain packages and engines — **not what it sounds like.** 36 packages existed under
-  `packages/` as of the 2026-07-31 audit; only 8 were actually imported by any app at that point
-  (`billing-platform`, `commission-engine`, `design-system`, `icons`, `landing`, `marketing-ai`,
-  `theme`, `tokens`), plus 2 more transitively (`flow-engine`, `illustrations`). A follow-up pass
-  the same day plugged 4 more in where they closed a real, previously-broken gap: `resource-engine`
-  now blocks double-booking in `api/operations` (see `lib/resource-availability.ts`), `reporting-engine`'s
-  `KpiEngine` now powers `tenant/reports`' trend cards (see `lib/kpi-data-provider.ts`), `motion`
-  now drives real Framer Motion transitions in `design-system`'s `Dialog`/`Drawer`, and
-  `tracking-engine` was split — its 8 vendor GPS adapters and device-provisioning runtime were
-  archived as speculative (no tenant has asked for a named-provider integration; the generic
-  bring-your-own-webhook already covers today's need), but its `GeofenceEngine` was kept and wired
-  into the fleet-tracking webhook (`api/webhooks/fleet-location/[token]`, `api/geofences`,
-  `tenant/tracking`'s "Cercas Virtuais" section) since geofencing is provider-agnostic and closed a
-  real gap. `operation-engine` is still genuinely unwired — its 8-state lifecycle would need a
-  schema migration with no current product trigger. `rule-engine`, `workflow-engine`, `auth`,
-  `domain`, `billing-engine`, `marketplace` were archived (removed) 2026-07-31 as confirmed
-  dead/superseded code — see git history if you need to recover one.
-  `authorization`/`iam-domain`/`iam-repository`/`ai-platform`/`blueprint-runtime`/`studio`/
-  `mobile-runtime`/`operation-engine` are coherent, real, but deliberately deferred — no current
-  feature needs them yet; don't force-integrate without a concrete product trigger.
+- M2–M20: Core domain packages and engines — **not what it sounds like, and the 2026-07-31 audit's
+  own claims have since drifted too.** As of a 2026-09-02 import-grep re-check, `resource-engine`
+  is **not** actually wired into `api/operations` despite the earlier audit's claim — the
+  double-booking guard there (`lib/resource-availability.ts`) is a hand-rolled reimplementation that
+  never imports the package; treat that claim as false until someone actually wires the package in.
+  `reporting-engine`'s `KpiEngine` (real, powers `tenant/reports`' trend cards via
+  `lib/kpi-data-provider.ts`) and `motion` (real, drives `design-system`'s `Dialog`/`Drawer`
+  transitions) still check out. `tracking-engine` is still split as described — `GeofenceEngine`
+  wired into the fleet-tracking webhook (`api/webhooks/fleet-location/[token]`, `api/geofences`,
+  `tenant/tracking`'s "Cercas Virtuais"), the 8 vendor GPS adapters unused. `operation-engine`,
+  `rule-engine`, `workflow-engine`, `auth`, `domain`, `billing-engine`, `marketplace`,
+  `authorization`, `iam-domain`, `iam-repository` all **still exist under `packages/` and are still
+  genuinely unwired** (zero imports from any app) — the 2026-07-31 audit's claim that
+  `rule-engine`/`workflow-engine`/`auth`/`domain`/`billing-engine`/`marketplace` were "archived
+  (removed)" was itself wrong (or reverted without updating this file) as of the 2026-09-02
+  re-check: they're still on disk, just unused. Don't trust either audit's claim about a specific
+  package without re-running the grep yourself: `grep -rl "@shina/<pkg>" apps/*/src apps/*/app`.
+  `ai-platform` and `blueprint-runtime` have real (if limited) usage — 2 and 4 importing files
+  respectively as of 2026-09-02 — contradicting the earlier "deliberately deferred, no current
+  feature needs them" framing; `studio` (customization/branding, `api/tenant-studio/*`,
+  `tenant/customization/branding`) is real and imported in 5 files — don't confuse it with the
+  `tenant/studio` _route_ (IAM/roles, M32), which is a same-named but unrelated hand-rolled feature
+  that doesn't import the `@shina/studio` package. `mobile-runtime` not re-checked in the 2026-09-02
+  pass.
 - M21: Design system (Tailwind, 15 components, 10 pages) — real, wired into both apps.
 - M22: Business features (real Supabase CRUD — operations, assets, contracts, tenants) — real; was
   rebuilt from scratch in 2026-07 after an audit found the pages were 3-line stubs with no API.
-- M23: Notifications (in-app, polling, auto-create on events) — **partially false.** Bell/dropdown/
-  polling exist, but `createNotification()` (`apps/web/src/lib/notifications/create-notification.ts`)
-  is never called by any route — nothing auto-creates a notification today.
+- M23: Notifications (in-app, polling, auto-create on events) — **real as of 2026-09-02** (was
+  "partially false" at the 2026-07-31 audit — the gap has since been closed, not by this session).
+  Bell/dropdown/polling exist, and `createNotification()`
+  (`apps/web/src/lib/notifications/create-notification.ts`) is now called from 14+ routes
+  (commissions approval, contracts, findings, infractions, inspections, mobile customer flows,
+  operations, platform-support threads) — auto-create on events is real today.
 - M24: Analytics & Reports (charts, dashboards, reports page) — real, but flat (no trend/aggregation).
-- M25: Settings & Deploy (profile, company settings, Vercel config) — **false.** No `tenant/settings`
-  page exists for user profile or company config; only `tenant/studio` (IAM/roles) was built.
+- M25: Settings & Deploy (profile, company settings, Vercel config) — **partially outdated.** The
+  2026-07-31 "no `tenant/settings` page exists at all" claim is false as of 2026-09-02:
+  `tenant/settings` now exists with real `billing` (Fase E of the Stripe -> Asaas migration —
+  manage/cancel subscription, update card) and `legal` (contract templates, acceptance detail)
+  sub-pages, plus its own root page. Whether a dedicated user-profile or company-config page exists
+  under it wasn't re-verified — check before assuming either way. `tenant/studio` (IAM/roles) is a
+  separate, unrelated route.
 - M26: Operation Lifecycle (status transitions, detail drawer, asset updates) — real.
 - M27: CRM & Contract Lifecycle (org CRUD, contract status transitions, detail drawer) — real.
 - M28: Command Menu (global Cmd+K search across all entities) — real.
@@ -81,10 +95,22 @@ All milestones through M19 are complete and merged to `main`. The platform is fe
 **Not on the original roadmap, built since:** tenant/commission (full engine, wired to real schema),
 Shinã Identity Fase 1 (unified OAuth/magic-link login, subscriptions, `BillingProvider` abstraction,
 Workspace Switcher), rental customer identity + `apps/mobile` (Fase 1 — staff-invite onboarding,
-RLS-authorized mobile app, no marketplace self-signup yet).
+RLS-authorized mobile app, no marketplace self-signup yet), Maintenance + Asset Intelligence module
+(P0-P2: Inspection→Maintenance and Tracking→Maintenance integration, AI Copilot, Maintenance
+Auditor, Shinã Insights dashboard — real and live, not a "planned layer"), Shinã-native TOTP MFA
+(RFC 6238 step-up, independent of Supabase/Firebase MFA — real and live, not just "decided"),
+**full Stripe -> Asaas payment gateway migration** (completed through Fase F as of 2026-09-02:
+platform SaaS subscriptions, Shinã MKT subscriptions, and the customer-facing one-off AR/invoices
+module all run on Asaas; every Stripe-specific code path, dependency, and env var removed from the
+repo — see git log for `feat(billing)`/`refactor(billing)` commits on `main` if you need the
+phase-by-phase detail; the one documented open gap is the MKT product's 14-day refund guarantee,
+never reimplemented for Asaas, tracked in `apps/mkt/src/app/api/checkout/route.ts`'s own comment).
 
-**Known gaps, not yet closed (see `packages/` audit for the integration plan):** M23's auto-trigger,
-M25's settings page, M31's general activity feed, M33's export/print wiring.
+**Known gaps, not yet closed:** M31's general activity feed, M33's export/print wiring, the Asaas
+14-day refund guarantee (MKT product), and whatever M25's profile/company-config page turns out to
+still be missing (not re-verified 2026-09-02). M23's auto-trigger gap and the 2026-07-31 audit's
+package-integration claims were the two items closed/corrected since — see inline notes above
+instead of a stale integration-plan pointer.
 
 ---
 
