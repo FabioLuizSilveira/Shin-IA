@@ -60,13 +60,13 @@ All milestones through M19 are complete and merged to `main`. The platform is fe
   (commissions approval, contracts, findings, infractions, inspections, mobile customer flows,
   operations, platform-support threads) — auto-create on events is real today.
 - M24: Analytics & Reports (charts, dashboards, reports page) — real, but flat (no trend/aggregation).
-- M25: Settings & Deploy (profile, company settings, Vercel config) — **partially outdated.** The
-  2026-07-31 "no `tenant/settings` page exists at all" claim is false as of 2026-09-02:
-  `tenant/settings` now exists with real `billing` (Fase E of the Stripe -> Asaas migration —
-  manage/cancel subscription, update card) and `legal` (contract templates, acceptance detail)
-  sub-pages, plus its own root page. Whether a dedicated user-profile or company-config page exists
-  under it wasn't re-verified — check before assuming either way. `tenant/studio` (IAM/roles) is a
-  separate, unrelated route.
+- M25: Settings & Deploy (profile, company settings, Vercel config) — **real as of 2026-09-02**
+  (the 2026-07-31 "no `tenant/settings` page exists at all" claim is false). `tenant/settings`'s
+  own root page (346 lines) has real, working "profile" and "company" tabs backed by
+  `api/tenant-settings/profile` and `api/tenant-settings/company` — exactly what M25 originally
+  asked for. Plus `billing` (Fase E of the Stripe -> Asaas migration — manage/cancel subscription,
+  update card) and `legal` (contract templates, acceptance detail) sub-pages. `tenant/studio`
+  (IAM/roles) is a separate, unrelated route. Vercel-config half of M25 not checked either time.
 - M26: Operation Lifecycle (status transitions, detail drawer, asset updates) — real.
 - M27: CRM & Contract Lifecycle (org CRUD, contract status transitions, detail drawer) — real.
 - M28: Command Menu (global Cmd+K search across all entities) — real.
@@ -85,9 +85,15 @@ All milestones through M19 are complete and merged to `main`. The platform is fe
   only covered 4 of the real entity types/actions being logged — expanded to match.
 - M32: Team & User Management (user profiles, settings Equipe tab, admin users view) — real, built
   as `tenant/studio` (full per-tenant IAM), not a settings tab.
-- M33: Export & Print (CSV export for 6 entities, printable invoice page, ExportButton) —
-  **false.** `ExportButton` component exists and works but is imported by zero pages. No printable
-  invoice route exists at all.
+- M33: Export & Print (CSV export for 6 entities, printable invoice page, ExportButton) — **real as
+  of 2026-09-02** (was "false" at the 2026-07-31 audit — the gap has since been closed, not by this
+  session; stale code comments in `api/export/route.ts` and the print page itself still describe
+  the old gap even though the code right below them closes it — don't trust a code comment's own
+  "this doesn't exist yet" claim without checking either). `ExportButton` is imported by exactly 6
+  pages (invoices, resources, assets, operations, contracts, organizations/CRM — matching the
+  original milestone spec exactly), backed by a real tenant-scoped `api/export` CSV route.
+  `financial/invoices/[id]/print/page.tsx` is real (292 lines, pt-BR/BRL formatting, no
+  AppShell/sidebar by design) and linked from `invoice-detail.tsx`'s "Imprimir" button.
 - M34: Operations Calendar (monthly grid, upcoming widget on dashboard, mobile-friendly) — real.
 - M35: Dark Mode & Mobile (class-based dark mode, mobile sidebar toggle, skeleton-ready) — real.
 - M36: Tenant Onboarding (signup wizard for new tenants) — real; provisioning bug (new tenants
@@ -112,12 +118,17 @@ repo — see git log for `feat(billing)`/`refactor(billing)` commits on `main` i
 phase-by-phase detail; the one documented open gap is the MKT product's 14-day refund guarantee,
 never reimplemented for Asaas, tracked in `apps/mkt/src/app/api/checkout/route.ts`'s own comment).
 
-**Known gaps, not yet closed:** M33's export/print wiring, and whatever M25's profile/company-config
-page turns out to still be missing (not re-verified 2026-09-02). M23's auto-trigger gap, M31's
-activity feed, the 2026-07-31 audit's package-integration claims, the Asaas plan-change flow (was
-completely broken post-Fase-F, fixed 2026-09-02), and the Asaas 14-day refund guarantee (MKT
-product, reimplemented 2026-09-02) were all closed/corrected since — see inline notes above and
-git log's `feat(billing)`/`fix(billing)` commits instead of a stale integration-plan pointer.
+**Known gaps, not yet closed:** the Vercel-config half of M25 was never actually checked (only
+profile/company/billing/legal settings were verified real) — don't assume either way. Everything
+else this file used to list here — M23's auto-trigger, M25's settings page, M31's activity feed,
+M33's export/print, the 2026-07-31 audit's package-integration claims, the Asaas plan-change flow
+(was completely broken post-Fase-F, fixed 2026-09-02), and the Asaas 14-day refund guarantee (MKT
+product, reimplemented 2026-09-02) — turned out to already be closed or got closed this session; see
+inline notes above and git log's `feat(billing)`/`fix(billing)` commits instead of a stale
+integration-plan pointer. The pattern across M23/M25/M31/M33 was the same every time: a real gap got
+closed by someone, and this file (plus, in two cases, the code's own comments) never got updated to
+say so — treat any remaining "false"/"partially false" claim anywhere in this file with the same
+suspicion until re-verified.
 
 ---
 
