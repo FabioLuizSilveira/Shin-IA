@@ -74,9 +74,15 @@ All milestones through M19 are complete and merged to `main`. The platform is fe
 - M30: Resources & Fleet Intelligence (resources page, detail drawer, admin metrics) — real for
   resources CRUD; fleet tracking (`tenant/tracking`) was a schema-less placeholder until rebuilt
   2026-07 as a bring-your-own-webhook GPS integration.
-- M31: Audit Log & Activity Feed (real-time activity timeline, admin audit page) — **partially
-  false.** Only impersonation-session auditing exists (`platform/support`); there is no general
-  tenant activity feed of what staff themselves do.
+- M31: Audit Log & Activity Feed (real-time activity timeline, admin audit page) — **real as of
+  2026-09-02** (was "partially false" at the 2026-07-31 audit — the gap has since been closed, not
+  by this session). `tenant_activity_log` (migration `20260056000000`) + `lib/activity-log.ts`'s
+  `logActivity()` is called from 65 files across contracts, operations, infractions, inspections,
+  maintenance, commissions, blueprints, onboarding, and subscription webhooks; `lib/mobile-audit.ts`
+  reuses the same table for sensitive mobile actions. Real read API (`api/tenant-activity`) and a
+  real, linked-in-the-sidebar UI page (`tenant/activity`) exist. The one actual (cosmetic, not
+  functional) gap found and fixed 2026-09-02: the page's `ENTITY_LABEL`/`ACTION_LABEL` dictionaries
+  only covered 4 of the real entity types/actions being logged — expanded to match.
 - M32: Team & User Management (user profiles, settings Equipe tab, admin users view) — real, built
   as `tenant/studio` (full per-tenant IAM), not a settings tab.
 - M33: Export & Print (CSV export for 6 entities, printable invoice page, ExportButton) —
@@ -106,11 +112,12 @@ repo — see git log for `feat(billing)`/`refactor(billing)` commits on `main` i
 phase-by-phase detail; the one documented open gap is the MKT product's 14-day refund guarantee,
 never reimplemented for Asaas, tracked in `apps/mkt/src/app/api/checkout/route.ts`'s own comment).
 
-**Known gaps, not yet closed:** M31's general activity feed, M33's export/print wiring, the Asaas
-14-day refund guarantee (MKT product), and whatever M25's profile/company-config page turns out to
-still be missing (not re-verified 2026-09-02). M23's auto-trigger gap and the 2026-07-31 audit's
-package-integration claims were the two items closed/corrected since — see inline notes above
-instead of a stale integration-plan pointer.
+**Known gaps, not yet closed:** M33's export/print wiring, and whatever M25's profile/company-config
+page turns out to still be missing (not re-verified 2026-09-02). M23's auto-trigger gap, M31's
+activity feed, the 2026-07-31 audit's package-integration claims, the Asaas plan-change flow (was
+completely broken post-Fase-F, fixed 2026-09-02), and the Asaas 14-day refund guarantee (MKT
+product, reimplemented 2026-09-02) were all closed/corrected since — see inline notes above and
+git log's `feat(billing)`/`fix(billing)` commits instead of a stale integration-plan pointer.
 
 ---
 
