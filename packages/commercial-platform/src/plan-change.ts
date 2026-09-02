@@ -63,9 +63,12 @@ export async function changePlan(
   }
 
   const toPlanVersion = await resolvePlanVersion(db, input.toPlanVersionId);
-  if (!toPlanVersion.gateway_price_id) {
-    throw new Error(`target plan version ${input.toPlanVersionId} has no gateway_price_id`);
-  }
+  // gateway_price_id was a Stripe-only concept (a reusable "price" resource
+  // to reference by id) -- Asaas has no equivalent, it takes the value
+  // directly (see updateSubscription() below). Requiring it unconditionally
+  // was a real bug post-Fase-F: every plan change would 500 here, since no
+  // plan_version has ever had a gateway_price_id populated under Asaas.
+  // price_cents is the one thing every provider can act on.
 
   let direction: "up" | "down" | "same" = "same";
   if (subscription.plan_version_id) {
@@ -103,7 +106,8 @@ export async function changePlan(
   }
 
   await billingProvider.updateSubscription(subscription.id, {
-    priceId: toPlanVersion.gateway_price_id,
+    priceId: toPlanVersion.gateway_price_id ?? undefined,
+    amountCents: toPlanVersion.price_cents,
   });
 
   await db

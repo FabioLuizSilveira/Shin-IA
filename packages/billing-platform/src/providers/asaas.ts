@@ -21,12 +21,11 @@ import { applyBillingEvent } from "../sync-webhook.js";
 // Endpoints below were each confirmed individually against the live
 // docs.asaas.com reference (method + path + request/response schema),
 // not guessed -- see the migration plan for the research trail. One
-// exception, flagged where it matters: the PUT /v3/subscriptions/{id}
-// schema as scraped doesn't list a `value` field even though Asaas's own
-// prose says the charge amount can be changed (a known limitation of the
-// markdown-export tooling, not a code decision) -- updateSubscription()
-// sends `value` as the most likely real field name, but this is
-// UNVERIFIED until Fase A's live sandbox test round-trips it.
+// exception: the PUT /v3/subscriptions/{id} schema as scraped doesn't list
+// a `value` field even though Asaas's own prose says the charge amount can
+// be changed (a known limitation of the markdown-export tooling, not a
+// code decision) -- updateSubscription() below sends `value`, now
+// live-verified against a real sandbox subscription (see its own comment).
 
 export interface AsaasBillingProviderOptions {
   apiKey: string;
@@ -383,11 +382,19 @@ export class AsaasBillingProvider implements BillingProvider {
       .maybeSingle();
     if (!sub?.gateway_subscription_id) throw new Error("Subscription has no gateway id");
 
-    // UNVERIFIED field name (see file header) -- Fase A's live sandbox
-    // test must confirm `value` actually changes the charge amount before
-    // this is trusted with a real subscription.
+    // Live-verified against a real sandbox subscription: `value` is the
+    // correct field, and it actually persists (independently re-fetching
+    // the subscription afterward confirmed the change, not just an echo in
+    // the PUT response). updatePendingPayments: true also live-confirmed
+    // as necessary -- without it, a charge already generated for the
+    // current cycle keeps its OLD value and only the NEXT cycle bills at
+    // the new one, which would silently under/over-charge an upgrade or
+    // downgrade that happens mid-cycle. true makes an already-pending
+    // charge jump to the new value immediately, matching what a tenant
+    // clicking "mudar de plano" expects to happen.
     await this.request("PUT", `/subscriptions/${sub.gateway_subscription_id}`, {
       value: params.amountCents / 100,
+      updatePendingPayments: true,
     });
   }
 
