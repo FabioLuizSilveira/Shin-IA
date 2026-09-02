@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { SectionHeader } from "@/components/ui/section-header";
-import { CreditCard, Loader2, ExternalLink } from "lucide-react";
+import { CreditCard, Loader2, XCircle } from "lucide-react";
 
 interface Subscription {
   id: string;
@@ -44,30 +44,86 @@ function formatDate(iso: string) {
   });
 }
 
+const emptyCardForm = {
+  holderName: "",
+  number: "",
+  expiryMonth: "",
+  expiryYear: "",
+  ccv: "",
+  holderCpfCnpj: "",
+  postalCode: "",
+  addressNumber: "",
+  phone: "",
+};
+
 export default function TenantBillingCenterPage() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
-  const [portalLoading, setPortalLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cardLoading, setCardLoading] = useState(false);
+  const [cardFormOpen, setCardFormOpen] = useState(false);
+  const [cardForm, setCardForm] = useState(emptyCardForm);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
+  function loadSubscription() {
+    setLoading(true);
     fetch("/api/commercial/subscription")
       .then((res) => res.json() as Promise<{ data?: Subscription }>)
       .then((json) => setSubscription(json.data ?? null))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadSubscription();
   }, []);
 
-  async function handlePortal() {
-    setPortalLoading(true);
+  async function handleCancel() {
+    if (
+      !window.confirm(
+        "Cancelar a assinatura da Shinã Platform? Isso não pode ser desfeito por aqui.",
+      )
+    ) {
+      return;
+    }
+    setCancelLoading(true);
     setError(null);
+    setNotice(null);
     try {
-      const res = await fetch("/api/commercial/portal", { method: "POST" });
-      const json = (await res.json()) as { data?: { url: string }; error?: string };
-      if (!res.ok || !json.data) throw new Error(json.error ?? "Não foi possível abrir o portal.");
-      window.location.href = json.data.url;
+      const res = await fetch("/api/commercial/cancel", { method: "POST" });
+      const json = (await res.json()) as { data?: { cancelling: boolean }; error?: string };
+      if (!res.ok || !json.data) throw new Error(json.error ?? "Não foi possível cancelar.");
+      setNotice(
+        "Cancelamento solicitado — a assinatura fica ativa até a confirmação da Asaas, que pode levar alguns minutos.",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
-      setPortalLoading(false);
+    } finally {
+      setCancelLoading(false);
+    }
+  }
+
+  async function handleUpdateCard(e: React.FormEvent) {
+    e.preventDefault();
+    setCardLoading(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/commercial/update-card", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cardForm),
+      });
+      const json = (await res.json()) as { data?: { updated: boolean }; error?: string };
+      if (!res.ok || !json.data)
+        throw new Error(json.error ?? "Não foi possível atualizar o cartão.");
+      setNotice("Cartão atualizado com sucesso.");
+      setCardForm(emptyCardForm);
+      setCardFormOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setCardLoading(false);
     }
   }
 
@@ -119,25 +175,34 @@ export default function TenantBillingCenterPage() {
           )}
           <p className="text-xs text-slate-400">
             Forma de cobrança:{" "}
-            {subscription.billing_mode === "card" ? "Cartão (Stripe)" : subscription.billing_mode}
+            {subscription.billing_mode === "card" ? "Cartão" : subscription.billing_mode}
           </p>
 
-          <div className="flex items-center gap-2 pt-2">
-            {subscription.billing_mode === "card" && (
-              <button
-                type="button"
-                onClick={() => void handlePortal()}
-                disabled={portalLoading}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-60 transition"
-              >
-                {portalLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            {subscription.billing_mode === "card" && !subscription.cancel_at_period_end && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCardFormOpen((v) => !v)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                >
                   <CreditCard className="w-4 h-4" />
-                )}
-                Gerenciar pagamento e faturas
-                <ExternalLink className="w-3 h-3" />
-              </button>
+                  Atualizar cartão
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleCancel()}
+                  disabled={cancelLoading}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/60 disabled:opacity-60 transition"
+                >
+                  {cancelLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <XCircle className="w-4 h-4" />
+                  )}
+                  Cancelar assinatura
+                </button>
+              </>
             )}
             <Link
               href="/tenant/billing/upgrade"
@@ -147,6 +212,89 @@ export default function TenantBillingCenterPage() {
             </Link>
           </div>
 
+          {cardFormOpen && (
+            <form
+              onSubmit={(e) => void handleUpdateCard(e)}
+              className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-200 dark:border-slate-800"
+            >
+              <input
+                required
+                placeholder="Nome impresso no cartão"
+                value={cardForm.holderName}
+                onChange={(e) => setCardForm({ ...cardForm, holderName: e.target.value })}
+                className="col-span-2 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent"
+              />
+              <input
+                required
+                placeholder="Número do cartão"
+                inputMode="numeric"
+                value={cardForm.number}
+                onChange={(e) => setCardForm({ ...cardForm, number: e.target.value })}
+                className="col-span-2 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent"
+              />
+              <input
+                required
+                placeholder="Mês (MM)"
+                inputMode="numeric"
+                value={cardForm.expiryMonth}
+                onChange={(e) => setCardForm({ ...cardForm, expiryMonth: e.target.value })}
+                className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent"
+              />
+              <input
+                required
+                placeholder="Ano (AAAA)"
+                inputMode="numeric"
+                value={cardForm.expiryYear}
+                onChange={(e) => setCardForm({ ...cardForm, expiryYear: e.target.value })}
+                className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent"
+              />
+              <input
+                required
+                placeholder="CVV"
+                inputMode="numeric"
+                value={cardForm.ccv}
+                onChange={(e) => setCardForm({ ...cardForm, ccv: e.target.value })}
+                className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent"
+              />
+              <input
+                required
+                placeholder="CPF/CNPJ do titular"
+                value={cardForm.holderCpfCnpj}
+                onChange={(e) => setCardForm({ ...cardForm, holderCpfCnpj: e.target.value })}
+                className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent"
+              />
+              <input
+                required
+                placeholder="CEP"
+                value={cardForm.postalCode}
+                onChange={(e) => setCardForm({ ...cardForm, postalCode: e.target.value })}
+                className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent"
+              />
+              <input
+                required
+                placeholder="Número do endereço"
+                value={cardForm.addressNumber}
+                onChange={(e) => setCardForm({ ...cardForm, addressNumber: e.target.value })}
+                className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent"
+              />
+              <input
+                required
+                placeholder="Telefone"
+                value={cardForm.phone}
+                onChange={(e) => setCardForm({ ...cardForm, phone: e.target.value })}
+                className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent"
+              />
+              <button
+                type="submit"
+                disabled={cardLoading}
+                className="col-span-2 px-4 py-2 text-sm font-semibold rounded-lg bg-shina-blue text-white hover:bg-blue-600 disabled:opacity-60 transition"
+              >
+                {cardLoading ? "Salvando..." : "Salvar novo cartão"}
+              </button>
+            </form>
+          )}
+
+          {notice && <p className="text-xs text-emerald-600 dark:text-emerald-400">{notice}</p>}
           {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
         </div>
       )}

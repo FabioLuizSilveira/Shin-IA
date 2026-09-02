@@ -99,6 +99,52 @@ export async function createOneOffCharge(params: {
   });
 }
 
+// Fase E: replaces the payment method a subscription charges, without
+// billing anything at the moment of the call -- Asaas's own documented
+// replacement for Stripe's "update default payment method" portal action.
+// Live-verified against a real sandbox subscription before this shipped:
+// 200, response echoes back a masked card (creditCardNumber's last 4,
+// creditCardBrand, creditCardToken) confirming the swap actually took.
+// Caught one real discrepancy in the process -- this endpoint 400s
+// ("Esta assinatura não é do tipo cartão de crédito") on any subscription
+// not created with billingType: CREDIT_CARD; harmless here because
+// createCheckout() (this file's subscription-checkout sibling in
+// billing-platform) only ever offers billingTypes: ["CREDIT_CARD"], so
+// every billing_mode: "card" platform_subscriptions row is guaranteed to
+// qualify -- but worth knowing if this function is ever reused elsewhere.
+// Card data passes through this server only in-memory, forwarded
+// immediately and never persisted -- same PCI posture Stripe.js gave for
+// free client-side; Asaas has no equivalent, so this backend proxy is the
+// documented way integrators do it here.
+export async function updateSubscriptionCreditCard(params: {
+  gatewaySubscriptionId: string;
+  remoteIp: string;
+  card: {
+    holderName: string;
+    number: string;
+    expiryMonth: string;
+    expiryYear: string;
+    ccv: string;
+  };
+  holderInfo: {
+    name: string;
+    email: string;
+    cpfCnpj: string;
+    postalCode: string;
+    addressNumber: string;
+    phone: string;
+  };
+}): Promise<void> {
+  await request(`/subscriptions/${params.gatewaySubscriptionId}/creditCard`, {
+    method: "PUT",
+    body: JSON.stringify({
+      creditCard: params.card,
+      creditCardHolderInfo: params.holderInfo,
+      remoteIp: params.remoteIp,
+    }),
+  });
+}
+
 export function parseOneOffExternalReference(
   externalReference: string | null | undefined,
 ): { action: string; invoiceId: string; refId: string | null } | null {
