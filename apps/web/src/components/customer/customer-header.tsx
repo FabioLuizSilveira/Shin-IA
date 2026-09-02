@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ArrowLeft, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { consumeDemoRedirect } from "@/lib/demo-session";
 
 interface CustomerHeaderProps {
   title: string;
@@ -19,6 +20,11 @@ export function CustomerHeader({ title, onBack }: CustomerHeaderProps) {
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
+    const landing = consumeDemoRedirect();
+    if (landing) {
+      window.location.href = landing;
+      return;
+    }
     router.push("/rentals/login");
     router.refresh();
   }

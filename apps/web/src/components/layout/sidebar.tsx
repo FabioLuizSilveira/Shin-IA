@@ -33,6 +33,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { consumeDemoRedirect } from "@/lib/demo-session";
 
 const PLATFORM_NAV_ITEMS = [
   { href: "/platform/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -119,6 +120,11 @@ export function Sidebar({ onClose }: SidebarProps) {
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
+    const landing = consumeDemoRedirect();
+    if (landing) {
+      window.location.href = landing;
+      return;
+    }
     router.push("/login");
     router.refresh();
   }
