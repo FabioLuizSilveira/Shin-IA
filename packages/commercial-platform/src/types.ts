@@ -23,7 +23,7 @@ export interface PlanVersion {
   discount_rules: Record<string, unknown>;
   revenue_share: Record<string, unknown>;
   metadata: Record<string, unknown>;
-  stripe_price_id: string | null;
+  gateway_price_id: string | null;
   status: "draft" | "published" | "superseded";
 }
 

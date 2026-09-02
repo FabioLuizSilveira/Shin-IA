@@ -21,7 +21,7 @@ export interface PlatformSubscription {
   product: SubscriptionProduct;
   plan_key: string;
   status: SubscriptionStatus;
-  stripe_subscription_id: string | null;
+  gateway_subscription_id: string | null;
   current_period_start: string | null;
   current_period_end: string | null;
   trial_ends_at: string | null;

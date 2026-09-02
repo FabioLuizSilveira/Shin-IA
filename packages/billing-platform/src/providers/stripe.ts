@@ -36,12 +36,12 @@ export class StripeBillingProvider implements BillingProvider {
   async createCustomer(params: CreateCustomerParams): Promise<{ customerId: string }> {
     const { data: existing } = await this.db
       .from("platform_customers")
-      .select("id, stripe_customer_id")
+      .select("id, gateway_customer_id")
       .eq("auth_user_id", params.authUserId)
       .maybeSingle();
 
-    if (existing?.stripe_customer_id) {
-      return { customerId: existing.stripe_customer_id };
+    if (existing?.gateway_customer_id) {
+      return { customerId: existing.gateway_customer_id };
     }
 
     const stripeCustomer = await this.stripe.customers.create({
@@ -53,7 +53,7 @@ export class StripeBillingProvider implements BillingProvider {
       {
         auth_user_id: params.authUserId,
         email: params.email,
-        stripe_customer_id: stripeCustomer.id,
+        gateway_customer_id: stripeCustomer.id,
       },
       { onConflict: "auth_user_id" },
     );
@@ -107,13 +107,13 @@ export class StripeBillingProvider implements BillingProvider {
   async cancelSubscription(subscriptionId: string): Promise<void> {
     const { data: sub } = await this.db
       .from("platform_subscriptions")
-      .select("stripe_subscription_id")
+      .select("gateway_subscription_id")
       .eq("id", subscriptionId)
       .maybeSingle();
-    if (!sub?.stripe_subscription_id) throw new Error("Subscription has no gateway id");
+    if (!sub?.gateway_subscription_id) throw new Error("Subscription has no gateway id");
     // Cancellation is finalized by the customer.subscription.deleted webhook,
     // not here — the DB status only changes when the gateway confirms.
-    await this.stripe.subscriptions.cancel(sub.stripe_subscription_id);
+    await this.stripe.subscriptions.cancel(sub.gateway_subscription_id);
   }
 
   async updateSubscription(
@@ -125,16 +125,16 @@ export class StripeBillingProvider implements BillingProvider {
     }
     const { data: sub } = await this.db
       .from("platform_subscriptions")
-      .select("stripe_subscription_id")
+      .select("gateway_subscription_id")
       .eq("id", subscriptionId)
       .maybeSingle();
-    if (!sub?.stripe_subscription_id) throw new Error("Subscription has no gateway id");
+    if (!sub?.gateway_subscription_id) throw new Error("Subscription has no gateway id");
 
-    const stripeSub = await this.stripe.subscriptions.retrieve(sub.stripe_subscription_id);
+    const stripeSub = await this.stripe.subscriptions.retrieve(sub.gateway_subscription_id);
     const itemId = stripeSub.items.data[0]?.id;
     if (!itemId) throw new Error("Stripe subscription has no items to update");
 
-    await this.stripe.subscriptions.update(sub.stripe_subscription_id, {
+    await this.stripe.subscriptions.update(sub.gateway_subscription_id, {
       items: [{ id: itemId, price: params.priceId }],
       proration_behavior: "create_prorations",
     });

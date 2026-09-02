@@ -33,7 +33,7 @@ export function mapStripeStatus(stripeStatus: string): SubscriptionStatus {
 // under a unique index on the gateway event id column -- a duplicate-key
 // error (23505) means this event was already processed (gateways retry
 // webhooks), so processing is skipped. Unchanged behavior from before
-// this refactor, same column (stripe_event_id, generic text -- Fase D
+// this refactor, same column (gateway_event_id, generic text -- Fase D
 // renames it, not this phase, per the migration plan's own sequencing).
 export async function applyBillingEvent(
   db: SupabaseClient,
@@ -44,7 +44,7 @@ export async function applyBillingEvent(
     .insert({
       provider: event.provider,
       event_type: event.eventType,
-      stripe_event_id: event.gatewayEventId,
+      gateway_event_id: event.gatewayEventId,
       payload: event.rawPayload,
     })
     .select("id")
@@ -73,7 +73,7 @@ export async function applyBillingEvent(
           {
             auth_user_id: event.authUserId,
             email: event.email ?? null,
-            stripe_customer_id: event.gatewayCustomerId ?? null,
+            gateway_customer_id: event.gatewayCustomerId ?? null,
           },
           { onConflict: "auth_user_id" },
         )
@@ -97,7 +97,7 @@ export async function applyBillingEvent(
           .update({
             plan_key: planKey,
             status: "active",
-            stripe_subscription_id: event.gatewaySubscriptionId ?? null,
+            gateway_subscription_id: event.gatewaySubscriptionId ?? null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", existing.id);
@@ -111,7 +111,7 @@ export async function applyBillingEvent(
             product,
             plan_key: planKey,
             status: "active",
-            stripe_subscription_id: event.gatewaySubscriptionId ?? null,
+            gateway_subscription_id: event.gatewaySubscriptionId ?? null,
           })
           .select("id")
           .single();
@@ -132,7 +132,7 @@ export async function applyBillingEvent(
           cancel_at_period_end: event.cancelAtPeriodEnd ?? false,
           updated_at: new Date().toISOString(),
         })
-        .eq("stripe_subscription_id", event.gatewaySubscriptionId)
+        .eq("gateway_subscription_id", event.gatewaySubscriptionId)
         .select("id")
         .maybeSingle();
       if (error) throw new Error(`subscription update failed: ${error.message}`);
@@ -149,7 +149,7 @@ export async function applyBillingEvent(
           cancelled_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .eq("stripe_subscription_id", event.gatewaySubscriptionId)
+        .eq("gateway_subscription_id", event.gatewaySubscriptionId)
         .select("id")
         .maybeSingle();
       if (error) throw new Error(`subscription cancel failed: ${error.message}`);

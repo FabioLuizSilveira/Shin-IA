@@ -19,7 +19,7 @@ export async function POST() {
 
   const { data: sub, error: subError } = await scope.db
     .from("platform_subscriptions")
-    .select("customer_id, platform_customers(stripe_customer_id)")
+    .select("customer_id, platform_customers(gateway_customer_id)")
     .eq("tenant_id", scope.tenantId)
     .eq("product", "platform")
     .neq("status", "cancelled")
@@ -27,8 +27,8 @@ export async function POST() {
   if (subError) return internalError(subError);
 
   const stripeCustomerId = (
-    sub?.platform_customers as unknown as { stripe_customer_id: string | null }
-  )?.stripe_customer_id;
+    sub?.platform_customers as unknown as { gateway_customer_id: string | null }
+  )?.gateway_customer_id;
   if (!stripeCustomerId) {
     return NextResponse.json(
       {

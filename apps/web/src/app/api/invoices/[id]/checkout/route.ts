@@ -27,7 +27,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const { data: invoice, error } = await supabase
     .from("invoices")
     .select(
-      "id, status, total_amount, total_currency, billing_account_id, billing_accounts(id, stripe_customer_id, organizations(id, name, email, document, phone))",
+      "id, status, total_amount, total_currency, billing_account_id, billing_accounts(id, gateway_customer_id, organizations(id, name, email, document, phone))",
     )
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
@@ -50,7 +50,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const billingAccount = invoice.billing_accounts as unknown as {
     id: string;
-    stripe_customer_id: string | null;
+    gateway_customer_id: string | null;
     organizations: {
       id: string;
       name: string;
@@ -64,19 +64,19 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Billing account has no organization" }, { status: 500 });
 
   const customerId = await findOrCreateAsaasCustomer({
-    existingCustomerId: billingAccount?.stripe_customer_id,
+    existingCustomerId: billingAccount?.gateway_customer_id,
     name: org.name,
     document: org.document,
     email: org.email,
     phone: org.phone,
   });
-  if (!billingAccount?.stripe_customer_id) {
+  if (!billingAccount?.gateway_customer_id) {
     // Obs-22 fix: re-scope by tenant_id even though invoice.billing_account_id
     // was already derived from a tenant-verified invoice row above — defense
     // in depth against this write surviving a future refactor unscoped.
     await supabase
       .from("billing_accounts")
-      .update({ stripe_customer_id: customerId })
+      .update({ gateway_customer_id: customerId })
       .eq("id", invoice.billing_account_id)
       .eq("tenant_id", scope.tenantId);
   }
@@ -94,7 +94,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   // (Fase A) -- rename deferred to Fase D, not this phase.
   await supabase
     .from("invoices")
-    .update({ stripe_checkout_session_id: payment.id, updated_at: new Date().toISOString() })
+    .update({ gateway_checkout_id: payment.id, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
 

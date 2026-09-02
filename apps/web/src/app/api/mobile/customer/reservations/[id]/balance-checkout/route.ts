@@ -55,7 +55,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: billingAccount } = await context.db
     .from("billing_accounts")
-    .select("id, stripe_customer_id, organizations(name, email, document, phone)")
+    .select("id, gateway_customer_id, organizations(name, email, document, phone)")
     .eq("organization_id", reservation.organization_id)
     .eq("tenant_id", reservation.tenant_id)
     .maybeSingle();
@@ -110,16 +110,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const customerId = await findOrCreateAsaasCustomer({
-    existingCustomerId: billingAccount.stripe_customer_id,
+    existingCustomerId: billingAccount.gateway_customer_id,
     name: org.name,
     document: org.document,
     email: org.email ?? context.email,
     phone: org.phone,
   });
-  if (!billingAccount.stripe_customer_id) {
+  if (!billingAccount.gateway_customer_id) {
     await context.db
       .from("billing_accounts")
-      .update({ stripe_customer_id: customerId })
+      .update({ gateway_customer_id: customerId })
       .eq("id", billingAccount.id);
   }
 
@@ -132,10 +132,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     refId: reservation.id,
   });
 
-  await context.db
-    .from("invoices")
-    .update({ stripe_checkout_session_id: payment.id })
-    .eq("id", invoiceId);
+  await context.db.from("invoices").update({ gateway_checkout_id: payment.id }).eq("id", invoiceId);
 
   return NextResponse.json({ data: { url: payment.invoiceUrl } });
 }

@@ -52,19 +52,19 @@ export async function changePlan(
 
   const { data: subscription, error: subError } = await db
     .from("platform_subscriptions")
-    .select("id, plan_version_id, stripe_subscription_id")
+    .select("id, plan_version_id, gateway_subscription_id")
     .eq("customer_id", customer.id)
     .eq("product", input.product)
     .neq("status", "cancelled")
     .maybeSingle();
   if (subError || !subscription) throw new Error("active subscription not found");
-  if (!subscription.stripe_subscription_id) {
+  if (!subscription.gateway_subscription_id) {
     throw new Error("subscription has no gateway id — cannot change plan");
   }
 
   const toPlanVersion = await resolvePlanVersion(db, input.toPlanVersionId);
-  if (!toPlanVersion.stripe_price_id) {
-    throw new Error(`target plan version ${input.toPlanVersionId} has no stripe_price_id`);
+  if (!toPlanVersion.gateway_price_id) {
+    throw new Error(`target plan version ${input.toPlanVersionId} has no gateway_price_id`);
   }
 
   let direction: "up" | "down" | "same" = "same";
@@ -103,7 +103,7 @@ export async function changePlan(
   }
 
   await billingProvider.updateSubscription(subscription.id, {
-    priceId: toPlanVersion.stripe_price_id,
+    priceId: toPlanVersion.gateway_price_id,
   });
 
   await db

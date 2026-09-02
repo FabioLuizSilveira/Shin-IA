@@ -74,11 +74,11 @@ export async function POST(request: Request) {
     .update({
       status: "paid",
       paid_at: new Date().toISOString(),
-      stripe_payment_intent_id: paymentId,
+      gateway_payment_intent_id: paymentId,
       updated_at: new Date().toISOString(),
     })
     .eq("id", invoiceId)
-    .eq("stripe_checkout_session_id", paymentId)
+    .eq("gateway_checkout_id", paymentId)
     .in("status", ["issued", "overdue"])
     .select("id")
     .maybeSingle();

@@ -6,7 +6,7 @@ import { hasLiveSubscription } from "./session-claims.js";
 
 // ── Minimal in-memory Supabase fake ────────────────────────────────────────────
 // Implements only the chains syncStripeEvent uses, with real unique-index
-// behavior for stripe_event_id so the idempotency path is actually exercised.
+// behavior for gateway_event_id so the idempotency path is actually exercised.
 
 interface Row {
   [key: string]: unknown;
@@ -74,8 +74,8 @@ class FakeQuery {
     if (this.op === "insert") {
       if (
         this.table === "platform_billing_events" &&
-        this.row.stripe_event_id &&
-        rows.some((r) => r.stripe_event_id === this.row.stripe_event_id)
+        this.row.gateway_event_id &&
+        rows.some((r) => r.gateway_event_id === this.row.gateway_event_id)
       ) {
         return { data: null, error: { code: "23505", message: "duplicate key" } };
       }
@@ -150,14 +150,14 @@ describe("syncStripeEvent", () => {
     const customers = db.tables["platform_customers"];
     expect(customers).toHaveLength(1);
     expect(customers[0].auth_user_id).toBe("auth-user-1");
-    expect(customers[0].stripe_customer_id).toBe("cus_123");
+    expect(customers[0].gateway_customer_id).toBe("cus_123");
 
     const subs = db.tables["platform_subscriptions"];
     expect(subs).toHaveLength(1);
     expect(subs[0].product).toBe("mkt");
     expect(subs[0].plan_key).toBe("pro");
     expect(subs[0].status).toBe("active");
-    expect(subs[0].stripe_subscription_id).toBe("sub_123");
+    expect(subs[0].gateway_subscription_id).toBe("sub_123");
   });
 
   it("is idempotent — a replayed event id changes nothing", async () => {
@@ -193,7 +193,7 @@ describe("syncStripeEvent", () => {
     expect(db.tables["platform_subscriptions"]).toBeUndefined();
   });
 
-  it("cancels by stripe_subscription_id on customer.subscription.deleted", async () => {
+  it("cancels by gateway_subscription_id on customer.subscription.deleted", async () => {
     const db = new FakeDb();
     await syncStripeEvent(db as unknown as SupabaseClient, checkoutEvent("evt_c"));
 

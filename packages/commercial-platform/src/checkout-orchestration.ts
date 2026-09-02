@@ -16,11 +16,11 @@ export async function createCommercialCheckout(
   input: CreateCommercialCheckoutInput,
 ): Promise<{ url: string; checkoutRefId: string }> {
   const planVersion = await resolvePlanVersion(db, input.planVersionId);
-  // stripe_price_id is only required for the Stripe provider (which
+  // gateway_price_id is only required for the Stripe provider (which
   // validates it itself, StripeBillingProvider.createCheckout throws a
   // clear error if missing) — a gateway without a reusable "price"
   // resource (Asaas) uses amountCents/billingCycle below instead, so this
-  // layer no longer hard-requires stripe_price_id for every provider.
+  // layer no longer hard-requires gateway_price_id for every provider.
 
   const { data: ref, error } = await db
     .from("checkout_session_references")
@@ -43,7 +43,7 @@ export async function createCommercialCheckout(
     email: input.email,
     product: input.product,
     planKey: planVersion.plans?.key ?? "unknown",
-    priceId: planVersion.stripe_price_id ?? undefined,
+    priceId: planVersion.gateway_price_id ?? undefined,
     amountCents: planVersion.price_cents,
     billingCycle: planVersion.billing_cycle,
     planName: planVersion.name,

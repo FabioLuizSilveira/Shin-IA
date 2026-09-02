@@ -200,12 +200,12 @@ export class AsaasBillingProvider implements BillingProvider {
   async createCustomer(params: CreateCustomerParams): Promise<{ customerId: string }> {
     const { data: existing } = await this.db
       .from("platform_customers")
-      .select("id, stripe_customer_id")
+      .select("id, gateway_customer_id")
       .eq("auth_user_id", params.authUserId)
       .maybeSingle();
 
-    if (existing?.stripe_customer_id) {
-      return { customerId: existing.stripe_customer_id };
+    if (existing?.gateway_customer_id) {
+      return { customerId: existing.gateway_customer_id };
     }
 
     // Never invent a document -- Asaas requires a real cpfCnpj, and a
@@ -217,7 +217,7 @@ export class AsaasBillingProvider implements BillingProvider {
       );
     }
 
-    // Written into the same `stripe_customer_id` text column the Stripe
+    // Written into the same `gateway_customer_id` text column the Stripe
     // provider uses -- it's untyped free text with no Stripe-specific
     // constraint, so this "just works" ahead of Fase D's rename to a
     // gateway-neutral column name; keeping the rename in its own phase
@@ -232,7 +232,7 @@ export class AsaasBillingProvider implements BillingProvider {
     const { error } = await this.db
       .from("platform_customers")
       .upsert(
-        { auth_user_id: params.authUserId, email: params.email, stripe_customer_id: customer.id },
+        { auth_user_id: params.authUserId, email: params.email, gateway_customer_id: customer.id },
         { onConflict: "auth_user_id" },
       );
     if (error) throw new Error(`customer upsert failed: ${error.message}`);
@@ -360,13 +360,13 @@ export class AsaasBillingProvider implements BillingProvider {
   async cancelSubscription(subscriptionId: string): Promise<void> {
     const { data: sub } = await this.db
       .from("platform_subscriptions")
-      .select("stripe_subscription_id")
+      .select("gateway_subscription_id")
       .eq("id", subscriptionId)
       .maybeSingle();
-    if (!sub?.stripe_subscription_id) throw new Error("Subscription has no gateway id");
+    if (!sub?.gateway_subscription_id) throw new Error("Subscription has no gateway id");
     // Same "gateway confirms, then we sync" posture as Stripe: DB status
     // only changes when the SUBSCRIPTION_DELETED/INACTIVATED webhook fires.
-    await this.request("DELETE", `/subscriptions/${sub.stripe_subscription_id}`);
+    await this.request("DELETE", `/subscriptions/${sub.gateway_subscription_id}`);
   }
 
   async updateSubscription(
@@ -378,15 +378,15 @@ export class AsaasBillingProvider implements BillingProvider {
     }
     const { data: sub } = await this.db
       .from("platform_subscriptions")
-      .select("stripe_subscription_id")
+      .select("gateway_subscription_id")
       .eq("id", subscriptionId)
       .maybeSingle();
-    if (!sub?.stripe_subscription_id) throw new Error("Subscription has no gateway id");
+    if (!sub?.gateway_subscription_id) throw new Error("Subscription has no gateway id");
 
     // UNVERIFIED field name (see file header) -- Fase A's live sandbox
     // test must confirm `value` actually changes the charge amount before
     // this is trusted with a real subscription.
-    await this.request("PUT", `/subscriptions/${sub.stripe_subscription_id}`, {
+    await this.request("PUT", `/subscriptions/${sub.gateway_subscription_id}`, {
       value: params.amountCents / 100,
     });
   }
