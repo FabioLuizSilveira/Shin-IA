@@ -31,7 +31,7 @@ const SYSTEM_ROLES = [
 // (/api/tenants POST), which stays exactly as it was: instant activation,
 // no checkout — that path is the deliberate manual/enterprise-vetted
 // equivalent of billing_mode "manual_contract" (item 26), not something this
-// refactor forces through Stripe.
+// refactor forces through the card checkout gateway.
 export interface CommercialOnboardingInput {
   userId: string;
   email: string;
@@ -44,7 +44,7 @@ export interface CommercialOnboardingInput {
   /**
    * The company's own CPF/CNPJ (Step 1's cnpj, not the individual
    * representative's document) — the actual payer for a B2B subscription.
-   * Required by document-based gateways (Asaas); ignored by Stripe.
+   * Required by Asaas; customer creation 400s without it.
    */
   document?: string;
   /** Billing address, collected once at signup — see CreateCommercialCheckoutInput's own comment for why this exists. */
@@ -94,7 +94,7 @@ export async function provisionTenant(
 ): Promise<ProvisionTenantResult> {
   const tenantId = crypto.randomUUID();
   // Commercial-flow tenants start pending_payment — real activation only
-  // happens when the Stripe webhook confirms (item 16: "webhook é fonte de
+  // happens when the Asaas webhook confirms (item 16: "webhook é fonte de
   // verdade"), never here and never from a success-page redirect.
   const initialStatus = input.commercial ? "pending_payment" : input.status;
 
@@ -207,7 +207,7 @@ export async function provisionTenant(
   }
 
   // ── Commercial flow: accept -> snapshot -> checkout. No subscription row
-  // exists until the webhook creates one (see api/webhooks/stripe-commercial).
+  // exists until the webhook creates one (see api/webhooks/asaas-commercial).
   try {
     const acceptance = await recordContractAcceptance(admin, {
       tenantId,

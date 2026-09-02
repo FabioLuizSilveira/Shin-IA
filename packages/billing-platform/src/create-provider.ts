@@ -1,22 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { StripeBillingProvider } from "./providers/stripe.js";
 import { AsaasBillingProvider } from "./providers/asaas.js";
 import type { BillingProvider } from "./types.js";
 
-// Gateway selection via BILLING_PROVIDER — this is the seam the Stripe ->
-// Asaas migration plan hangs the whole cutover on. "stripe" stays the
-// default until Fase F confirms zero active Stripe-backed subscriptions
-// remain (see the migration plan's Fase F) and the Stripe branch is
-// removed for real.
+// Gateway selection via BILLING_PROVIDER. Fase F of the Stripe -> Asaas
+// migration removed the "stripe" branch for real: zero active Stripe-backed
+// platform_subscriptions confirmed beforehand (see the migration plan's own
+// Fase F gate), StripeBillingProvider deleted along with it. "asaas" is now
+// the only supported value — MERCADOPAGO_ACCESS_TOKEN stays reserved for a
+// possible future provider, same as before.
 export function createBillingProvider(db: SupabaseClient): BillingProvider {
-  const provider = process.env.BILLING_PROVIDER ?? "stripe";
+  const provider = process.env.BILLING_PROVIDER ?? "asaas";
   switch (provider) {
-    case "stripe":
-      return new StripeBillingProvider({
-        secretKey: process.env.STRIPE_SECRET_KEY ?? "",
-        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-        db,
-      });
     case "asaas":
       return new AsaasBillingProvider({
         apiKey: process.env.ASAAS_API_KEY ?? "",

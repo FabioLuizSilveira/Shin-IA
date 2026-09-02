@@ -10,8 +10,11 @@ import { createCommercialCheckout, hasAcceptedCurrentContract } from "@shina/com
 // contract to already be accepted (see /api/commercial/accept); returns 403
 // with acceptance_required so the signup page can show that step first.
 //
-// 14-day refund guarantee stays as subscription metadata handled by the
-// webhook (unchanged — see api/webhooks/stripe/route.ts).
+// KNOWN GAP (Stripe -> Asaas migration, tracked, not yet closed): the old
+// Stripe webhook's 14-day refund guarantee (refund via the last payment
+// intent, gated by a refundEligibleUntil subscription metadata field) was
+// never reimplemented for Asaas — see api/webhooks/asaas/route.ts's own
+// comment. No refund automation runs today.
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {

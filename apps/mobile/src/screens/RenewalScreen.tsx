@@ -51,7 +51,7 @@ const RESERVATION_STATUS_LABEL: Record<string, string> = {
 };
 
 // "Renovar contrato": same car = pay to renew, no calendar needed — the
-// Stripe webhook (action: "renewal") extends the existing contract the
+// Asaas webhook (action: "renewal") extends the existing contract the
 // moment payment clears. A different (equal-or-higher) car = a real
 // booking: pick dates on the calendar, pay a 20% deposit to hold the
 // period (webhook action: "deposit"), pay the 80% balance any time before

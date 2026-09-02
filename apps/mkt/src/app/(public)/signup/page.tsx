@@ -1,8 +1,8 @@
 "use client";
 
 // Criação de conta — autenticação via Google/Facebook (Supabase OAuth) +
-// seleção de plano. A conta só é ativada após o checkout no Stripe (ver
-// /api/checkout e /api/webhooks/stripe): sem conta grátis, cobrança
+// seleção de plano. A conta só é ativada após o checkout na Asaas (ver
+// /api/checkout e /api/webhooks/asaas): sem conta grátis, cobrança
 // imediata com reembolso garantido em até 14 dias em caso de cancelamento.
 //
 // Fase C (Unified Commercial Flow): planos vêm de /api/commercial/plans
@@ -14,7 +14,8 @@
 // Pré-requisitos para funcionar em produção (fora do escopo deste código):
 // 1. Google e Facebook configurados como provedores OAuth no painel do
 //    Supabase (Authentication → Providers) — client id/secret de cada um.
-// 2. STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET configurados no ambiente.
+// 2. ASAAS_API_KEY, ASAAS_ENV e ASAAS_WEBHOOK_AUTH_TOKEN configurados no
+//    ambiente (Stripe -> Asaas migration, Fase A/F).
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";

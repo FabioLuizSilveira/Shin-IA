@@ -38,7 +38,7 @@ const SITE_PATHS = [
 ];
 
 // Paths that are public within the app subdomain (no auth required).
-// /api/webhooks is called server-to-server by Stripe — no user session
+// /api/webhooks is called server-to-server by Asaas — no user session
 // ever exists for it, so it must never redirect to /login.
 const APP_PUBLIC_PATHS = [
   "/login",
@@ -69,7 +69,7 @@ const APP_PUBLIC_PATHS = [
   // Public "Fale com nossa equipe" contact form -- creates a crm_leads row
   // with no session involved, same pre-auth posture as demo-login above.
   "/api/contact",
-  // Stripe Checkout success/cancel landing page for the mobile app's
+  // Asaas payment success/cancel landing page for the mobile app's
   // renewal/reservation flow — no session exists when the customer's
   // in-app browser lands here after paying (or cancelling).
   "/mobile/payment-complete",

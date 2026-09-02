@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Service-role client — used only by server-to-server code (Stripe webhook)
+// Service-role client — used only by server-to-server code (Asaas webhook)
 // where no user session exists. Same helper shape as apps/web's.
 export function createAdminClient() {
   return createClient(

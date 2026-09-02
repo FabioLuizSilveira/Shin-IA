@@ -1,11 +1,5 @@
 export * from "./types.js";
-export {
-  syncStripeEvent,
-  mapStripeStatus,
-  applyBillingEvent,
-  mapStripeEventToNormalized,
-} from "./sync-webhook.js";
-export { StripeBillingProvider, type StripeBillingProviderOptions } from "./providers/stripe.js";
+export { applyBillingEvent } from "./sync-webhook.js";
 export {
   AsaasBillingProvider,
   type AsaasBillingProviderOptions,

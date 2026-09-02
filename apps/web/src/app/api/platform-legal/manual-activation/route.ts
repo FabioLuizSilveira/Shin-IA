@@ -8,7 +8,7 @@ import { clientIp } from "@/lib/rate-limit";
 export const dynamic = "force-dynamic";
 
 // Enterprise activation path (item 26) — a platform admin confirms a deal
-// closed outside Stripe (invoice sent, contract signed manually) and
+// closed outside the card checkout gateway (invoice sent, contract signed manually) and
 // activates the subscription directly, no card checkout involved. Never
 // reachable by a tenant itself — platform-staff only.
 export async function POST(req: NextRequest) {

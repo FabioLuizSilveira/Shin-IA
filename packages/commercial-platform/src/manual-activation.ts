@@ -16,7 +16,7 @@ export interface ManualActivationInput extends AcceptContractInput {
 // called from a platform-admin route (never self-serve) — the acceptance
 // itself still goes through the same recordContractAcceptance() as the
 // card path, so the legal evidence trail is identical either way; what
-// differs is that a human at Shinã, not Stripe, confirms the deal exists.
+// differs is that a human at Shinã, not the gateway, confirms the deal exists.
 export async function activateSubscriptionManually(
   db: SupabaseClient,
   input: ManualActivationInput,

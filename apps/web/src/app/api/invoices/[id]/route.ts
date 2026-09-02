@@ -37,8 +37,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({ data: detail });
 }
 
-// Manual transitions — for payments settled outside Stripe (bank transfer,
-// boleto, etc). The Stripe webhook drives issued/overdue -> paid separately
+// Manual transitions — for payments settled outside Asaas (bank transfer,
+// boleto, etc). The Asaas webhook drives issued/overdue -> paid separately
 // when a checkout session actually completes.
 const MANUAL_TRANSITIONS: Record<string, string[]> = {
   draft: ["issued", "cancelled"],

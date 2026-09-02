@@ -893,7 +893,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
       onComplete?.();
       // Real activation only happens after the webhook confirms payment —
-      // Stripe Checkout is the next stop, not the dashboard (item 34).
+      // Asaas checkout is the next stop, not the dashboard (item 34).
       window.location.href = json.checkoutUrl;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro inesperado. Tente novamente.";

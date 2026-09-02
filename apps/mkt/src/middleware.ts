@@ -15,7 +15,7 @@ import {
 // Public routes: landing, pricing, signup, login and auth callbacks.
 // /api/mcp authenticates via Authorization bearer header, not cookies.
 // /api/checkout is hit by unauthenticated visitors starting a subscription.
-// /api/webhooks is called server-to-server by Stripe — no user session
+// /api/webhooks is called server-to-server by Asaas — no user session
 // ever exists for it, so it must never redirect to /login.
 const PUBLIC_PATHS = [
   "/",
@@ -144,7 +144,7 @@ export async function middleware(request: NextRequest) {
   // App pages (dashboard etc.) need a live MKT subscription. The status
   // comes from the JWT claim custom_access_token_hook injects
   // (mkt_subscription_status) — no extra DB round trip here. Access is only
-  // ever granted by the Stripe webhook writing platform_subscriptions, so a
+  // ever granted by the Asaas webhook writing platform_subscriptions, so a
   // user straight off the success page without a processed webhook still
   // lands back on /signup. API routes keep their own route-level auth.
   if (user && !isPublic && !isApiRoute) {

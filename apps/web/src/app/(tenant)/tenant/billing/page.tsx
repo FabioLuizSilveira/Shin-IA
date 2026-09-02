@@ -132,7 +132,7 @@ export default function TenantBillingPage() {
               className="flex items-center gap-1.5 text-xs text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-2.5 py-1 rounded-lg font-medium border-0 cursor-pointer"
             >
               <CreditCard className="w-3.5 h-3.5" />
-              {payingId === row.id ? "Redirecionando..." : "Pagar com Stripe"}
+              {payingId === row.id ? "Redirecionando..." : "Pagar fatura"}
             </button>
           )}
         </div>

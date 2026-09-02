@@ -367,10 +367,10 @@ export const shinaia = {
   firebaseDemoLogin: (persona: "tenant" | "customer") =>
     request<{ customToken: string }>("POST", "/api/auth/firebase/demo-login", { persona }),
 
-  // Customer contract renewal — real Stripe Checkout, no fake mocks (the
+  // Customer contract renewal — real Asaas checkout, no fake mocks (the
   // demo customer login already gets real data; these hit the real
   // payment routes too). "Só pagar para renovar" — paying the returned
-  // checkout URL is what renews the contract, via the Stripe webhook.
+  // checkout URL is what renews the contract, via the Asaas webhook.
   customerRenewalCheckout: (contractId: string) =>
     request<{ url: string }>("POST", "/api/mobile/customer/renewal-checkout", { contractId }),
   customerAssetAvailability: (assetId: string) =>

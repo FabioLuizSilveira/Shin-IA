@@ -33,11 +33,9 @@ export interface CreateCustomerParams {
   authUserId: string;
   email: string;
   /**
-   * CPF/CNPJ — required by document-based gateways (Asaas rejects customer
-   * creation without one); Stripe ignores it entirely. Optional here so the
-   * Stripe provider's signature doesn't change; the Asaas provider throws
-   * an explicit error rather than inventing a placeholder document when
-   * this is missing.
+   * CPF/CNPJ — Asaas rejects customer creation without one. The Asaas
+   * provider throws an explicit error rather than inventing a placeholder
+   * document when this is missing.
    */
   document?: string;
 }
@@ -47,7 +45,8 @@ export interface CreateCheckoutParams {
   email: string;
   product: SubscriptionProduct;
   planKey: string;
-  /** Stripe Price id — only the Stripe provider needs this. */
+  /** Legacy reusable gateway price/plan id — unused by Asaas, kept for a
+   * possible future provider that has one. */
   priceId?: string;
   /**
    * Charge amount in cents and its billing cycle — needed by gateways with
@@ -88,22 +87,24 @@ export interface CreateCheckoutParams {
 }
 
 export interface CreatePortalParams {
-  stripeCustomerId: string;
+  gatewayCustomerId: string;
   returnUrl: string;
 }
 
-// Fase B of the Stripe -> Asaas migration: sync-webhook.ts's core DB-
-// writing logic (applyBillingEvent) is gateway-agnostic, consuming this
-// shape instead of a raw Stripe.Event. Each provider's syncWebhook() maps
-// its own gateway's payload into this before calling applyBillingEvent —
-// StripeBillingProvider's mapping is exactly the field-extraction logic
-// that used to live directly in the old syncStripeEvent().
+// applyBillingEvent (sync-webhook.ts) is the gateway-agnostic DB-writing
+// core, consuming this shape instead of a raw gateway payload. Each
+// provider's own mapper (AsaasBillingProvider's mapAsaasEventToNormalized)
+// translates its gateway's webhook payload into this before calling
+// applyBillingEvent.
 export type NormalizedEventKind =
   | "checkout_completed"
   | "subscription_updated"
   | "subscription_cancelled";
 
 export interface NormalizedBillingEvent {
+  /** "stripe" stays a valid literal only for historical platform_billing_events
+   * rows written before Fase F removed the Stripe provider — no code
+   * constructs one anymore. */
   provider: "stripe" | "asaas";
   gatewayEventId: string;
   eventType: string;
@@ -134,9 +135,11 @@ export interface SyncWebhookResult {
   subscriptionId?: string;
 }
 
-// Gateway abstraction. Only Stripe is implemented today; a MercadoPago
-// provider would implement this same interface and be selected via the
-// BILLING_PROVIDER env var (see createBillingProvider in index.ts).
+// Gateway abstraction. Asaas is the only implementation today (Stripe was
+// removed in Fase F of the Stripe -> Asaas migration, once zero active
+// Stripe-backed subscriptions were confirmed) — a future provider would
+// implement this same interface and be selected via the BILLING_PROVIDER
+// env var (see createBillingProvider in create-provider.ts).
 export interface BillingProvider {
   createCustomer(params: CreateCustomerParams): Promise<{ customerId: string }>;
   createCheckout(params: CreateCheckoutParams): Promise<{ url: string }>;

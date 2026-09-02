@@ -72,7 +72,7 @@ export default function PrivacyPage() {
                 — não coletamos localização do dispositivo pessoal do usuário.
               </li>
               <li>
-                <strong>Dados de pagamento:</strong> processados diretamente pelo Stripe (cartão ou
+                <strong>Dados de pagamento:</strong> processados diretamente pela Asaas (cartão ou
                 Pix). A Shinã não armazena números de cartão de crédito.
               </li>
               <li>
@@ -100,7 +100,7 @@ export default function PrivacyPage() {
             </h2>
             <p>
               Não vendemos dados pessoais. Compartilhamos dados apenas com prestadores de serviço
-              necessários à operação da plataforma — processamento de pagamentos (Stripe),
+              necessários à operação da plataforma — processamento de pagamentos (Asaas),
               infraestrutura e banco de dados (Supabase) e hospedagem (Vercel) — e quando exigido
               por lei.
             </p>

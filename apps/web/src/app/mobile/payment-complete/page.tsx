@@ -1,12 +1,12 @@
 import Link from "next/link";
 
-// Stripe Checkout requires a real https success_url/cancel_url — a custom
+// Asaas's hosted payment page requires a real https return URL — a custom
 // app scheme (shinacustomer://...) isn't accepted. This is that landing
-// page: the mobile app opens Checkout in an in-app browser and relies on
-// the user closing it to return (RenewalScreen/RentalsListScreen already
-// refetch on focus), so this page's only job is telling them that's safe
-// to do — the actual state change happens via the Stripe webhook
-// independently of whether anyone ever sees this page.
+// page: the mobile app opens the payment page in an in-app browser and
+// relies on the user closing it to return (RenewalScreen/RentalsListScreen
+// already refetch on focus), so this page's only job is telling them
+// that's safe to do — the actual state change happens via the Asaas
+// webhook independently of whether anyone ever sees this page.
 export default async function PaymentCompletePage({
   searchParams,
 }: {

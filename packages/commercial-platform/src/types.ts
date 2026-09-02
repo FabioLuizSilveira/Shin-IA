@@ -1,7 +1,7 @@
 // Unified commercial flow shared by Shinã Platform and Shinã MKT — see
 // supabase/migrations/20260072000000_commercial_flow.sql for the schema this
 // layer orchestrates. Sits ABOVE @shina/billing-platform (which stays the
-// thin Stripe adapter + platform_subscriptions sync, untouched) — this
+// thin Asaas adapter + platform_subscriptions sync, untouched) — this
 // package owns the business sequence: accept -> snapshot -> checkout ->
 // webhook -> activate -> entitlements, for both products identically.
 
@@ -76,19 +76,18 @@ export interface CreateCommercialCheckoutInput {
   /** Extra provider metadata a caller needs (e.g. MKT's refund-guarantee deadline). */
   extraMetadata?: Record<string, string>;
   /**
-   * Passed straight through to the gateway for providers that need them
-   * (Asaas's checkout `customerData`, no separate createCustomer() call in
-   * that flow) — sourced from the same RepresentativeInfo already
-   * collected at contract acceptance. Ignored by the Stripe provider.
+   * Passed straight through to the gateway — Asaas's checkout `customerData`
+   * needs these directly, no separate createCustomer() call in that flow —
+   * sourced from the same RepresentativeInfo already collected at contract
+   * acceptance.
    */
   customerName?: string;
   customerDocument?: string;
   /**
    * Billing address — live-verified against the Asaas sandbox (Fase A of
    * the Stripe -> Asaas migration) to be required for checkout creation.
-   * Optional here (Stripe never reads these); the caller collects them
-   * once at signup and threads them through regardless of which gateway
-   * ends up active.
+   * Optional here at the type level; the caller collects them once at
+   * signup and threads them through regardless.
    */
   phone?: string;
   address?: string;

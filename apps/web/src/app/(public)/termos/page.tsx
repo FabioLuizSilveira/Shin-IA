@@ -77,7 +77,7 @@ export default function TermsPage() {
             </h2>
             <p>
               Alguns produtos e recursos são pagos, cobrados por assinatura recorrente através do
-              nosso processador de pagamentos (Stripe). Onde aplicável (ex.: Shinã Marketing IA),
+              nosso processador de pagamentos (Asaas). Onde aplicável (ex.: Shinã Marketing IA),
               oferecemos garantia de reembolso integral se o cancelamento ocorrer dentro de 14 dias
               corridos da contratação. Após esse período, cancelamentos interrompem cobranças
               futuras, sem reembolso proporcional do ciclo já em curso, salvo disposição legal em
@@ -130,7 +130,7 @@ export default function TermsPage() {
             </h2>
             <p>
               A plataforma pode se conectar a serviços de terceiros (Meta, Google, TikTok, LinkedIn,
-              Stripe, entre outros) mediante sua autorização explícita (OAuth). Essas integrações
+              Asaas, entre outros) mediante sua autorização explícita (OAuth). Essas integrações
               estão sujeitas também aos termos de uso de cada terceiro. Você pode revogar o acesso a
               qualquer momento pelas configurações da sua conta ou diretamente no painel do
               provedor.

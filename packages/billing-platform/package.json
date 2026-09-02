@@ -21,8 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.38.0",
-    "stripe": "^17.4.0"
+    "@supabase/supabase-js": "^2.38.0"
   },
   "devDependencies": {
     "@shina/typescript-config": "workspace:*",

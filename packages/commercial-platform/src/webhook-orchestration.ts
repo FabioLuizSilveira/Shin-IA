@@ -5,15 +5,14 @@ import {
   type SyncWebhookResult,
 } from "@shina/billing-platform";
 
-// Fase B of the Stripe -> Asaas migration: activateFromWebhook() now
-// consumes the gateway-agnostic NormalizedBillingEvent (billing-platform)
-// instead of a Stripe-shaped WebhookEventLike. The two existing Stripe
-// webhook routes (api/webhooks/stripe-commercial, apps/mkt's
-// api/webhooks/stripe) already have a verified Stripe.Event and call
-// mapStripeEventToNormalized() on it before reaching this function; the
-// new Asaas webhook routes do the equivalent with
-// mapAsaasEventToNormalized(). This function itself never touches either
-// gateway's SDK/payload shape.
+// activateFromWebhook() consumes the gateway-agnostic NormalizedBillingEvent
+// (billing-platform) -- never a raw gateway payload. The two Asaas webhook
+// routes (api/webhooks/asaas-commercial, apps/mkt's api/webhooks/asaas)
+// verify + parse their own envelope and call mapAsaasEventToNormalized() on
+// it before reaching this function; this function itself never touches the
+// gateway's own payload shape. (Fase B introduced this normalized-event
+// core to share it with Stripe's equivalent webhook handling; Fase F
+// removed Stripe once zero active Stripe-backed subscriptions remained.)
 
 // Item 16: webhook is the source of truth for activation. Before letting
 // applyBillingEvent() touch platform_subscriptions, validate that the
@@ -23,8 +22,7 @@ export async function activateFromWebhook(
   db: SupabaseClient,
   event: NormalizedBillingEvent,
 ): Promise<SyncWebhookResult> {
-  // Stripe's checkout.session.completed carries our authUserId directly
-  // (client_reference_id). Asaas's SUBSCRIPTION_CREATED never does --
+  // Asaas's SUBSCRIPTION_CREATED never carries our authUserId directly --
   // only checkoutRefId (its externalReference) -- so it has to be
   // resolved here, the one place with schema knowledge of
   // checkout_session_references. A checkout_completed event with neither

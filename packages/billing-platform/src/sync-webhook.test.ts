@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type Stripe from "stripe";
-import { mapStripeStatus, syncStripeEvent } from "./sync-webhook.js";
+import { applyBillingEvent } from "./sync-webhook.js";
 import { hasLiveSubscription } from "./session-claims.js";
+import type { NormalizedBillingEvent } from "./types.js";
 
 // ── Minimal in-memory Supabase fake ────────────────────────────────────────────
-// Implements only the chains syncStripeEvent uses, with real unique-index
+// Implements only the chains applyBillingEvent uses, with real unique-index
 // behavior for gateway_event_id so the idempotency path is actually exercised.
 
 interface Row {
@@ -122,27 +122,30 @@ class FakeDb {
   }
 }
 
-function checkoutEvent(id: string, overrides?: Partial<Stripe.Checkout.Session>): Stripe.Event {
+function checkoutEvent(
+  id: string,
+  overrides?: Partial<NormalizedBillingEvent>,
+): NormalizedBillingEvent {
   return {
-    id,
-    type: "checkout.session.completed",
-    data: {
-      object: {
-        client_reference_id: "auth-user-1",
-        customer_details: { email: "buyer@example.com" },
-        customer: "cus_123",
-        subscription: "sub_123",
-        metadata: { product: "mkt", plan: "pro" },
-        ...overrides,
-      },
-    },
-  } as unknown as Stripe.Event;
+    provider: "asaas",
+    gatewayEventId: id,
+    eventType: "SUBSCRIPTION_CREATED",
+    kind: "checkout_completed",
+    authUserId: "auth-user-1",
+    email: "buyer@example.com",
+    product: "mkt",
+    planKey: "pro",
+    gatewayCustomerId: "cus_123",
+    gatewaySubscriptionId: "sub_123",
+    rawPayload: {},
+    ...overrides,
+  };
 }
 
-describe("syncStripeEvent", () => {
-  it("provisions customer + subscription on checkout.session.completed", async () => {
+describe("applyBillingEvent", () => {
+  it("provisions customer + subscription on a checkout_completed event", async () => {
     const db = new FakeDb();
-    const result = await syncStripeEvent(db as unknown as SupabaseClient, checkoutEvent("evt_1"));
+    const result = await applyBillingEvent(db as unknown as SupabaseClient, checkoutEvent("evt_1"));
 
     expect(result.duplicate).toBe(false);
     expect(result.handled).toBe(true);
@@ -162,8 +165,11 @@ describe("syncStripeEvent", () => {
 
   it("is idempotent — a replayed event id changes nothing", async () => {
     const db = new FakeDb();
-    await syncStripeEvent(db as unknown as SupabaseClient, checkoutEvent("evt_dup"));
-    const replay = await syncStripeEvent(db as unknown as SupabaseClient, checkoutEvent("evt_dup"));
+    await applyBillingEvent(db as unknown as SupabaseClient, checkoutEvent("evt_dup"));
+    const replay = await applyBillingEvent(
+      db as unknown as SupabaseClient,
+      checkoutEvent("evt_dup"),
+    );
 
     expect(replay.duplicate).toBe(true);
     expect(db.tables["platform_subscriptions"]).toHaveLength(1);
@@ -172,10 +178,10 @@ describe("syncStripeEvent", () => {
 
   it("reuses the live subscription instead of duplicating it", async () => {
     const db = new FakeDb();
-    await syncStripeEvent(db as unknown as SupabaseClient, checkoutEvent("evt_a"));
-    await syncStripeEvent(
+    await applyBillingEvent(db as unknown as SupabaseClient, checkoutEvent("evt_a"));
+    await applyBillingEvent(
       db as unknown as SupabaseClient,
-      checkoutEvent("evt_b", { metadata: { product: "mkt", plan: "business" } }),
+      checkoutEvent("evt_b", { planKey: "business" }),
     );
 
     const subs = db.tables["platform_subscriptions"];
@@ -183,42 +189,33 @@ describe("syncStripeEvent", () => {
     expect(subs[0].plan_key).toBe("business");
   });
 
-  it("skips sessions without client_reference_id (pre-identity checkout)", async () => {
+  it("skips events without authUserId (pre-identity checkout)", async () => {
     const db = new FakeDb();
-    const result = await syncStripeEvent(
+    const result = await applyBillingEvent(
       db as unknown as SupabaseClient,
-      checkoutEvent("evt_noref", { client_reference_id: null }),
+      checkoutEvent("evt_noref", { authUserId: null }),
     );
     expect(result.handled).toBe(false);
     expect(db.tables["platform_subscriptions"]).toBeUndefined();
   });
 
-  it("cancels by gateway_subscription_id on customer.subscription.deleted", async () => {
+  it("cancels by gateway_subscription_id on a subscription_cancelled event", async () => {
     const db = new FakeDb();
-    await syncStripeEvent(db as unknown as SupabaseClient, checkoutEvent("evt_c"));
+    await applyBillingEvent(db as unknown as SupabaseClient, checkoutEvent("evt_c"));
 
-    const cancelEvent = {
-      id: "evt_cancel",
-      type: "customer.subscription.deleted",
-      data: { object: { id: "sub_123", status: "canceled" } },
-    } as unknown as Stripe.Event;
-    const result = await syncStripeEvent(db as unknown as SupabaseClient, cancelEvent);
+    const cancelEvent: NormalizedBillingEvent = {
+      provider: "asaas",
+      gatewayEventId: "evt_cancel",
+      eventType: "SUBSCRIPTION_DELETED",
+      kind: "subscription_cancelled",
+      gatewaySubscriptionId: "sub_123",
+      rawPayload: {},
+    };
+    const result = await applyBillingEvent(db as unknown as SupabaseClient, cancelEvent);
 
     expect(result.handled).toBe(true);
     expect(db.tables["platform_subscriptions"][0].status).toBe("cancelled");
     expect(db.tables["platform_subscriptions"][0].cancelled_at).toBeTruthy();
-  });
-});
-
-describe("mapStripeStatus", () => {
-  it("maps stripe vocabulary to the normalized statuses", () => {
-    expect(mapStripeStatus("trialing")).toBe("trialing");
-    expect(mapStripeStatus("active")).toBe("active");
-    expect(mapStripeStatus("past_due")).toBe("past_due");
-    expect(mapStripeStatus("unpaid")).toBe("suspended");
-    expect(mapStripeStatus("canceled")).toBe("cancelled");
-    expect(mapStripeStatus("incomplete")).toBe("pending");
-    expect(mapStripeStatus("something_new")).toBe("pending");
   });
 });
 

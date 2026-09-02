@@ -32,7 +32,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 // Called server-to-server by the tenant's own GPS/telemetry provider — no
 // Supabase session ever exists here, the webhook token in the URL is the
 // only credential. Path lives under /api/webhooks so middleware's existing
-// APP_PUBLIC_PATHS exemption (added for the Stripe webhook) already skips
+// APP_PUBLIC_PATHS exemption (added for the Asaas webhook) already skips
 // auth for it.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
