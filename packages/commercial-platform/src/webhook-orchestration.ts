@@ -107,9 +107,27 @@ export async function activateFromWebhook(
   });
 
   if (result.handled && result.subscriptionId) {
+    // tenant_id belongs here, not in applyBillingEvent(): billing-platform's
+    // checkout_completed handler (both its insert and update branches) never
+    // sets it -- the insert branch in particular has no tenant context to
+    // draw from (NormalizedBillingEvent carries no tenantId field). In the
+    // common case this is masked by provisionPlatformSubscription() already
+    // creating the row with tenant_id at onboarding time (the webhook then
+    // only ever updates it, preserving the value untouched) -- but a churned
+    // tenant reactivating (their old row is 'cancelled', excluded by
+    // applyBillingEvent's existing-row lookup) hits the insert branch again
+    // and would otherwise end up with a tenant_id: null row, invisible to
+    // /api/commercial/subscription, /api/commercial/plan-change and
+    // /api/commercial/portal (all filter by tenant_id). Live-caught during
+    // Fase B's real webhook E2E verification against the Asaas sandbox, not
+    // introduced by it -- the same gap existed in the original Stripe-only
+    // code. Stamped unconditionally here since this is the one layer with
+    // real tenant knowledge (ref.tenant_id, resolved from
+    // checkout_session_references); null for mkt product, as intended.
     await db
       .from("platform_subscriptions")
       .update({
+        tenant_id: ref.tenant_id,
         plan_version_id: ref.plan_version_id,
         commercial_terms_snapshot_id: ref.commercial_terms_snapshot_id,
       })
