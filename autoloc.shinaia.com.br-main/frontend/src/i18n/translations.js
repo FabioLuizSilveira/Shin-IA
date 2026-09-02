@@ -80,8 +80,8 @@ export const translations = {
       d: "Dois aplicativos, uma inteligência. O painel de gestão para você e uma experiência de reserva impecável para o seu cliente.",
       tabOwner: "Para o locador",
       tabRenter: "Para o locatário",
-      ctaOwner: "Ver como Cliente",
-      ctaRenter: "Ver como Equipe",
+      ctaOwner: "Ver como Equipe",
+      ctaRenter: "Ver como Cliente",
       owner: [
         "Painel financeiro com margem por veículo",
         "Contratos e assinatura digital",
@@ -232,8 +232,8 @@ export const translations = {
       d: "Two apps, one intelligence. A management dashboard for you and a flawless booking experience for your customer.",
       tabOwner: "For owners",
       tabRenter: "For renters",
-      ctaOwner: "View as Customer",
-      ctaRenter: "View as Team",
+      ctaOwner: "View as Team",
+      ctaRenter: "View as Customer",
       owner: [
         "Financial dashboard with margin per vehicle",
         "Contracts and digital signature",
