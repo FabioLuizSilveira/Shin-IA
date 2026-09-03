@@ -69,10 +69,12 @@ export function LeadProvider({ children }) {
                   className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm outline-none focus:border-[#00E5FF]/60 transition-colors" />
                 <input data-testid="lead-phone" value={form.phone} onChange={upd("phone")} placeholder={m.phone}
                   className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm outline-none focus:border-[#00E5FF]/60 transition-colors" />
-                <select data-testid="lead-profile" value={form.profile} onChange={upd("profile")}
+                <select data-testid="lead-fleet" required value={form.fleet_size} onChange={upd("fleet_size")}
                   className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm outline-none focus:border-[#00E5FF]/60 transition-colors">
-                  <option value="locador" className="bg-[#3f3f52]">{m.locador}</option>
-                  <option value="locatario" className="bg-[#3f3f52]">{m.locatario}</option>
+                  <option value="" disabled className="bg-[#3f3f52]">{m.fleet}</option>
+                  <option value="ate_10" className="bg-[#3f3f52]">{m.fleet10}</option>
+                  <option value="ate_50" className="bg-[#3f3f52]">{m.fleet50}</option>
+                  <option value="mais_50" className="bg-[#3f3f52]">{m.fleet50p}</option>
                 </select>
                 {status === "error" && <p className="text-sm text-red-400">{m.error}</p>}
                 <button data-testid="lead-submit" type="submit" disabled={status === "loading"}
