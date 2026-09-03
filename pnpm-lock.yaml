@@ -1026,6 +1026,25 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
 
+  packages/signature-platform:
+    dependencies:
+      '@shina/tenant-contract-engine':
+        specifier: workspace:*
+        version: link:../tenant-contract-engine
+      '@supabase/supabase-js':
+        specifier: ^2.38.0
+        version: 2.108.2
+    devDependencies:
+      '@shina/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
+
   packages/storybook:
     dependencies:
       '@shina/charts':
@@ -10996,7 +11015,7 @@ snapshots:
       std-env: 3.10.0
       strip-literal: 2.1.1
       test-exclude: 6.0.0
-      vitest: 1.6.1(@types/node@20.19.43)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
+      vitest: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -11050,7 +11069,7 @@ snapshots:
       pathe: 1.1.2
       picocolors: 1.1.1
       sirv: 2.0.4
-      vitest: 1.6.1(@types/node@20.19.43)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
+      vitest: 1.6.1(@types/node@26.0.0)(@vitest/ui@1.6.1)(jsdom@24.1.3)(lightningcss@1.32.0)(terser@5.48.0)
 
   '@vitest/utils@1.6.1':
     dependencies:
