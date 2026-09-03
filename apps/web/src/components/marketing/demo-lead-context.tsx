@@ -22,14 +22,17 @@ export function useDemoLead(): DemoLeadContextValue {
   return ctx;
 }
 
-// "Até 10 carros" / "Até 50 carros" / "Mais de 50 carros" -> a representative
+// "Até 10 ativos" / "Até 50 ativos" / "Mais de 50 ativos" -> a representative
 // integer for crm_leads.estimated_fleet_size (a plain integer column, not a
 // bucket enum) — 10/50/100 as the ceiling of each bucket, good enough for a
-// sales-qualification estimate, not meant to be an exact count.
+// sales-qualification estimate, not meant to be an exact count. "Ativos",
+// not "carros" here -- unlike the Autoloc (car-rental-only) LP, the Shinã
+// Platform site targets fleets of any physical asset (agro, construção,
+// logística, indústria — see hero.tsx's own copy), not just vehicles.
 const FLEET_SIZE_OPTIONS: { label: string; value: string }[] = [
-  { label: "Até 10 carros", value: "10" },
-  { label: "Até 50 carros", value: "50" },
-  { label: "Mais de 50 carros", value: "100" },
+  { label: "Até 10 ativos", value: "10" },
+  { label: "Até 50 ativos", value: "50" },
+  { label: "Mais de 50 ativos", value: "100" },
 ];
 
 export function DemoLeadProvider({ children }: { children: React.ReactNode }) {
