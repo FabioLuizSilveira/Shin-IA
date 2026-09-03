@@ -7677,6 +7677,7 @@ export type Database = {
           contract_id: string;
           contract_version_id: string;
           created_at: string;
+          created_by: string | null;
           document_name: string;
           id: string;
           provider: string;
@@ -7690,6 +7691,7 @@ export type Database = {
           contract_id: string;
           contract_version_id: string;
           created_at?: string;
+          created_by?: string | null;
           document_name: string;
           id?: string;
           provider: string;
@@ -7703,6 +7705,7 @@ export type Database = {
           contract_id?: string;
           contract_version_id?: string;
           created_at?: string;
+          created_by?: string | null;
           document_name?: string;
           id?: string;
           provider?: string;

@@ -32,6 +32,30 @@ const DOC_STATUS_LABEL: Record<string, string> = {
   rejected: "Rejeitado",
 };
 
+interface SignatureStatus {
+  id: string;
+  status: "draft" | "sent" | "in_progress" | "signed" | "cancelled" | "expired" | "failed";
+  signers: { role: string; name: string; status: string }[];
+}
+
+const SIGNATURE_STATUS_COPY: Record<SignatureStatus["status"], string> = {
+  draft: "Assinatura eletrônica sendo preparada.",
+  sent: "Assinatura eletrônica enviada — você vai receber um e-mail da Clicksign com o link para assinar.",
+  in_progress: "Assinatura eletrônica em andamento.",
+  signed: "Contrato assinado eletronicamente.",
+  cancelled: "Assinatura eletrônica cancelada.",
+  expired: "Assinatura eletrônica expirada.",
+  failed: "Falha na assinatura eletrônica.",
+};
+
+// Non-terminal or already-signed => e-signature is the acceptance
+// mechanism for this contract, clickwrap stays hidden (product decision:
+// avoid a customer accepting twice via two different methods). Terminal
+// failure states fall back to clickwrap.
+function signatureBlocksClickwrap(status: SignatureStatus["status"]): boolean {
+  return status !== "cancelled" && status !== "expired" && status !== "failed";
+}
+
 export default function RentalContractPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -49,6 +73,7 @@ export default function RentalContractPage() {
   const [requirements, setRequirements] = useState<DocumentRequirement[]>([]);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [signature, setSignature] = useState<SignatureStatus | null>(null);
 
   const loadDocuments = useCallback(() => {
     fetch(`/api/customer-contracts/${contractId}/documents`)
@@ -82,6 +107,10 @@ export default function RentalContractPage() {
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
     loadDocuments();
+    fetch(`/api/customer-contracts/${contractId}/signature`)
+      .then((r) => r.json())
+      .then((j: { data: SignatureStatus | null }) => setSignature(j.data ?? null))
+      .catch(() => setSignature(null));
   }, [contractId, loadDocuments]);
 
   useEffect(() => {
@@ -170,7 +199,19 @@ export default function RentalContractPage() {
           </pre>
         </div>
 
-        {done || rental.status === "active" ? (
+        {signature && signatureBlocksClickwrap(signature.status) ? (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+            <p
+              className={`text-sm font-semibold ${
+                signature.status === "signed"
+                  ? "text-green-700 dark:text-green-400"
+                  : "text-slate-700 dark:text-slate-300"
+              }`}
+            >
+              {SIGNATURE_STATUS_COPY[signature.status]}
+            </p>
+          </div>
+        ) : done || rental.status === "active" ? (
           <div className="bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900 rounded-xl p-4">
             <p className="text-sm font-semibold text-green-700 dark:text-green-400">
               Contrato aceito.

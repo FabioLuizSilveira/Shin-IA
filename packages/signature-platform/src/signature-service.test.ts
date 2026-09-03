@@ -242,6 +242,31 @@ describe("applySignatureEvent", () => {
     const methods = db.tables["tenant_contract_acceptances"].map((r) => r.acceptance_method);
     expect(methods.every((m) => m === "electronic_signature_provider")).toBe(true);
   });
+
+  it("surfaces tenantId/contractId/actorId so callers can fire their own app-level side effects", async () => {
+    const db = new FakeDb();
+    const provider = new FakeSignatureProvider("fake");
+    seedContract(db, "contract-1", "version-1", "snapshot-1");
+    const created = await createSignatureRequest(
+      db as unknown as SupabaseClient,
+      provider,
+      baseInput({ createdBy: "user-who-requested-it" }),
+    );
+
+    const [signedEvent] = await provider.normalizeWebhook(
+      JSON.stringify({ type: "signature_completed", requestId: created.providerRequestId }),
+      {},
+    );
+    const result = await applySignatureEvent(
+      db as unknown as SupabaseClient,
+      provider,
+      signedEvent,
+    );
+
+    expect(result.tenantId).toBe("tenant-1");
+    expect(result.contractId).toBe("contract-1");
+    expect(result.actorId).toBe("user-who-requested-it");
+  });
 });
 
 describe("FakeSignatureProvider — smoke coverage of the interface's other methods", () => {

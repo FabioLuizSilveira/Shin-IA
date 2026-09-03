@@ -2,13 +2,40 @@ import { NextResponse, type NextRequest } from "next/server";
 import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
+import { createNotification } from "@/lib/notifications/create-notification";
 import { createStudioVersionRepository } from "@/lib/studio-repository";
 import { renderContractSignaturePdf } from "@/lib/contract-signature-pdf";
+import { getSignatureStatusForContract } from "@/lib/contract-signature-status";
 import { createSignatureProvider, createSignatureRequest } from "@shina/signature-platform";
 import type { SignerRole, SignerPartyType } from "@shina/signature-platform";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs"; // @react-pdf/renderer needs the Node runtime, not edge
+
+// GET /api/signature-requests?contractId=... — latest signature status for
+// a contract, used by the tenant contract-detail UI. Same tenant-scoped
+// posture as every other route here; the shared helper also backs the
+// customer-portal and mobile read paths so all 3 UIs see identical data.
+export async function GET(req: NextRequest) {
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+
+  const contractId = req.nextUrl.searchParams.get("contractId");
+  if (!contractId) {
+    return NextResponse.json({ error: "contractId query param is required" }, { status: 400 });
+  }
+
+  const { data: contract } = await scope.db
+    .from("contracts")
+    .select("id")
+    .eq("id", contractId)
+    .eq("tenant_id", scope.tenantId)
+    .maybeSingle();
+  if (!contract) return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+
+  const status = await getSignatureStatusForContract(scope.db, contractId);
+  return NextResponse.json({ data: status });
+}
 
 // POST /api/signature-requests — starts a real e-signature flow for a
 // contract: renders the frozen snapshot as a PDF, creates the envelope
@@ -98,6 +125,7 @@ export async function POST(req: NextRequest) {
       documentContentType: "application/pdf",
       documentName: `${contractNumber}.pdf`,
       signers: body.signers,
+      createdBy: scope.userId,
     });
 
     void logActivity(scope.db, {
@@ -107,6 +135,12 @@ export async function POST(req: NextRequest) {
       entityId: contract.id,
       action: "signature_requested",
       metadata: { signatureRequestId: created.id, provider: created.provider },
+    });
+    void createNotification({
+      tenantId: scope.tenantId,
+      subject: "Assinatura solicitada",
+      body: `O contrato ${contractNumber} foi enviado para assinatura eletrônica.`,
+      deepLink: { type: "contract", id: contract.id },
     });
 
     return NextResponse.json({ data: created });

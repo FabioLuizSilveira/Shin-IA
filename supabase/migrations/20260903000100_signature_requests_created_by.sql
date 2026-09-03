@@ -1,0 +1,11 @@
+-- P2: applySignatureEvent()'s webhook-driven logActivity() calls need a
+-- real actor_id (tenant_activity_log.actor_id is uuid not null) — a
+-- webhook has no live HTTP session to source one from. created_by is
+-- captured once, at creation time (POST /api/signature-requests, which
+-- DOES have a real requireTenantScope().userId), and threaded back out
+-- through ApplySignatureEventResult.actorId so the webhook route can
+-- attribute its own logActivity() calls to whoever originally requested
+-- the signature. No FK — tenant_activity_log.actor_id itself has none
+-- either (confirmed in its own migration), so this matches that existing
+-- looseness rather than inventing a stricter constraint.
+alter table signature_requests add column if not exists created_by uuid;

@@ -86,6 +86,12 @@ export interface CreateSignatureRequestSigner {
 export interface CreateSignatureRequestInput {
   tenantId: string;
   contractId: string;
+  /** The tenant-staff user who requested this signature — persisted so a
+   * later, webhook-driven applySignatureEvent() (no live session) can
+   * still attribute its own audit-log entries to someone. Optional only
+   * because a caller might legitimately not have one (e.g. a system
+   * process); every real tenant-UI-driven route always has it. */
+  createdBy?: string | null;
   /** Re-derived and cross-checked against the contract row itself before
    * any provider call is made — never trusted verbatim from the caller,
    * same discipline as recordContractAcceptance(). */
@@ -192,4 +198,15 @@ export interface ApplySignatureEventResult {
   duplicate: boolean;
   handled: boolean;
   signatureRequestId?: string;
+  /** tenantId/contractId/actorId — surfaced so the caller (an apps/web
+   * route) can fire its own app-level notification/activity-log side
+   * effects without a second DB round-trip. This package never calls
+   * createNotification()/logActivity() itself — it stays app-agnostic;
+   * these are just the identifiers the request row already had. actorId
+   * is signature_requests.created_by (who originally requested the
+   * signature), not who triggered this particular webhook event (a
+   * webhook has no live session to attribute to). */
+  tenantId?: string;
+  contractId?: string;
+  actorId?: string | null;
 }

@@ -72,6 +72,7 @@ export async function createSignatureRequest(
       provider_request_id: null,
       document_name: input.documentName,
       status: "draft",
+      created_by: input.createdBy ?? null,
     })
     .select("id")
     .single();
@@ -160,7 +161,7 @@ export async function applySignatureEvent(
 
   const { data: request, error: requestError } = await db
     .from("signature_requests")
-    .select("id, tenant_id, contract_id, contract_version_id, snapshot_id")
+    .select("id, tenant_id, contract_id, contract_version_id, snapshot_id, created_by")
     .eq("provider", event.provider)
     .eq("provider_request_id", event.providerRequestId)
     .maybeSingle();
@@ -306,5 +307,12 @@ export async function applySignatureEvent(
     .update({ processed_at: new Date().toISOString(), signature_request_id: signatureRequestId })
     .eq("id", logged.id);
 
-  return { duplicate: false, handled, signatureRequestId };
+  return {
+    duplicate: false,
+    handled,
+    signatureRequestId,
+    tenantId: request.tenant_id,
+    contractId: request.contract_id,
+    actorId: request.created_by ?? null,
+  };
 }

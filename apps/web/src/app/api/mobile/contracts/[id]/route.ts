@@ -3,6 +3,7 @@ import { requireMobileContext } from "@/lib/mobile-context";
 import { customerOrganizationIds } from "@/lib/mobile-contracts-scope";
 import { auditMobileAction } from "@/lib/mobile-audit";
 import { internalError } from "@/lib/api-error";
+import { getSignatureStatusForContract } from "@/lib/contract-signature-status";
 import {
   hasAcceptedContract,
   resolveBillingRequirement,
@@ -64,7 +65,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Contract not found" }, { status: 404 });
   }
 
-  const [snapshotResult, versionResult, assetsResult, accepted] = await Promise.all([
+  const [snapshotResult, versionResult, assetsResult, accepted, signature] = await Promise.all([
     contract.snapshot_id
       ? context.db
           .from("tenant_contract_snapshots")
@@ -88,6 +89,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       partyType: "customer",
       customerId: context.customerId,
     }),
+    getSignatureStatusForContract(context.db, id),
   ]);
 
   const billing = resolveBillingRequirement(contract);
@@ -128,6 +130,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       acceptance: { accepted },
       billing: { ...billing, satisfied: billingSatisfied },
       documents: { allApproved: documentsApproved },
+      signature,
       allowedActions,
     },
   });

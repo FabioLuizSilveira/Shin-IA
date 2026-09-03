@@ -103,6 +103,19 @@ const ACTION_LABEL: Record<string, string> = {
   "tracking.history_viewed": "Histórico de localização consultado",
   "mobile_device.registered": "Dispositivo registrado",
   "mobile_device.disabled": "Dispositivo desativado",
+  // Signature Platform (P2) — "Assinatura eletrônica" prefix everywhere to
+  // disambiguate from "subscription.activated" above ("Assinatura
+  // ativada"), same Portuguese word for a different concept.
+  signature_requested: "Assinatura eletrônica solicitada",
+  signature_cancelled_by_tenant: "Assinatura eletrônica cancelada pelo tenant",
+  signature_request_sent: "Assinatura eletrônica enviada",
+  signer_viewed: "Documento visualizado pelo signatário",
+  signer_signed: "Signatário assinou",
+  signer_refused: "Signatário recusou assinar",
+  signature_completed: "Assinatura eletrônica concluída",
+  signature_cancelled: "Assinatura eletrônica cancelada",
+  signature_expired: "Assinatura eletrônica expirada",
+  signature_failed: "Assinatura eletrônica falhou",
 };
 
 function formatDateTime(dt: string) {

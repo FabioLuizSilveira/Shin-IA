@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { applySignatureEvent, createSignatureProvider } from "@shina/signature-platform";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logActivity } from "@/lib/activity-log";
+import { createNotification } from "@/lib/notifications/create-notification";
+import { getSignatureEventNotificationCopy } from "@/lib/signature-notification-copy";
 
 // POST /api/webhooks/clicksign — real webhook receiver. Reads the body as
 // TEXT, never .json() — Clicksign authenticates webhooks via HMAC over the
@@ -37,7 +40,41 @@ export async function POST(request: Request) {
 
   try {
     for (const event of events) {
-      await applySignatureEvent(admin, provider, event);
+      const result = await applySignatureEvent(admin, provider, event);
+
+      // Side effects only for events this run actually applied (not
+      // duplicates/unhandled) and that resolved to a real tenant/contract
+      // — see ApplySignatureEventResult's own comment: the package never
+      // fires these itself, only this app-layer caller does.
+      if (result.handled && !result.duplicate && result.tenantId && result.contractId) {
+        // actorId comes from signature_requests.created_by (whoever
+        // requested the signature) — always populated in practice, since
+        // the only creation path (POST /api/signature-requests) always
+        // sets it. Skipped rather than logged with a made-up actor if it
+        // is ever somehow missing — tenant_activity_log.actor_id has no
+        // real "system" placeholder convention anywhere else in this app.
+        if (result.actorId) {
+          void logActivity(admin, {
+            tenantId: result.tenantId,
+            actorId: result.actorId,
+            entityType: "contract",
+            entityId: result.contractId,
+            action: event.kind,
+            metadata: { signatureRequestId: result.signatureRequestId, provider: event.provider },
+          });
+        }
+
+        const copy = getSignatureEventNotificationCopy(event.kind);
+        if (copy && !copy.logOnly) {
+          void createNotification({
+            tenantId: result.tenantId,
+            subject: copy.subject,
+            body: copy.body,
+            priority: copy.priority,
+            deepLink: { type: "contract", id: result.contractId },
+          });
+        }
+      }
     }
   } catch (err) {
     console.error("[clicksign webhook] apply failed:", err);

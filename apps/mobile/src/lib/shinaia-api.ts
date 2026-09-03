@@ -172,6 +172,15 @@ export interface ContractDetail extends ContractItem {
   acceptance: { accepted: boolean };
   billing: { type: string; satisfied: boolean };
   documents: { allApproved: boolean };
+  // Loose string types, not the canonical @shina/signature-platform enums
+  // — this app has no workspace dependency on any @shina/* package (same
+  // posture already used for every other server enum in this file).
+  signature: {
+    id: string;
+    provider: string;
+    status: string;
+    signers: { role: string; name: string; status: string }[];
+  } | null;
   allowedActions: string[];
 }
 export interface NotificationItem {

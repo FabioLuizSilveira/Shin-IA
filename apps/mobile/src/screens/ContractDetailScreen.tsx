@@ -10,6 +10,20 @@ import type { RootStackParamList } from "../navigation";
 const brl = (amount: number, currency: string) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(amount);
 
+// Local translator, not a shared ui.tsx dictionary entry — same reasoning
+// as web's contract-detail.tsx: these status strings are specific to
+// electronic-signature requests, not a generic entity status other
+// screens' Chip usages should also match against.
+const SIGNATURE_STATUS_LABEL: Record<string, string> = {
+  draft: "Preparando",
+  sent: "Enviada",
+  in_progress: "Em andamento",
+  signed: "Assinado",
+  cancelled: "Cancelada",
+  expired: "Expirada",
+  failed: "Falhou",
+};
+
 // M23 — GET /api/mobile/contracts/{id}. allowedActions is server-computed —
 // "accept" only ever appears for a customer identity on a draft contract
 // they haven't accepted yet (see apps/web's route); this screen just
@@ -109,6 +123,19 @@ export function ContractDetailScreen() {
           <Text style={T.text(theme.font.sm)}>
             Documentos: {contract.documents.allApproved ? "Aprovados" : "Pendentes"}
           </Text>
+          {contract.signature && (
+            <View
+              style={{ flexDirection: "row", alignItems: "center", marginTop: theme.spacing.sm }}
+            >
+              <Text style={T.text(theme.font.sm)}>Assinatura eletrônica: </Text>
+              <Chip
+                status={contract.signature.status}
+                label={
+                  SIGNATURE_STATUS_LABEL[contract.signature.status] ?? contract.signature.status
+                }
+              />
+            </View>
+          )}
         </Card>
 
         {contract.allowedActions.includes("accept") && (

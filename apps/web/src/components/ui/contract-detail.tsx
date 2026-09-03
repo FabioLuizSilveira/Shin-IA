@@ -13,9 +13,74 @@ import {
   FileCheck,
   Check,
   Ban,
+  PenTool,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ContractSendSignatureModal } from "@/components/ui/contract-send-signature-modal";
 import type { ContractDetail as ContractDetailData, ContractStatus } from "@/types/domain";
+
+interface ContractSignatureSigner {
+  role: string;
+  name: string;
+  status: "pending" | "viewed" | "signed" | "refused";
+}
+
+interface ContractSignatureStatus {
+  id: string;
+  provider: string;
+  status: "draft" | "sent" | "in_progress" | "signed" | "cancelled" | "expired" | "failed";
+  signers: ContractSignatureSigner[];
+}
+
+const SIGNER_ROLE_LABEL: Record<string, string> = {
+  customer: "Cliente",
+  operator: "Operador",
+  guarantor: "Fiador",
+  witness: "Testemunha",
+  tenant_representative: "Representante do tenant",
+  other: "Outro",
+};
+
+const SIGNER_STATUS_LABEL: Record<ContractSignatureSigner["status"], string> = {
+  pending: "Pendente",
+  viewed: "Visualizado",
+  signed: "Assinado",
+  refused: "Recusado",
+};
+
+function signatureStatusToUi(
+  status: ContractSignatureStatus["status"],
+): "active" | "inactive" | "pending" | "warning" | "error" {
+  switch (status) {
+    case "signed":
+      return "active";
+    case "in_progress":
+    case "sent":
+      return "pending";
+    case "draft":
+      return "pending";
+    case "cancelled":
+    case "expired":
+      return "inactive";
+    case "failed":
+      return "error";
+    default:
+      return "inactive";
+  }
+}
+
+function signatureStatusLabel(status: ContractSignatureStatus["status"]): string {
+  const labels: Record<ContractSignatureStatus["status"], string> = {
+    draft: "Preparando",
+    sent: "Enviada",
+    in_progress: "Em andamento",
+    signed: "Assinado",
+    cancelled: "Cancelada",
+    expired: "Expirada",
+    failed: "Falhou",
+  };
+  return labels[status] ?? status;
+}
 
 interface LinkedAsset {
   id: string;
@@ -151,6 +216,29 @@ export function ContractDetail({ contractId, onClose, onStatusChange }: Contract
   const [inviting, setInviting] = useState(false);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
+  const [signatureStatus, setSignatureStatus] = useState<ContractSignatureStatus | null>(null);
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [cancellingSignature, setCancellingSignature] = useState(false);
+
+  const refreshSignatureStatus = useCallback(() => {
+    if (!contractId) return;
+    fetch(`/api/signature-requests?contractId=${contractId}`)
+      .then((r) => r.json())
+      .then((j: { data: ContractSignatureStatus | null }) => setSignatureStatus(j.data ?? null))
+      .catch(() => setSignatureStatus(null));
+  }, [contractId]);
+
+  async function handleCancelSignature() {
+    if (!signatureStatus) return;
+    setCancellingSignature(true);
+    try {
+      await fetch(`/api/signature-requests/${signatureStatus.id}/cancel`, { method: "POST" });
+      refreshSignatureStatus();
+    } finally {
+      setCancellingSignature(false);
+    }
+  }
+
   const refreshAssets = useCallback(() => {
     if (!contractId) return;
     fetch(`/api/contracts/${contractId}/assets`)
@@ -191,7 +279,8 @@ export function ContractDetail({ contractId, onClose, onStatusChange }: Contract
     refreshAssets();
     refreshCustomers();
     refreshDocuments();
-  }, [contractId, refreshAssets, refreshCustomers, refreshDocuments]);
+    refreshSignatureStatus();
+  }, [contractId, refreshAssets, refreshCustomers, refreshDocuments, refreshSignatureStatus]);
 
   async function handleReviewDocument(documentId: string, status: "approved" | "rejected") {
     if (!contractId) return;
@@ -528,6 +617,70 @@ export function ContractDetail({ contractId, onClose, onStatusChange }: Contract
                 </div>
               )}
 
+              {/* Signature Platform (P2) — electronic signature status */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-slate-500">Assinatura eletrônica</p>
+                  {signatureStatus && (
+                    <StatusBadge
+                      status={signatureStatusToUi(signatureStatus.status)}
+                      label={signatureStatusLabel(signatureStatus.status)}
+                    />
+                  )}
+                </div>
+                {signatureStatus ? (
+                  <div className="space-y-2">
+                    <div className="space-y-1.5">
+                      {signatureStatus.signers.map((signer, idx) => (
+                        <div
+                          // eslint-disable-next-line react/no-array-index-key
+                          key={idx}
+                          className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl text-xs"
+                        >
+                          <span className="text-slate-700">
+                            {signer.name}{" "}
+                            <span className="text-slate-400">
+                              ({SIGNER_ROLE_LABEL[signer.role] ?? signer.role})
+                            </span>
+                          </span>
+                          <span className="text-slate-500">
+                            {SIGNER_STATUS_LABEL[signer.status]}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {["draft", "sent", "in_progress"].includes(signatureStatus.status) && (
+                      <button
+                        onClick={() => void handleCancelSignature()}
+                        disabled={cancellingSignature}
+                        className="text-xs text-red-600 hover:underline cursor-pointer border-0 bg-transparent disabled:opacity-60"
+                      >
+                        {cancellingSignature ? "Cancelando..." : "Cancelar solicitação"}
+                      </button>
+                    )}
+                    {/* cancelled/expired/failed are terminal but not
+                        blocking — the tenant can send a fresh request */}
+                    {["cancelled", "expired", "failed"].includes(signatureStatus.status) && (
+                      <button
+                        onClick={() => setShowSignatureModal(true)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer border-0"
+                      >
+                        <PenTool className="w-4 h-4" />
+                        Solicitar nova assinatura
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowSignatureModal(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer border-0"
+                  >
+                    <PenTool className="w-4 h-4" />
+                    Solicitar assinatura
+                  </button>
+                )}
+              </div>
+
               {/* Created */}
               <div>
                 <p className="text-xs text-slate-500">Criado em</p>
@@ -563,6 +716,16 @@ export function ContractDetail({ contractId, onClose, onStatusChange }: Contract
           </div>
         )}
       </div>
+
+      {contract && showSignatureModal && (
+        <ContractSendSignatureModal
+          contractId={contract.id}
+          customerName={contract.organizations?.name ?? ""}
+          customerEmail={contract.organizations?.email ?? ""}
+          onClose={() => setShowSignatureModal(false)}
+          onSent={refreshSignatureStatus}
+        />
+      )}
     </>
   );
 }
