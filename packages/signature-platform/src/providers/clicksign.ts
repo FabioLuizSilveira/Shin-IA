@@ -203,6 +203,17 @@ export class ClicksignProvider implements SignatureProvider {
       data: { id: envelopeId, type: "envelopes", attributes: { status: "running" } },
     });
 
+    // Activating the envelope does NOT, by itself, send anything to
+    // signers -- confirmed live 2026-09-03 (two real signers got no email
+    // until this call was made manually against a stuck envelope): a
+    // separate POST is required to actually dispatch the signature-request
+    // email. Without this, createRequest() "succeeds" (the envelope shows
+    // "running") but no signer is ever notified and the flow silently
+    // stalls forever with no error anywhere.
+    await this.request("POST", `/envelopes/${envelopeId}/notifications`, {
+      data: { type: "notifications", attributes: {} },
+    });
+
     return {
       providerRequestId: envelopeId,
       // signingUrl intentionally left null in P1 — Clicksign emails each

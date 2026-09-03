@@ -20,7 +20,7 @@ adivinhar.
 
 Um teste E2E completo (`clicksign.e2e.test.ts`) rodou de ponta a ponta
 contra a conta sandbox real do usuário — `createRequest` → `getRequest`
-(`running`) → `cancelRequest` → `getRequest` (`cancelled`) — e revelou 3
+(`running`) → `cancelRequest` → `getRequest` (`cancelled`) — e revelou 4
 pontos onde o texto da doc oficial diverge do comportamento real da API:
 
 1. **`content_base64` precisa de um Data URI completo**
@@ -41,6 +41,17 @@ pontos onde o texto da doc oficial diverge do comportamento real da API:
 formato válido"`); um nome completo plausível sem dígitos/abreviações
    funcionou. A regra exata não foi isolada (não vale a pena adivinhar o
    regex), só documentado que existe.
+4. **Ativar o envelope (`PATCH status:"running"`) NÃO dispara o e-mail de
+   assinatura por si só.** Confirmado ao vivo 2026-09-03: dois envios reais
+   (pra `fabio@shinaia.com.br` e `fabioshinaia@gmail.com`) não chegaram —
+   o envelope ficava `running`, o signatário `pending`, e nada acontecia.
+   Existe uma chamada separada e obrigatória:
+   `POST /envelopes/{id}/notifications {data:{type:"notifications",
+attributes:{}}}` — só depois dela a Clicksign de fato manda o e-mail
+   (`summary: [{signer_id, notified:true}]` na resposta). `createRequest()`
+   agora chama isso automaticamente logo após a ativação. Sem essa
+   correção, TODA solicitação de assinatura criada pelo P1/P2 ficava presa
+   pra sempre sem nenhum erro visível — o pior tipo de bug silencioso.
 
 ## Confirmado na documentação oficial
 
