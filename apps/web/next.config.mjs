@@ -69,6 +69,32 @@ const nextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
+  // pdfkit (a @react-pdf/renderer dependency, used by inspection-pdf.tsx
+  // and contract-signature-pdf.tsx) loads its standard-font .afm/.cjs
+  // files at runtime via a dynamic path, not a static import — Vercel's
+  // file tracer can't see that reference, so the built serverless bundle
+  // omits them and every PDF-rendering route 500s in production with
+  // "Cannot find module '.../pdfkit/js/standard-fonts/Helvetica.cjs'"
+  // (confirmed live on 2026-09-03 testing the Signature Platform's
+  // contract PDF route — the same root cause was already latent for the
+  // pre-existing inspection-report PDF routes, not something this feature
+  // introduced). Explicitly including the whole package's files fixes it
+  // for every current and future @react-pdf/renderer route at once.
+  // next@14.x still nests this under `experimental` — it only became a
+  // stable top-level key in Next.js 15.
+  experimental: {
+    // Confirmed live 2026-09-03 (500 in production, reproduced + fixed
+    // locally by inspecting the built .nft.json trace manifest): the
+    // include path must point at pdfkit's REAL physical location, not the
+    // `node_modules/pdfkit` symlink apps/web itself sees — pnpm hoists the
+    // actual package store to the monorepo ROOT's node_modules/.pnpm, two
+    // directories up from apps/web, and the tracer's glob doesn't follow
+    // that symlink on its own. `pdfkit@*` (not a pinned version) so a
+    // future pdfkit bump doesn't silently break this again.
+    outputFileTracingIncludes: {
+      "/api/**/*": ["../../node_modules/.pnpm/pdfkit@*/node_modules/pdfkit/js/**/*"],
+    },
+  },
 };
 
 export default nextConfig;
