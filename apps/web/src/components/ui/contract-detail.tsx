@@ -720,8 +720,21 @@ export function ContractDetail({ contractId, onClose, onStatusChange }: Contract
       {contract && showSignatureModal && (
         <ContractSendSignatureModal
           contractId={contract.id}
-          customerName={contract.organizations?.name ?? ""}
-          customerEmail={contract.organizations?.email ?? ""}
+          // The signer needs a real rental_customers.id to bridge into
+          // recordContractAcceptance() (createSignatureRequest() rejects
+          // partyType:"customer" without one) — contract.organizations is
+          // just the CRM org contact, not necessarily a real customer
+          // identity. linkedCustomers (already fetched for the "Clientes
+          // com acesso ao app" section) is the real source; found live in
+          // production 2026-09-03 when the org-prefilled version had no
+          // customerId to send and the backend correctly rejected it.
+          linkedCustomerId={linkedCustomers[0]?.rental_customers?.id ?? null}
+          customerName={
+            linkedCustomers[0]?.rental_customers?.full_name ?? contract.organizations?.name ?? ""
+          }
+          customerEmail={
+            linkedCustomers[0]?.rental_customers?.email ?? contract.organizations?.email ?? ""
+          }
           onClose={() => setShowSignatureModal(false)}
           onSent={refreshSignatureStatus}
         />

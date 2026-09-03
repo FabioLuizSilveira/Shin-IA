@@ -28,6 +28,12 @@ const EXTRA_ROLE_LABEL: Record<ExtraSigner["role"], string> = {
 
 interface ContractSendSignatureModalProps {
   contractId: string;
+  /** A real rental_customers.id — required for this signer to bridge into
+   * recordContractAcceptance() (the backend rejects partyType:"customer"
+   * without one). null when the contract has no linked customer yet — the
+   * signer still gets sent, just without the formal-acceptance bridge,
+   * same as the optional extra signers below. */
+  linkedCustomerId: string | null;
   customerName: string;
   customerEmail: string;
   onClose: () => void;
@@ -36,6 +42,7 @@ interface ContractSendSignatureModalProps {
 
 export function ContractSendSignatureModal({
   contractId,
+  linkedCustomerId,
   customerName,
   customerEmail,
   onClose,
@@ -68,7 +75,15 @@ export function ContractSendSignatureModal({
         body: JSON.stringify({
           contractId,
           signers: [
-            { role: "customer", name: name.trim(), email: email.trim(), partyType: "customer" },
+            linkedCustomerId
+              ? {
+                  role: "customer",
+                  name: name.trim(),
+                  email: email.trim(),
+                  partyType: "customer",
+                  customerId: linkedCustomerId,
+                }
+              : { role: "customer", name: name.trim(), email: email.trim() },
             ...extraSigners
               .filter((s) => s.name.trim() && s.email.trim())
               .map((s) => ({ role: s.role, name: s.name.trim(), email: s.email.trim() })),
@@ -111,6 +126,13 @@ export function ContractSendSignatureModal({
 
           <div>
             <p className="text-xs font-medium text-slate-700 mb-2">Cliente (obrigatório)</p>
+            {!linkedCustomerId && (
+              <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mb-2">
+                Este contrato ainda não tem um cliente com acesso ao app vinculado — a assinatura
+                será enviada, mas não vai gerar um registro formal de aceite do contrato. Vincule um
+                cliente na seção "Clientes com acesso ao app" para isso.
+              </p>
+            )}
             <div className="space-y-2">
               <input
                 value={name}
