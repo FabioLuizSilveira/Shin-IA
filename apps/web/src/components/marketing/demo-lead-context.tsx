@@ -40,7 +40,6 @@ export function DemoLeadProvider({ children }: { children: React.ReactNode }) {
     name: "",
     email: "",
     phone: "",
-    profile: "locador",
     fleetSize: FLEET_SIZE_OPTIONS[0].value,
   });
 
@@ -64,8 +63,8 @@ export function DemoLeadProvider({ children }: { children: React.ReactNode }) {
           name: form.name,
           email: form.email,
           phone: form.phone,
-          profile: form.profile,
-          fleet_size: form.profile === "locador" ? Number(form.fleetSize) : undefined,
+          profile: "locador",
+          fleet_size: Number(form.fleetSize),
           source,
         }),
       });
@@ -129,30 +128,16 @@ export function DemoLeadProvider({ children }: { children: React.ReactNode }) {
                     className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-white/30 transition-colors"
                   />
                   <select
-                    value={form.profile}
-                    onChange={(e) => setForm((f) => ({ ...f, profile: e.target.value }))}
+                    value={form.fleetSize}
+                    onChange={(e) => setForm((f) => ({ ...f, fleetSize: e.target.value }))}
                     className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white outline-none focus:border-white/30 transition-colors"
                   >
-                    <option value="locador" className="bg-slate-900">
-                      Locador (tenho frota)
-                    </option>
-                    <option value="locatario" className="bg-slate-900">
-                      Locatário (quero alugar)
-                    </option>
+                    {FLEET_SIZE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value} className="bg-slate-900">
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
-                  {form.profile === "locador" && (
-                    <select
-                      value={form.fleetSize}
-                      onChange={(e) => setForm((f) => ({ ...f, fleetSize: e.target.value }))}
-                      className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white outline-none focus:border-white/30 transition-colors"
-                    >
-                      {FLEET_SIZE_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value} className="bg-slate-900">
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
                   {status === "error" && (
                     <p className="text-sm text-red-400">Algo deu errado. Tente novamente.</p>
                   )}
