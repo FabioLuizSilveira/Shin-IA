@@ -53,6 +53,8 @@ export interface OperationDetail {
 export type AssetCategory = "vehicle" | "equipment" | "tool" | "property" | "technology";
 export type AssetStatus = "available" | "in_use" | "maintenance" | "decommissioned";
 
+export type AssetOwnershipType = "own" | "shared" | "third_party_managed";
+
 export interface Asset {
   id: string;
   name: string;
@@ -63,6 +65,10 @@ export interface Asset {
   branch_id?: string;
   asset_type_id?: string;
   metadata?: { photo_url?: string } | null;
+  ownership_type?: AssetOwnershipType;
+  owner_org_id?: string | null;
+  owner_org_name?: string;
+  tenant_share_pct?: number;
 }
 
 export type ContractType = "service" | "rental" | "lease" | "subscription" | "one_time";

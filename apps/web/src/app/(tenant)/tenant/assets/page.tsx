@@ -8,13 +8,34 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ExportButton } from "@/components/ui/export-button";
 import { Plus, X, ImageIcon, Upload, Download } from "lucide-react";
-import type { Asset, AssetCategory, AssetStatus } from "@/types/domain";
+import type { Asset, AssetCategory, AssetOwnershipType, AssetStatus } from "@/types/domain";
 
 interface AssetType {
   id: string;
   name: string;
   category: AssetCategory;
 }
+
+interface Organization {
+  id: string;
+  name: string;
+}
+
+interface Settlement {
+  id: string;
+  gross_amount: number;
+  tenant_share_pct: number;
+  tenant_amount: number;
+  owner_amount: number;
+  currency: string;
+  created_at: string;
+}
+
+const OWNERSHIP_LABEL: Record<AssetOwnershipType, string> = {
+  own: "Próprio",
+  shared: "Sócio/parceiro",
+  third_party_managed: "Administrado pra terceiro",
+};
 
 interface ImportResult {
   created: number;
@@ -131,6 +152,7 @@ export default function TenantAssetsPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
@@ -139,6 +161,18 @@ export default function TenantAssetsPage() {
   const [formSerial, setFormSerial] = useState("");
   const [formPhoto, setFormPhoto] = useState<File | null>(null);
   const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
+  const [formOwnershipType, setFormOwnershipType] = useState<AssetOwnershipType>("own");
+  const [formOwnerOrgId, setFormOwnerOrgId] = useState("");
+  const [formTenantSharePct, setFormTenantSharePct] = useState("100");
+
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [settlementsLoading, setSettlementsLoading] = useState(false);
+  const [ownershipEditing, setOwnershipEditing] = useState(false);
+  const [ownershipSaving, setOwnershipSaving] = useState(false);
+  const [ownershipError, setOwnershipError] = useState<string | null>(null);
+  const [editOwnershipType, setEditOwnershipType] = useState<AssetOwnershipType>("own");
+  const [editOwnerOrgId, setEditOwnerOrgId] = useState("");
+  const [editTenantSharePct, setEditTenantSharePct] = useState("100");
 
   const [showImport, setShowImport] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -161,14 +195,36 @@ export default function TenantAssetsPage() {
     void load();
   }, [load]);
 
+  async function loadOrganizations() {
+    if (organizations.length > 0) return;
+    const res = await fetch("/api/organizations?activeOnly=1");
+    const json = (await res.json()) as { data?: Organization[] };
+    setOrganizations(json.data ?? []);
+  }
+
   useEffect(() => {
     if (!selected) {
       setHealthScore(null);
       setAnomalies(null);
       setRecommendations(null);
       setPredictiveRisk(null);
+      setSettlements([]);
+      setOwnershipEditing(false);
+      setOwnershipError(null);
       return;
     }
+    setEditOwnershipType(selected.ownership_type ?? "own");
+    setEditOwnerOrgId(selected.owner_org_id ?? "");
+    setEditTenantSharePct(String(selected.tenant_share_pct ?? 100));
+    void loadOrganizations();
+
+    setSettlementsLoading(true);
+    fetch(`/api/assets/${selected.id}/settlements`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: { data?: Settlement[] } | null) => setSettlements(json?.data ?? []))
+      .catch(() => setSettlements([]))
+      .finally(() => setSettlementsLoading(false));
+
     let cancelled = false;
     setHealthScoreLoading(true);
     setHealthScore(null);
@@ -241,6 +297,7 @@ export default function TenantAssetsPage() {
       const json = (await res.json()) as { data?: AssetType[] };
       setAssetTypes(json.data ?? []);
     }
+    void loadOrganizations();
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -248,6 +305,9 @@ export default function TenantAssetsPage() {
     setSubmitting(true);
     setFormError(null);
     try {
+      if (formOwnershipType !== "own" && !formOwnerOrgId) {
+        throw new Error("Selecione o sócio/terceiro dono do ativo.");
+      }
       const res = await fetch("/api/assets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -256,6 +316,9 @@ export default function TenantAssetsPage() {
           category: formCategory,
           asset_type_id: formTypeId,
           serial_number: formSerial || undefined,
+          ownership_type: formOwnershipType,
+          owner_org_id: formOwnershipType === "own" ? null : formOwnerOrgId,
+          tenant_share_pct: formOwnershipType === "own" ? 100 : Number(formTenantSharePct),
         }),
       });
       const json = (await res.json()) as { error?: string; data?: Asset };
@@ -280,6 +343,9 @@ export default function TenantAssetsPage() {
       setFormSerial("");
       setFormPhoto(null);
       setFormPhotoPreview(null);
+      setFormOwnershipType("own");
+      setFormOwnerOrgId("");
+      setFormTenantSharePct("100");
       await load();
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Erro inesperado");
@@ -365,6 +431,35 @@ export default function TenantAssetsPage() {
       await load();
     } finally {
       setChangingStatus(false);
+    }
+  }
+
+  async function handleSaveOwnership() {
+    if (!selected) return;
+    setOwnershipSaving(true);
+    setOwnershipError(null);
+    try {
+      if (editOwnershipType !== "own" && !editOwnerOrgId) {
+        throw new Error("Selecione o sócio/terceiro dono do ativo.");
+      }
+      const res = await fetch(`/api/assets/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownership_type: editOwnershipType,
+          owner_org_id: editOwnershipType === "own" ? null : editOwnerOrgId,
+          tenant_share_pct: editOwnershipType === "own" ? 100 : Number(editTenantSharePct),
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Falha ao salvar propriedade");
+      setOwnershipEditing(false);
+      setSelected(null);
+      await load();
+    } catch (e) {
+      setOwnershipError(e instanceof Error ? e.message : "Erro inesperado");
+    } finally {
+      setOwnershipSaving(false);
     }
   }
 
@@ -521,6 +616,164 @@ export default function TenantAssetsPage() {
                   </div>
                 )}
               </div>
+
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-slate-500">Propriedade</p>
+                  {!ownershipEditing && (
+                    <button
+                      type="button"
+                      onClick={() => setOwnershipEditing(true)}
+                      className="text-xs text-shina-blue hover:text-blue-700 font-medium bg-transparent border-0 cursor-pointer p-0"
+                    >
+                      Editar
+                    </button>
+                  )}
+                </div>
+
+                {!ownershipEditing ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Tipo</span>
+                      <span className="font-medium text-slate-900 dark:text-slate-50">
+                        {OWNERSHIP_LABEL[selected.ownership_type ?? "own"]}
+                      </span>
+                    </div>
+                    {selected.ownership_type !== "own" && (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Sócio/terceiro</span>
+                          <span className="font-medium text-slate-900 dark:text-slate-50">
+                            {selected.owner_org_name ?? "—"}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">% do tenant</span>
+                          <span className="font-medium text-slate-900 dark:text-slate-50">
+                            {selected.tenant_share_pct}% (dono:{" "}
+                            {100 - (selected.tenant_share_pct ?? 100)}%)
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <select
+                      value={editOwnershipType}
+                      onChange={(e) => setEditOwnershipType(e.target.value as AssetOwnershipType)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100"
+                    >
+                      {Object.entries(OWNERSHIP_LABEL).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    {editOwnershipType !== "own" && (
+                      <>
+                        <select
+                          value={editOwnerOrgId}
+                          onChange={(e) => setEditOwnerOrgId(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100"
+                        >
+                          <option value="">Selecione o sócio/terceiro...</option>
+                          {organizations.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.name}
+                            </option>
+                          ))}
+                        </select>
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">
+                            % que fica com o tenant (o resto vai pro dono)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.01"
+                            value={editTenantSharePct}
+                            onChange={(e) => setEditTenantSharePct(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100"
+                          />
+                        </div>
+                      </>
+                    )}
+                    {ownershipError && <p className="text-xs text-red-600">{ownershipError}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={ownershipSaving}
+                        onClick={() => void handleSaveOwnership()}
+                        className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-shina-blue hover:bg-blue-600 disabled:opacity-60 text-white border-0 cursor-pointer"
+                      >
+                        {ownershipSaving ? "Salvando..." : "Salvar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOwnershipEditing(false);
+                          setOwnershipError(null);
+                        }}
+                        className="px-3 py-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-0 cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {selected.ownership_type && selected.ownership_type !== "own" && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-slate-500">Repasses ao sócio/terceiro</p>
+                  {settlementsLoading ? (
+                    <p className="text-xs text-slate-400">Carregando…</p>
+                  ) : settlements.length === 0 ? (
+                    <p className="text-xs text-slate-400">Nenhum repasse calculado ainda.</p>
+                  ) : (
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden">
+                      {settlements.map((s) => (
+                        <div
+                          key={s.id}
+                          className="px-3 py-2 text-xs flex items-center justify-between"
+                        >
+                          <div>
+                            <p className="text-slate-700 dark:text-slate-200">
+                              {new Date(s.created_at).toLocaleDateString("pt-BR")}
+                            </p>
+                            <p className="text-slate-400">
+                              Bruto{" "}
+                              {new Intl.NumberFormat("pt-BR", {
+                                style: "currency",
+                                currency: s.currency,
+                              }).format(s.gross_amount)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-slate-700 dark:text-slate-200 font-medium">
+                              Tenant:{" "}
+                              {new Intl.NumberFormat("pt-BR", {
+                                style: "currency",
+                                currency: s.currency,
+                              }).format(s.tenant_amount)}
+                            </p>
+                            <p className="text-slate-400">
+                              Dono:{" "}
+                              {new Intl.NumberFormat("pt-BR", {
+                                style: "currency",
+                                currency: s.currency,
+                              }).format(s.owner_amount)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {healthScoreLoading && (
                 <p className="text-xs text-slate-400">Calculando saúde do ativo…</p>
               )}
@@ -838,6 +1091,55 @@ export default function TenantAssetsPage() {
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Propriedade</label>
+                <select
+                  value={formOwnershipType}
+                  onChange={(e) => setFormOwnershipType(e.target.value as AssetOwnershipType)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                >
+                  {Object.entries(OWNERSHIP_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {formOwnershipType !== "own" && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">
+                      Sócio/terceiro
+                    </label>
+                    <select
+                      value={formOwnerOrgId}
+                      onChange={(e) => setFormOwnerOrgId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                    >
+                      <option value="">Selecione...</option>
+                      {organizations.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">
+                      % que fica com o tenant (o resto vai pro dono)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.01"
+                      value={formTenantSharePct}
+                      onChange={(e) => setFormTenantSharePct(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                </>
+              )}
               {formError && (
                 <div className="px-3 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
                   {formError}

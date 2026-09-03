@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseOneOffExternalReference } from "@/lib/asaas/client";
+import { settleAssetOwnersForPaidInvoice } from "@/lib/asset-owner-settlement";
 
 export const dynamic = "force-dynamic";
 
@@ -80,11 +81,21 @@ export async function POST(request: Request) {
     .eq("id", invoiceId)
     .eq("gateway_checkout_id", paymentId)
     .in("status", ["issued", "overdue"])
-    .select("id")
+    .select("id, tenant_id, contract_id, total_amount, total_currency")
     .maybeSingle();
 
   if (!updatedInvoice) {
     return NextResponse.json({ received: true, duplicate: true });
+  }
+
+  if (action === "invoice" && updatedInvoice.contract_id) {
+    void settleAssetOwnersForPaidInvoice(admin, {
+      tenantId: updatedInvoice.tenant_id,
+      invoiceId: updatedInvoice.id,
+      contractId: updatedInvoice.contract_id,
+      totalAmount: Number(updatedInvoice.total_amount),
+      currency: updatedInvoice.total_currency,
+    });
   }
 
   if (action === "renewal" && refId) {

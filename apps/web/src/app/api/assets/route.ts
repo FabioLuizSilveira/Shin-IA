@@ -2,17 +2,19 @@ import { NextResponse, type NextRequest } from "next/server";
 import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
+import { validateOwnership } from "@/lib/asset-owner-settlement";
 
 export const dynamic = "force-dynamic";
 
 const SELECT =
-  "id, name, serial_number, category, status, branch_id, asset_type_id, metadata, asset_types(name)";
+  "id, name, serial_number, category, status, branch_id, asset_type_id, metadata, " +
+  "ownership_type, owner_org_id, tenant_share_pct, asset_types(name), owner_org:organizations!owner_org_id(name)";
 
-function flattenType<T extends { asset_types: { name: string } | null }>(
-  row: T,
-): Omit<T, "asset_types"> & { type_name?: string } {
-  const { asset_types, ...rest } = row;
-  return { ...rest, type_name: asset_types?.name };
+function flattenType<
+  T extends { asset_types: { name: string } | null; owner_org: { name: string } | null },
+>(row: T): Omit<T, "asset_types" | "owner_org"> & { type_name?: string; owner_org_name?: string } {
+  const { asset_types, owner_org, ...rest } = row;
+  return { ...rest, type_name: asset_types?.name, owner_org_name: owner_org?.name };
 }
 
 export async function GET() {
@@ -28,7 +30,12 @@ export async function GET() {
   if (error) return internalError(error);
 
   return NextResponse.json({
-    data: (data as unknown as { asset_types: { name: string } | null }[]).map(flattenType),
+    data: (
+      data as unknown as {
+        asset_types: { name: string } | null;
+        owner_org: { name: string } | null;
+      }[]
+    ).map(flattenType),
   });
 }
 
@@ -47,6 +54,9 @@ export async function POST(req: NextRequest) {
     category?: string;
     asset_type_id?: string;
     serial_number?: string;
+    ownership_type?: string;
+    owner_org_id?: string | null;
+    tenant_share_pct?: number;
   };
 
   if (
@@ -59,6 +69,11 @@ export async function POST(req: NextRequest) {
       { error: "name, category and asset_type_id are required" },
       { status: 422 },
     );
+  }
+
+  const ownership = validateOwnership(body);
+  if ("error" in ownership) {
+    return NextResponse.json({ error: ownership.error }, { status: 422 });
   }
 
   const { data: branch, error: branchError } = await scope.db
@@ -86,22 +101,27 @@ export async function POST(req: NextRequest) {
       name: body.name.trim(),
       serial_number: body.serial_number?.trim() || null,
       category: body.category,
+      ownership_type: ownership.ownership_type,
+      owner_org_id: ownership.owner_org_id,
+      tenant_share_pct: ownership.tenant_share_pct,
     })
     .select(SELECT)
     .single();
   if (insertError) return internalError(insertError);
+  const createdAsset = created as unknown as {
+    id: string;
+    asset_types: { name: string } | null;
+    owner_org: { name: string } | null;
+  };
 
   void logActivity(scope.db, {
     tenantId,
     actorId: scope.userId,
     entityType: "asset",
-    entityId: created.id,
+    entityId: createdAsset.id,
     action: "created",
     metadata: { name: body.name.trim(), category: body.category },
   });
 
-  return NextResponse.json(
-    { data: flattenType(created as unknown as { asset_types: { name: string } | null }) },
-    { status: 201 },
-  );
+  return NextResponse.json({ data: flattenType(createdAsset) }, { status: 201 });
 }

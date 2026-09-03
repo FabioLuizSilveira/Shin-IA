@@ -255,6 +255,87 @@ export type Database = {
           },
         ];
       };
+      asset_owner_settlements: {
+        Row: {
+          asset_id: string;
+          contract_id: string | null;
+          created_at: string;
+          currency: string;
+          gross_amount: number;
+          id: string;
+          invoice_id: string;
+          owner_amount: number;
+          owner_org_id: string;
+          tenant_amount: number;
+          tenant_id: string;
+          tenant_share_pct: number;
+        };
+        Insert: {
+          asset_id: string;
+          contract_id?: string | null;
+          created_at?: string;
+          currency?: string;
+          gross_amount: number;
+          id?: string;
+          invoice_id: string;
+          owner_amount: number;
+          owner_org_id: string;
+          tenant_amount: number;
+          tenant_id: string;
+          tenant_share_pct: number;
+        };
+        Update: {
+          asset_id?: string;
+          contract_id?: string | null;
+          created_at?: string;
+          currency?: string;
+          gross_amount?: number;
+          id?: string;
+          invoice_id?: string;
+          owner_amount?: number;
+          owner_org_id?: string;
+          tenant_amount?: number;
+          tenant_id?: string;
+          tenant_share_pct?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "asset_owner_settlements_asset_fk";
+            columns: ["asset_id"];
+            isOneToOne: false;
+            referencedRelation: "assets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "asset_owner_settlements_contract_fk";
+            columns: ["contract_id"];
+            isOneToOne: false;
+            referencedRelation: "contracts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "asset_owner_settlements_invoice_fk";
+            columns: ["invoice_id"];
+            isOneToOne: false;
+            referencedRelation: "invoices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "asset_owner_settlements_owner_org_fk";
+            columns: ["owner_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "asset_owner_settlements_tenant_fk";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       asset_types: {
         Row: {
           active: boolean;
@@ -318,11 +399,14 @@ export type Database = {
           metadata: Json;
           name: string;
           odometer: number | null;
+          owner_org_id: string | null;
+          ownership_type: Database["public"]["Enums"]["asset_ownership_type"];
           plate: string | null;
           renavam: string | null;
           serial_number: string | null;
           status: Database["public"]["Enums"]["asset_status"];
           tenant_id: string;
+          tenant_share_pct: number;
           updated_at: string;
           version: number;
         };
@@ -338,11 +422,14 @@ export type Database = {
           metadata?: Json;
           name: string;
           odometer?: number | null;
+          owner_org_id?: string | null;
+          ownership_type?: Database["public"]["Enums"]["asset_ownership_type"];
           plate?: string | null;
           renavam?: string | null;
           serial_number?: string | null;
           status?: Database["public"]["Enums"]["asset_status"];
           tenant_id: string;
+          tenant_share_pct?: number;
           updated_at?: string;
           version?: number;
         };
@@ -358,11 +445,14 @@ export type Database = {
           metadata?: Json;
           name?: string;
           odometer?: number | null;
+          owner_org_id?: string | null;
+          ownership_type?: Database["public"]["Enums"]["asset_ownership_type"];
           plate?: string | null;
           renavam?: string | null;
           serial_number?: string | null;
           status?: Database["public"]["Enums"]["asset_status"];
           tenant_id?: string;
+          tenant_share_pct?: number;
           updated_at?: string;
           version?: number;
         };
@@ -379,6 +469,13 @@ export type Database = {
             columns: ["branch_id"];
             isOneToOne: false;
             referencedRelation: "branches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "assets_owner_org_id_fkey";
+            columns: ["owner_org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
             referencedColumns: ["id"];
           },
           {
@@ -8670,6 +8767,7 @@ export type Database = {
     Enums: {
       allocation_status: "reserved" | "active" | "completed" | "cancelled";
       asset_category: "vehicle" | "equipment" | "tool" | "property" | "technology";
+      asset_ownership_type: "own" | "shared" | "third_party_managed";
       asset_status: "available" | "in_use" | "maintenance" | "decommissioned";
       billing_account_status: "active" | "suspended" | "closed";
       billing_cycle: "monthly" | "quarterly" | "annual" | "one_time";
@@ -9073,6 +9171,7 @@ export const Constants = {
     Enums: {
       allocation_status: ["reserved", "active", "completed", "cancelled"],
       asset_category: ["vehicle", "equipment", "tool", "property", "technology"],
+      asset_ownership_type: ["own", "shared", "third_party_managed"],
       asset_status: ["available", "in_use", "maintenance", "decommissioned"],
       billing_account_status: ["active", "suspended", "closed"],
       billing_cycle: ["monthly", "quarterly", "annual", "one_time"],

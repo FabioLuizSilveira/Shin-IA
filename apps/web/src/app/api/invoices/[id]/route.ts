@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { settleAssetOwnersForPaidInvoice } from "@/lib/asset-owner-settlement";
 import type { InvoiceDetail } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: current, error: fetchError } = await supabase
     .from("invoices")
-    .select("status, previous_status")
+    .select("status, previous_status, contract_id, total_amount, total_currency")
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
@@ -115,6 +116,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq("id", id)
     .eq("tenant_id", scope.tenantId);
   if (updateError) return internalError(updateError);
+
+  if (body.status === "paid" && current.contract_id) {
+    void settleAssetOwnersForPaidInvoice(supabase, {
+      tenantId: scope.tenantId,
+      invoiceId: id,
+      contractId: current.contract_id,
+      totalAmount: Number(current.total_amount),
+      currency: current.total_currency,
+    });
+  }
 
   return NextResponse.json({ data: { ok: true } });
 }
