@@ -1,4 +1,5 @@
 import { Instrument_Serif, Barlow } from "next/font/google";
+import { DemoLeadProvider } from "@/components/marketing/demo-lead-context";
 import "./public.css";
 
 // Layout exclusivo do site institucional público — carrega a tipografia do
@@ -21,7 +22,7 @@ const barlow = Barlow({
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`${instrumentSerif.variable} ${barlow.variable} bg-black font-body`}>
-      {children}
+      <DemoLeadProvider>{children}</DemoLeadProvider>
     </div>
   );
 }

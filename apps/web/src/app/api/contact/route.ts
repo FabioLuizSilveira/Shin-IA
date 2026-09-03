@@ -24,7 +24,16 @@ interface ContactBody {
   email?: string;
   company?: string;
   message?: string;
+  phone?: string;
+  profile?: "locador" | "locatario";
+  fleet_size?: number;
+  source?: string;
 }
+
+const PROFILE_LABEL: Record<string, string> = {
+  locador: "Locador (tem frota)",
+  locatario: "Locatário (quer alugar)",
+};
 
 // POST /api/contact — public, no auth (listed in middleware.ts's
 // APP_PUBLIC_PATHS; also unconditionally reachable via the root/marketing
@@ -53,8 +62,18 @@ export async function POST(req: NextRequest) {
   const email = body?.email?.trim();
   const message = body?.message?.trim();
   const company = body?.company?.trim();
-  if (!name || !email || !message) {
-    return NextResponse.json({ error: "name, email and message are required" }, { status: 400 });
+  const phone = body?.phone?.trim();
+  const profile = body?.profile;
+  const fleetSize = body?.fleet_size;
+  // message is required for the "Fale com nossa equipe" form (a free-text
+  // question needs a question); the "Agendar Demo" modal has no message
+  // field at all, phone stands in for it there — one of the two is always
+  // required so every lead has *something* beyond bare contact info.
+  if (!name || !email || (!message && !phone)) {
+    return NextResponse.json(
+      { error: "name, email and (message or phone) are required" },
+      { status: 400 },
+    );
   }
   // Cheap sanity check, not full RFC 5322 validation -- good enough to
   // reject obvious junk without rejecting a real address the browser's own
@@ -88,6 +107,9 @@ export async function POST(req: NextRequest) {
       company_name: company || name,
       contact_name: name,
       contact_email: email,
+      contact_phone: phone || null,
+      estimated_fleet_size: profile === "locador" ? (fleetSize ?? null) : null,
+      segment: profile ? (PROFILE_LABEL[profile] ?? profile) : null,
       source: "website",
       status: "new",
       created_by: SYSTEM_ACTOR_ID,
@@ -98,7 +120,9 @@ export async function POST(req: NextRequest) {
       id: crypto.randomUUID(),
       lead_id: leadId,
       type: "status_change",
-      description: "Lead criado a partir do formulário de contato do site.",
+      description: message
+        ? "Lead criado a partir do formulário de contato do site."
+        : "Lead criado a partir do formulário de agendamento de demo do site.",
       from_status: null,
       to_status: "new",
       created_by: SYSTEM_ACTOR_ID,
@@ -112,16 +136,23 @@ export async function POST(req: NextRequest) {
       company_name: company || name,
       contact_name: name,
       contact_email: email,
-      message,
+      message: message || `Pedido de demonstração. Telefone: ${phone ?? "não informado"}.`,
       lead_url: appUrl(`/platform/crm`),
     });
   }
+
+  const noteParts = [
+    message,
+    phone && `Telefone: ${phone}`,
+    profile && `Perfil: ${PROFILE_LABEL[profile] ?? profile}`,
+    profile === "locador" && fleetSize && `Frota estimada: até ${fleetSize} carros`,
+  ].filter(Boolean);
 
   await admin.from("crm_lead_activities").insert({
     id: crypto.randomUUID(),
     lead_id: leadId,
     type: "note",
-    description: message,
+    description: noteParts.join(" — "),
     created_by: SYSTEM_ACTOR_ID,
   });
 

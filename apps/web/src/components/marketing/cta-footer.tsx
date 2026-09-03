@@ -4,9 +4,9 @@
 // Automatizar. Escalar."
 
 import { motion } from "framer-motion";
-import { appUrl } from "@/lib/domain";
 import { AmbientBackground } from "./ambient-background";
 import { Footer } from "./footer";
+import { useDemoLead } from "./demo-lead-context";
 
 const STEPS = [
   {
@@ -26,9 +26,8 @@ const STEPS = [
   },
 ];
 
-const DEMO_URL = appUrl("/login");
-
 export function CtaFooter() {
+  const { open: openDemoLead } = useDemoLead();
   return (
     <>
       <section className="relative py-24 px-4 overflow-hidden">
@@ -80,12 +79,13 @@ export function CtaFooter() {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="relative z-10 flex flex-col sm:flex-row items-center justify-center gap-4"
         >
-          <a
-            href={DEMO_URL}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-black font-body font-semibold rounded-full transition-transform hover:scale-[1.02] no-underline"
+          <button
+            type="button"
+            onClick={() => openDemoLead("cta-footer")}
+            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-black font-body font-semibold rounded-full transition-transform hover:scale-[1.02] border-0 cursor-pointer"
           >
             Agendar Demonstração
-          </a>
+          </button>
           <a
             href="/contact"
             className="inline-flex items-center gap-2 px-8 py-4 liquid-glass text-white font-body font-semibold rounded-full transition-colors hover:bg-white/5 no-underline"

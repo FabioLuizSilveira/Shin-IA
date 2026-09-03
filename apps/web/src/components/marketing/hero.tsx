@@ -4,8 +4,8 @@
 // dois CTAs e barra de setores-alvo, sobre fundo preto com aurora sutil.
 
 import { motion } from "framer-motion";
-import { appUrl } from "@/lib/domain";
 import { WispBackground } from "./wisp-background";
+import { useDemoLead } from "./demo-lead-context";
 
 const SECTORS = [
   "Locação de Ativos",
@@ -16,9 +16,8 @@ const SECTORS = [
   "Energia",
 ];
 
-const DEMO_URL = appUrl("/login");
-
 export function Hero() {
+  const { open: openDemoLead } = useDemoLead();
   return (
     <section className="relative pt-40 pb-24 px-4 overflow-hidden">
       {/* Fundo WebGL "wisp" (template Nexus, recolorido indigo/violeta) +
@@ -68,12 +67,13 @@ export function Hero() {
           transition={{ duration: 0.7, delay: 0.3 }}
           className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
         >
-          <a
-            href={DEMO_URL}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-black font-body font-semibold rounded-full transition-transform hover:scale-[1.02] no-underline"
+          <button
+            type="button"
+            onClick={() => openDemoLead("hero")}
+            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-black font-body font-semibold rounded-full transition-transform hover:scale-[1.02] border-0 cursor-pointer"
           >
             Agendar Demonstração
-          </a>
+          </button>
           <a
             href="#plataforma"
             className="inline-flex items-center gap-2 px-8 py-4 liquid-glass text-white font-body font-semibold rounded-full transition-colors hover:bg-white/5 no-underline"

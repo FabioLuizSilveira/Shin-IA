@@ -7,8 +7,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { Menu, X } from "@shina/icons";
-import { appUrl } from "@/lib/domain";
 import { AuthOptions } from "@/components/auth/auth-options";
+import { useDemoLead } from "@/components/marketing/demo-lead-context";
 
 const NAV_LINKS = [
   { href: "/#plataforma", label: "Plataforma" },
@@ -18,11 +18,10 @@ const NAV_LINKS = [
   { href: "/contact", label: "Contato" },
 ];
 
-const DEMO_URL = appUrl("/login");
-
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  const { open: openDemoLead } = useDemoLead();
 
   return (
     <>
@@ -64,13 +63,14 @@ export function Navbar() {
               >
                 Entrar
               </button>
-              <a
-                href={DEMO_URL}
+              <button
+                type="button"
                 id="nav-cta"
-                className="inline-flex items-center gap-1.5 px-4 py-2 liquid-glass-strong text-white text-sm font-body font-semibold rounded-full transition-colors no-underline"
+                onClick={() => openDemoLead("nav")}
+                className="inline-flex items-center gap-1.5 px-4 py-2 liquid-glass-strong text-white text-sm font-body font-semibold rounded-full transition-colors border-0 cursor-pointer"
               >
                 Agendar Demo
-              </a>
+              </button>
             </div>
 
             <button
@@ -109,12 +109,16 @@ export function Navbar() {
                 >
                   Entrar
                 </button>
-                <a
-                  href={DEMO_URL}
-                  className="block px-3 py-2.5 liquid-glass-strong text-white text-sm font-body font-semibold rounded-xl text-center no-underline"
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    openDemoLead("nav-mobile");
+                  }}
+                  className="block w-full px-3 py-2.5 liquid-glass-strong text-white text-sm font-body font-semibold rounded-xl text-center border-0 cursor-pointer"
                 >
                   Agendar Demo
-                </a>
+                </button>
               </div>
             </div>
           </div>
