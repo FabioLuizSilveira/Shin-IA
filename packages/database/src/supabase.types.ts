@@ -7621,6 +7621,221 @@ export type Database = {
         };
         Relationships: [];
       };
+      signature_artifacts: {
+        Row: {
+          content_type: string;
+          created_at: string;
+          filename: string;
+          hash: string;
+          id: string;
+          kind: Database["public"]["Enums"]["signature_artifact_kind"];
+          signature_request_id: string;
+          storage_path: string;
+          tenant_id: string;
+        };
+        Insert: {
+          content_type: string;
+          created_at?: string;
+          filename: string;
+          hash: string;
+          id?: string;
+          kind: Database["public"]["Enums"]["signature_artifact_kind"];
+          signature_request_id: string;
+          storage_path: string;
+          tenant_id: string;
+        };
+        Update: {
+          content_type?: string;
+          created_at?: string;
+          filename?: string;
+          hash?: string;
+          id?: string;
+          kind?: Database["public"]["Enums"]["signature_artifact_kind"];
+          signature_request_id?: string;
+          storage_path?: string;
+          tenant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "signature_artifacts_request_fk";
+            columns: ["signature_request_id"];
+            isOneToOne: false;
+            referencedRelation: "signature_requests";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "signature_artifacts_tenant_fk";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      signature_requests: {
+        Row: {
+          contract_id: string;
+          contract_version_id: string;
+          created_at: string;
+          document_name: string;
+          id: string;
+          provider: string;
+          provider_request_id: string | null;
+          snapshot_id: string;
+          status: Database["public"]["Enums"]["signature_status"];
+          tenant_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          contract_id: string;
+          contract_version_id: string;
+          created_at?: string;
+          document_name: string;
+          id?: string;
+          provider: string;
+          provider_request_id?: string | null;
+          snapshot_id: string;
+          status?: Database["public"]["Enums"]["signature_status"];
+          tenant_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          contract_id?: string;
+          contract_version_id?: string;
+          created_at?: string;
+          document_name?: string;
+          id?: string;
+          provider?: string;
+          provider_request_id?: string | null;
+          snapshot_id?: string;
+          status?: Database["public"]["Enums"]["signature_status"];
+          tenant_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "signature_requests_contract_fk";
+            columns: ["contract_id"];
+            isOneToOne: false;
+            referencedRelation: "contracts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "signature_requests_tenant_fk";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      signature_signers: {
+        Row: {
+          created_at: string;
+          customer_id: string | null;
+          email: string;
+          id: string;
+          name: string;
+          operator_id: string | null;
+          party_type: string | null;
+          provider_external_id: string | null;
+          role: Database["public"]["Enums"]["signer_role"];
+          signature_request_id: string;
+          signed_at: string | null;
+          status: Database["public"]["Enums"]["signer_status"];
+          tenant_id: string;
+          user_id: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          customer_id?: string | null;
+          email: string;
+          id?: string;
+          name: string;
+          operator_id?: string | null;
+          party_type?: string | null;
+          provider_external_id?: string | null;
+          role: Database["public"]["Enums"]["signer_role"];
+          signature_request_id: string;
+          signed_at?: string | null;
+          status?: Database["public"]["Enums"]["signer_status"];
+          tenant_id: string;
+          user_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          customer_id?: string | null;
+          email?: string;
+          id?: string;
+          name?: string;
+          operator_id?: string | null;
+          party_type?: string | null;
+          provider_external_id?: string | null;
+          role?: Database["public"]["Enums"]["signer_role"];
+          signature_request_id?: string;
+          signed_at?: string | null;
+          status?: Database["public"]["Enums"]["signer_status"];
+          tenant_id?: string;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "signature_signers_request_fk";
+            columns: ["signature_request_id"];
+            isOneToOne: false;
+            referencedRelation: "signature_requests";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "signature_signers_tenant_fk";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      signature_webhook_events: {
+        Row: {
+          created_at: string;
+          event_type: string;
+          id: string;
+          payload: Json;
+          processed_at: string | null;
+          provider: string;
+          provider_event_id: string;
+          signature_request_id: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          event_type: string;
+          id?: string;
+          payload?: Json;
+          processed_at?: string | null;
+          provider: string;
+          provider_event_id: string;
+          signature_request_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          event_type?: string;
+          id?: string;
+          payload?: Json;
+          processed_at?: string | null;
+          provider?: string;
+          provider_event_id?: string;
+          signature_request_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "signature_webhook_events_request_fk";
+            columns: ["signature_request_id"];
+            isOneToOne: false;
+            referencedRelation: "signature_requests";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       studio_drafts: {
         Row: {
           config: Json;
@@ -9037,6 +9252,23 @@ export type Database = {
       resource_status: "available" | "busy" | "offline" | "suspended";
       resource_type: "human" | "vehicle" | "equipment" | "virtual";
       rule_set_status: "draft" | "active" | "inactive";
+      signature_artifact_kind: "original" | "signed" | "evidence" | "certificate";
+      signature_status:
+        | "draft"
+        | "sent"
+        | "in_progress"
+        | "signed"
+        | "cancelled"
+        | "expired"
+        | "failed";
+      signer_role:
+        | "customer"
+        | "operator"
+        | "guarantor"
+        | "witness"
+        | "tenant_representative"
+        | "other";
+      signer_status: "pending" | "viewed" | "signed" | "refused";
       subscription_product: "platform" | "mkt";
       tenant_plan: "starter" | "professional" | "enterprise";
       tenant_status: "trialing" | "active" | "suspended" | "cancelled" | "pending_payment";
@@ -9448,6 +9680,25 @@ export const Constants = {
       resource_status: ["available", "busy", "offline", "suspended"],
       resource_type: ["human", "vehicle", "equipment", "virtual"],
       rule_set_status: ["draft", "active", "inactive"],
+      signature_artifact_kind: ["original", "signed", "evidence", "certificate"],
+      signature_status: [
+        "draft",
+        "sent",
+        "in_progress",
+        "signed",
+        "cancelled",
+        "expired",
+        "failed",
+      ],
+      signer_role: [
+        "customer",
+        "operator",
+        "guarantor",
+        "witness",
+        "tenant_representative",
+        "other",
+      ],
+      signer_status: ["pending", "viewed", "signed", "refused"],
       subscription_product: ["platform", "mkt"],
       tenant_plan: ["starter", "professional", "enterprise"],
       tenant_status: ["trialing", "active", "suspended", "cancelled", "pending_payment"],
