@@ -132,7 +132,12 @@ export class ClicksignProvider implements SignatureProvider {
           type: "documents",
           attributes: {
             filename: input.documentName,
-            content_base64: Buffer.from(input.documentContent).toString("base64"),
+            // The doc text says "raw base64, no data URI prefix" — the
+            // real sandbox API disagrees and 400s without a full Data URI
+            // ("Formatação do campo inválida. O valor deve ser um Data URI
+            // completo."), confirmed live while building this adapter.
+            // Trusting the live response over the doc text here.
+            content_base64: `data:${input.documentContentType};base64,${Buffer.from(input.documentContent).toString("base64")}`,
           },
         },
       },
@@ -250,9 +255,22 @@ export class ClicksignProvider implements SignatureProvider {
   }
 
   async cancelRequest(providerRequestId: string): Promise<void> {
-    await this.request("PATCH", `/envelopes/${providerRequestId}`, {
-      data: { id: providerRequestId, type: "envelopes", attributes: { status: "canceled" } },
-    });
+    // NOT what the docs imply: PATCHing the ENVELOPE's own status to
+    // "canceled" is rejected live ("status deve estar em: draft, running")
+    // — envelopes only accept draft/running via this endpoint. Cancellation
+    // actually happens at the DOCUMENT level (confirmed live + in
+    // developers.clicksign.com/reference/editar-documento): PATCH each
+    // document's status to "canceled". P1 always has exactly one document
+    // per envelope, so this cancels the whole thing in practice.
+    const documents = await this.request<JsonApiCollection<DocumentAttributes>>(
+      "GET",
+      `/envelopes/${providerRequestId}/documents`,
+    );
+    for (const doc of documents.data) {
+      await this.request("PATCH", `/envelopes/${providerRequestId}/documents/${doc.id}`, {
+        data: { id: doc.id, type: "documents", attributes: { status: "canceled" } },
+      });
+    }
   }
 
   async getSignedArtifacts(providerRequestId: string): Promise<ProviderArtifact[]> {

@@ -10,10 +10,37 @@ autorizada — nunca um flip de configuração.
 
 Este documento separa o que foi **confirmado na documentação oficial**
 (`developers.clicksign.com`, consultada ao vivo durante a construção deste
-adapter) do que **ainda precisa ser confirmado contra uma chamada real ao
-sandbox** antes de confiar cegamente. Nenhum comportamento abaixo foi
-inventado — onde a doc não deu resposta completa, o código
-(`clicksign-status-mapper.ts`) falha alto (`throw`) em vez de adivinhar.
+adapter) do que **foi confirmado ao vivo contra o sandbox real** (2026-09-03,
+com a conta do usuário) e do que **ainda não foi exercitado**. Nenhum
+comportamento abaixo foi inventado — onde nada disso deu resposta completa,
+o código (`clicksign-status-mapper.ts`) falha alto (`throw`) em vez de
+adivinhar.
+
+## Confirmado ao vivo contra o sandbox real (2026-09-03)
+
+Um teste E2E completo (`clicksign.e2e.test.ts`) rodou de ponta a ponta
+contra a conta sandbox real do usuário — `createRequest` → `getRequest`
+(`running`) → `cancelRequest` → `getRequest` (`cancelled`) — e revelou 3
+pontos onde o texto da doc oficial diverge do comportamento real da API:
+
+1. **`content_base64` precisa de um Data URI completo**
+   (`data:<content-type>;base64,<...>`), não base64 cru como o texto da doc
+   de upload de documento afirma — a API rejeita base64 cru com 400
+   ("Formatação do campo inválida. O valor deve ser um Data URI completo.").
+2. **Cancelar um envelope `running` não é `PATCH /envelopes/{id}
+{status:"canceled"}`** — esse endpoint só aceita `draft`/`running` como
+   valores de destino (`400: "status deve estar em: draft, running"`).
+   Cancelamento acontece no nível do DOCUMENTO: `PATCH
+/envelopes/{id}/documents/{document_id} {status:"canceled"}` (confirmado
+   também em `developers.clicksign.com/reference/editar-documento`) — como
+   o P1 sempre tem exatamente um documento por envelope, cancelar o único
+   documento cancela o envelope inteiro na prática (`getRequest()` depois
+   confirma `status: cancelled`).
+3. **O campo `name` de um signatário tem validação de formato** — um nome
+   como `"Shinã E2E Test Signer"` foi rejeitado (`400: "name não está em um
+formato válido"`); um nome completo plausível sem dígitos/abreviações
+   funcionou. A regra exata não foi isolada (não vale a pena adivinhar o
+   regex), só documentado que existe.
 
 ## Confirmado na documentação oficial
 
@@ -23,7 +50,8 @@ inventado — onde a doc não deu resposta completa, o código
 - Ciclo de vida do Envelope: só 4 status — `draft`, `running`, `closed`,
   `canceled` (grafia americana, sem "l" duplo).
 - Sequência de criação: `POST /envelopes` (draft) → `POST
-/envelopes/{id}/documents` (`filename` + `content_base64` cru) → `POST
+/envelopes/{id}/documents` (`filename` + `content_base64` — ver correção
+  #1 abaixo, o texto da doc está errado nesse campo) → `POST
 /envelopes/{id}/signers` (`name`, `email`, `communicate_events`) → `POST
 /envelopes/{id}/requirements` (duas por par signatário/documento: uma de
   qualificação `{action:"agree", role:"sign"}` — é isso que obriga o
@@ -37,11 +65,14 @@ inventado — onde a doc não deu resposta completa, o código
   (todos os requirements de um documento cumpridos) e `close` (documento
   fechado manualmente).
 
-## Pontos a confirmar ao vivo (`TO_BE_CONFIRMED`)
+## Pontos ainda não exercitados (`TO_BE_CONFIRMED`)
 
 Nenhum destes foi inventado — cada um está isolado no código com um
 comentário explícito apontando pra este documento, e falha alto em vez de
-assumir um valor.
+assumir um valor. Diferente da seção anterior, estes não foram exercitados
+nem uma vez contra o sandbox real ainda (o E2E de 2026-09-03 cobriu
+`createRequest`/`getRequest`/`cancelRequest`, não o webhook nem
+`getSigningSession`/`getSignedArtifacts`).
 
 - **Header e algoritmo exatos do HMAC do webhook.** O adapter implementa
   `x-clicksign-signature` + HMAC-SHA256 sobre o corpo bruto, mas essa
@@ -99,10 +130,11 @@ CLICKSIGN_API_KEY=<...> pnpm --filter @shina/signature-platform test
 ```
 
 Sem a variável, `clicksign.e2e.test.ts` é pulado automaticamente — `pnpm
-test` continua limpo pra quem não tem credenciais. O E2E cobre só o que dá
-pra testar sem um humano clicando num link de assinatura ou um webhook
-publicamente alcançável: criar envelope, confirmar `running`, cancelar,
-confirmar `canceled`. O caminho completo assinatura → webhook →
-`getSignedArtifacts()` precisa de um ambiente publicamente alcançável
-(deploy real ou túnel) — não foi (e não pode ser, honestamente) testado
-contra `localhost`.
+test` continua limpo pra quem não tem credenciais. Rodado com sucesso em
+2026-09-03 contra a conta sandbox real do usuário (14/14 testes,
+incluindo o E2E). Cobre só o que dá pra testar sem um humano clicando num
+link de assinatura ou um webhook publicamente alcançável: criar envelope,
+confirmar `running`, cancelar, confirmar `cancelled`. O caminho completo
+assinatura → webhook → `getSignedArtifacts()` precisa de um ambiente
+publicamente alcançável (deploy real ou túnel) — não foi (e não pode ser,
+honestamente) testado contra `localhost`.

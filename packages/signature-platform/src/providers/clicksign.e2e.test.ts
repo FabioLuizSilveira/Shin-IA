@@ -39,7 +39,12 @@ describeIfConfigured("ClicksignProvider — live sandbox E2E", () => {
       signers: [
         {
           role: "customer",
-          name: "Shinã E2E Test Signer",
+          // Clicksign rejects "Shinã E2E Test Signer" with a 400 ("name
+          // não está em um formato válido") — confirmed live; its name
+          // validation apparently rejects digits/abbreviations. A
+          // plausible full name avoids that without guessing the exact
+          // regex.
+          name: "Maria Da Silva Teste",
           email: "e2e-test@shina.local",
           partyType: "customer",
           userId: "e2e-user",
