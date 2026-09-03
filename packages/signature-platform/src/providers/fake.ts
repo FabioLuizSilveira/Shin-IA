@@ -88,18 +88,27 @@ export class FakeSignatureProvider implements SignatureProvider {
     ];
   }
 
-  // Accepts a fake-but-real JSON payload shaped like { type, requestId,
-  // signerExternalId? } — exercised by the substitutability test as an
-  // actual webhook body, not bypassed. A real adapter's normalizeWebhook
-  // would additionally verify a signature/token here (spec section 24);
-  // the fake provider has no such secret to check.
-  async normalizeWebhook(rawPayload: unknown): Promise<CanonicalSignatureEvent[]> {
-    const payload = rawPayload as {
+  // Accepts a fake-but-real JSON webhook body shaped like { type,
+  // requestId, signerExternalId? } — exercised by the substitutability
+  // test as an actual webhook delivery, not bypassed. Takes rawBody +
+  // headers like a real adapter would (P1's ClicksignProvider verifies an
+  // HMAC header here); the fake provider has no secret to check, so it
+  // just parses the body.
+  async normalizeWebhook(
+    rawBody: string,
+    _headers: Record<string, string | null>,
+  ): Promise<CanonicalSignatureEvent[]> {
+    let payload: {
       type?: string;
       eventId?: string;
       requestId?: string;
       signerExternalId?: string;
     };
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      throw new Error("fake provider: malformed webhook payload");
+    }
     if (!payload.type || !payload.requestId) {
       throw new Error("fake provider: malformed webhook payload");
     }

@@ -28,6 +28,7 @@
     "@shina/maintenance-engine": "workspace:*",
     "@shina/landing": "workspace:*",
     "@shina/reporting-engine": "workspace:*",
+    "@shina/signature-platform": "workspace:*",
     "@shina/studio": "workspace:*",
     "@shina/tenant-contract-engine": "workspace:*",
     "@shina/theme": "workspace:*",

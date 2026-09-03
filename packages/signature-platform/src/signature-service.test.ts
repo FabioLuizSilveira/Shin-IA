@@ -134,7 +134,8 @@ function baseInput(overrides?: Partial<CreateSignatureRequestInput>): CreateSign
     contractId: "contract-1",
     contractVersionId: "version-1",
     snapshotId: "snapshot-1",
-    documentContent: "conteúdo do contrato congelado",
+    documentContent: new TextEncoder().encode("conteúdo do contrato congelado"),
+    documentContentType: "application/pdf",
     documentName: "Contrato de Locação.pdf",
     signers: [
       {
@@ -204,11 +205,14 @@ describe("applySignatureEvent", () => {
     const provider = new FakeSignatureProvider("fake");
     const created = await createAndSend(db, provider);
 
-    const [signedEvent] = await provider.normalizeWebhook({
-      type: "signature_completed",
-      eventId: "evt-completed-1",
-      requestId: created.providerRequestId,
-    });
+    const [signedEvent] = await provider.normalizeWebhook(
+      JSON.stringify({
+        type: "signature_completed",
+        eventId: "evt-completed-1",
+        requestId: created.providerRequestId,
+      }),
+      {},
+    );
 
     const first = await applySignatureEvent(db as unknown as SupabaseClient, provider, signedEvent);
     const replay = await applySignatureEvent(
@@ -227,10 +231,10 @@ describe("applySignatureEvent", () => {
     const provider = new FakeSignatureProvider("fake");
     const created = await createAndSend(db, provider);
 
-    const [signedEvent] = await provider.normalizeWebhook({
-      type: "signature_completed",
-      requestId: created.providerRequestId,
-    });
+    const [signedEvent] = await provider.normalizeWebhook(
+      JSON.stringify({ type: "signature_completed", requestId: created.providerRequestId }),
+      {},
+    );
     await applySignatureEvent(db as unknown as SupabaseClient, provider, signedEvent);
 
     expect(db.tables["signature_requests"][0].status).toBe("signed");
@@ -288,14 +292,14 @@ describe("provider substitutability", () => {
     expect(requestA.provider).toBe("fake");
     expect(requestB.provider).toBe("fake_alt");
 
-    const [eventA] = await providerA.normalizeWebhook({
-      type: "signature_completed",
-      requestId: requestA.providerRequestId,
-    });
-    const [eventB] = await providerB.normalizeWebhook({
-      type: "signature_completed",
-      requestId: requestB.providerRequestId,
-    });
+    const [eventA] = await providerA.normalizeWebhook(
+      JSON.stringify({ type: "signature_completed", requestId: requestA.providerRequestId }),
+      {},
+    );
+    const [eventB] = await providerB.normalizeWebhook(
+      JSON.stringify({ type: "signature_completed", requestId: requestB.providerRequestId }),
+      {},
+    );
 
     await applySignatureEvent(db as unknown as SupabaseClient, providerA, eventA);
     await applySignatureEvent(db as unknown as SupabaseClient, providerB, eventB);

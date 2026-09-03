@@ -91,10 +91,12 @@ export interface CreateSignatureRequestInput {
    * same discipline as recordContractAcceptance(). */
   contractVersionId: string;
   snapshotId: string;
-  /** The immutable rendered contract content this signature request is
-   * for — read once, at request-creation time, from the already-frozen
-   * tenant_contract_snapshots row (never live/re-rendered data). */
-  documentContent: string;
+  /** The immutable rendered document (PDF bytes) this signature request is
+   * for — rendered once, at request-creation time, from the already-frozen
+   * tenant_contract_snapshots row (never live/re-rendered data). A file, not
+   * semantic text — the provider needs real bytes to upload. */
+  documentContent: Uint8Array;
+  documentContentType: string;
   documentName: string;
   signers: CreateSignatureRequestSigner[];
 }
@@ -172,11 +174,18 @@ export interface SignatureProvider {
   ): Promise<ProviderSigningSession>;
   cancelRequest(providerRequestId: string): Promise<void>;
   getSignedArtifacts(providerRequestId: string): Promise<ProviderArtifact[]>;
-  /** Verifies + translates a raw provider webhook payload into zero or
-   * more canonical events. Authenticity checking (signature/token/IP
-   * allowlist per the provider's own real docs) happens here, inside the
-   * adapter — never assumed by the caller. */
-  normalizeWebhook(rawPayload: unknown): Promise<CanonicalSignatureEvent[]>;
+  /** Verifies + translates a raw provider webhook delivery into zero or
+   * more canonical events. Takes the RAW body text (never pre-parsed) plus
+   * the request's headers — a P1 correction from P0's original
+   * `normalizeWebhook(rawPayload: unknown)`: a real provider (Clicksign)
+   * authenticates webhooks via HMAC over the exact raw bytes, which is
+   * impossible to verify once the body has already been JSON.parse()'d.
+   * The provider parses the body itself, AFTER verifying authenticity —
+   * never assumed by the caller. */
+  normalizeWebhook(
+    rawBody: string,
+    headers: Record<string, string | null>,
+  ): Promise<CanonicalSignatureEvent[]>;
 }
 
 export interface ApplySignatureEventResult {
