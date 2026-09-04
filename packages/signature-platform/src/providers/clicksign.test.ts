@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { mapEnvelopeStatus, mapWebhookEventType } from "./clicksign-status-mapper.js";
 import { ClicksignProvider } from "./clicksign.js";
@@ -39,10 +39,11 @@ describe("ClicksignProvider.normalizeWebhook", () => {
   const secret = "test-webhook-secret";
   const provider = new ClicksignProvider({ apiKey: "unused-in-this-test", webhookSecret: secret });
 
+  // sha256/hex is one of the candidate encodings normalizeWebhook() tries
+  // — any candidate matching is sufficient for verification to succeed,
+  // so signing with this one exercises the real accept path.
   function sign(rawBody: string): string {
-    return createHash("sha256")
-      .update(secret + rawBody)
-      .digest("hex");
+    return createHmac("sha256", secret).update(rawBody).digest("hex");
   }
 
   it("accepts a correctly-signed document_closed payload and produces a canonical event", async () => {
@@ -51,7 +52,7 @@ describe("ClicksignProvider.normalizeWebhook", () => {
       envelope: { id: "env_123" },
     });
     const events = await provider.normalizeWebhook(rawBody, {
-      "x-clicksign-signature": sign(rawBody),
+      "content-hmac": sign(rawBody),
     });
 
     expect(events).toHaveLength(1);
@@ -62,9 +63,7 @@ describe("ClicksignProvider.normalizeWebhook", () => {
 
   it("rejects a payload with a missing signature header", async () => {
     const rawBody = JSON.stringify({ event: { name: "close" }, envelope: { id: "env_123" } });
-    await expect(provider.normalizeWebhook(rawBody, {})).rejects.toThrow(
-      /missing x-clicksign-signature/,
-    );
+    await expect(provider.normalizeWebhook(rawBody, {})).rejects.toThrow(/missing content-hmac/);
   });
 
   it("rejects a payload with a tampered body (signature no longer matches)", async () => {
@@ -73,7 +72,7 @@ describe("ClicksignProvider.normalizeWebhook", () => {
     const tampered = JSON.stringify({ event: { name: "close" }, envelope: { id: "env_999" } });
 
     await expect(
-      provider.normalizeWebhook(tampered, { "x-clicksign-signature": signature }),
+      provider.normalizeWebhook(tampered, { "content-hmac": signature }),
     ).rejects.toThrow(/signature verification failed/);
   });
 });

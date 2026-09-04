@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { mapEnvelopeStatus, mapWebhookEventType } from "./clicksign-status-mapper.js";
 import type {
   CanonicalSignatureEvent,
@@ -328,27 +328,38 @@ export class ClicksignProvider implements SignatureProvider {
     rawBody: string,
     headers: Record<string, string | null>,
   ): Promise<CanonicalSignatureEvent[]> {
-    // HMAC verification — x-clicksign-signature / HMAC-SHA256 over the raw
-    // body is what secondary sources describe; this adapter's own build
-    // notes (docs/integrations/CLICKSIGN.md) flag this as unconfirmed
-    // against Clicksign's own primary docs and require live confirmation
-    // against a real registered sandbox webhook before this is trusted in
-    // anger. Implemented for real here, not stubbed, so that confirmation
-    // pass only has to fix a header name / hash comparison, not build the
-    // mechanism from scratch.
-    const signatureHeader = headers["x-clicksign-signature"] ?? headers["X-Clicksign-Signature"];
+    // HMAC verification — confirmed live 2026-09-04 (a real production
+    // delivery's header list): the real header is `content-hmac`, NOT
+    // x-clicksign-signature (that name came from secondary sources and
+    // never actually arrived on a real delivery — always flagged as
+    // unconfirmed in docs/integrations/CLICKSIGN.md, now corrected).
+    const signatureHeader = headers["content-hmac"] ?? headers["Content-HMAC"];
     if (!signatureHeader) {
-      throw new Error("ClicksignProvider: webhook missing x-clicksign-signature header");
+      throw new Error("ClicksignProvider: webhook missing content-hmac header");
     }
-    const expected = createHash("sha256")
-      .update(this.webhookSecret + rawBody)
-      .digest("hex");
-    // Constant-time comparison — never a plain `===` against attacker-
-    // influenced input.
-    const a = Buffer.from(signatureHeader);
-    const b = Buffer.from(expected);
-    const authentic = a.length === b.length && timingSafeEqual(a, b);
-    if (!authentic) {
+
+    // DIAGNOSTIC (temporary, 2026-09-04): exact algorithm/encoding for
+    // content-hmac isn't confirmed yet either — try the plausible HMAC
+    // candidates and log ONLY which ones matched (never the header value
+    // or any computed digest — those aren't safe to put in logs). Once a
+    // real delivery confirms one, this narrows to a single, permanent
+    // comparison and the console.log below comes out.
+    const candidates: [string, string, "hex" | "base64"][] = [
+      ["sha256", "hex", "hex"],
+      ["sha256", "base64", "base64"],
+      ["sha1", "hex", "hex"],
+      ["sha1", "base64", "base64"],
+    ].map(([algo, label, enc]) => [algo, label, enc as "hex" | "base64"]);
+    const matches: string[] = [];
+    for (const [algo, label, encoding] of candidates) {
+      const digest = createHmac(algo, this.webhookSecret).update(rawBody).digest(encoding);
+      const a = Buffer.from(signatureHeader);
+      const b = Buffer.from(digest);
+      if (a.length === b.length && timingSafeEqual(a, b)) matches.push(`hmac-${label}`);
+    }
+    console.log("[ClicksignProvider] content-hmac candidate matches:", matches.join(",") || "none");
+
+    if (matches.length === 0) {
       throw new Error("ClicksignProvider: webhook signature verification failed");
     }
 
