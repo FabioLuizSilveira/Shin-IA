@@ -40,10 +40,6 @@ interface EnvelopeAttributes {
 interface DocumentAttributes {
   filename?: string;
   status?: string;
-  // Field name for the signed-file download link is one of this adapter's
-  // documented "confirm against a live sandbox" gaps — see
-  // docs/integrations/CLICKSIGN.md. Kept as an open index signature rather
-  // than a guessed field name.
   [key: string]: unknown;
 }
 
@@ -57,6 +53,11 @@ interface JsonApiResource<A> {
   id: string;
   type: string;
   attributes: A;
+  // The signed-file download link lives here, not under attributes —
+  // confirmed live 2026-09-04: GET .../documents returns
+  // `links.files.signed` (a presigned, time-limited S3 URL), alongside
+  // `links.files.original`/`links.files.ziped`.
+  links?: { files?: { original?: string; signed?: string; ziped?: string } };
 }
 
 interface JsonApiSingle<A> {
@@ -216,6 +217,11 @@ export class ClicksignProvider implements SignatureProvider {
 
     return {
       providerRequestId: envelopeId,
+      // Confirmed live 2026-09-04: Clicksign's document_closed/close
+      // webhooks carry the DOCUMENT's id (this one), not the envelope id
+      // above — applySignatureEvent() needs this to actually find the
+      // request a real webhook is about.
+      providerSecondaryId: documentId,
       // signingUrl intentionally left null in P1 — Clicksign emails each
       // signer its own signing link directly (communicate_events above),
       // which is what spec section 35 asks for (Shinã must avoid sending
@@ -292,11 +298,9 @@ export class ClicksignProvider implements SignatureProvider {
     const doc = documents.data[0];
     if (!doc) throw new Error(`ClicksignProvider: envelope ${providerRequestId} has no documents`);
 
-    // The exact field carrying the signed-file download URL is another
-    // documented "confirm against a live sandbox" gap — thrown loudly
-    // rather than guessed, per this adapter's whole-file policy.
-    const downloadUrl = doc.attributes["downloads"] as { signed_file_url?: string } | undefined;
-    const url = downloadUrl?.signed_file_url;
+    // Confirmed live 2026-09-04: the real field is links.files.signed (a
+    // presigned S3 URL, not under attributes as originally guessed).
+    const url = doc.links?.files?.signed;
     if (!url) {
       throw new Error(
         "ClicksignProvider.getSignedArtifacts: no signed-file download URL found on the document response — confirm the real field name against a live sandbox call before relying on this method",

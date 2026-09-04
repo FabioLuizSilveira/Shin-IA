@@ -113,7 +113,11 @@ export async function createSignatureRequest(
 
   const { error: updateError } = await db
     .from("signature_requests")
-    .update({ provider_request_id: created.providerRequestId, status: "sent" })
+    .update({
+      provider_request_id: created.providerRequestId,
+      provider_document_id: created.providerSecondaryId ?? null,
+      status: "sent",
+    })
     .eq("id", signatureRequestId);
   if (updateError) throw new Error(`signature request update failed: ${updateError.message}`);
 
@@ -159,11 +163,20 @@ export async function applySignatureEvent(
     throw new Error(`signature event log failed: ${logError.message}`);
   }
 
+  // Matches on EITHER identifier — a provider's webhook may key its events
+  // off the root request id or a secondary sub-resource id (confirmed
+  // necessary live 2026-09-04: Clicksign's own webhooks carry the
+  // document id, not the envelope id createRequest() returns as
+  // providerRequestId — see ProviderCreateRequestResult.providerSecondaryId).
   const { data: request, error: requestError } = await db
     .from("signature_requests")
-    .select("id, tenant_id, contract_id, contract_version_id, snapshot_id, created_by")
+    .select(
+      "id, tenant_id, contract_id, contract_version_id, snapshot_id, created_by, provider_request_id",
+    )
     .eq("provider", event.provider)
-    .eq("provider_request_id", event.providerRequestId)
+    .or(
+      `provider_request_id.eq.${event.providerRequestId},provider_document_id.eq.${event.providerRequestId}`,
+    )
     .maybeSingle();
   if (requestError) throw new Error(`signature request lookup failed: ${requestError.message}`);
   if (!request) {
@@ -215,7 +228,12 @@ export async function applySignatureEvent(
     }
 
     case "signature_completed": {
-      const artifacts = await provider.getSignedArtifacts(event.providerRequestId);
+      // request.provider_request_id (the DB row's own root id), never
+      // event.providerRequestId — the webhook's own event may be keyed by
+      // a secondary sub-resource id (see the lookup above) that a real
+      // provider's getSignedArtifacts() wouldn't recognize as its root
+      // request id.
+      const artifacts = await provider.getSignedArtifacts(request.provider_request_id);
       let signedHash: string | null = null;
       for (const artifact of artifacts) {
         const path = artifactStoragePath(request.tenant_id, signatureRequestId, artifact.filename);

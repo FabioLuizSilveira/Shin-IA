@@ -70,6 +70,28 @@ sha256=<hex>` — HMAC-SHA256(key=secret, message=corpo bruto). Esse
    (tamanhos diferentes). A doc também confirma "não formate o JSON antes
    do cálculo" — por isso o corpo é lido como texto bruto, nunca
    `JSON.parse()`'d antes da verificação.
+6. **O payload do webhook (`document_closed`/`close`) carrega o id do
+   DOCUMENTO, não o id do envelope.** Confirmado ao vivo 2026-09-04: depois
+   da correção #5, o primeiro webhook aceito com sucesso (200) ainda não
+   batia com nenhuma `signature_requests` — `event.providerRequestId`
+   extraído do payload era um UUID diferente do envelope. Bati esse UUID
+   contra `GET /envelopes/{id}/documents` e confirmei: é o id do
+   **documento**, não do envelope. Corrigido assim: `createRequest()` agora
+   retorna também `providerSecondaryId` (o id do documento), gravado numa
+   coluna nova `signature_requests.provider_document_id`;
+   `applySignatureEvent()` busca a linha por `provider_request_id` OU
+   `provider_document_id`. Também corrigi um bug relacionado que só
+   apareceria no P2 (nunca exercitado antes por falta de webhook real
+   funcionando): `getSignedArtifacts()` estava sendo chamado com
+   `event.providerRequestId` (o id do documento, errado) em vez do
+   `provider_request_id` real da linha (o id do envelope, o que o método
+   realmente precisa).
+7. **O campo de download do arquivo assinado é `links.files.signed`, não
+   `attributes.downloads.signed_file_url`** (o nome antigo era um chute
+   documentado como não confirmado). Confirmado no mesmo `GET
+/envelopes/{id}/documents` do achado #6 — a resposta real tem
+   `data.links.files.{original,signed,ziped}`, URLs pré-assinadas do S3 da
+   Clicksign com expiração curta.
 
 ## Confirmado na documentação oficial
 
@@ -108,8 +130,6 @@ nem uma vez contra o sandbox real ainda (o E2E de 2026-09-03 cobriu
   que não é exercitado pelo fluxo do P1 (a Clicksign manda o link
   diretamente por e-mail; esse método existe pra uma futura UI com
   assinatura embutida).
-- **Campo de download do arquivo assinado** em `GET
-/envelopes/{id}/documents` — usado por `getSignedArtifacts()`.
 - **Vocabulário completo de eventos de webhook** além de
   `document_closed`/`close` — recusa, cancelamento, expiração de prazo são
   prováveis mas não confirmados.

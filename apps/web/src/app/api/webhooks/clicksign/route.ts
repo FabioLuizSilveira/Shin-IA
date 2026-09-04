@@ -43,20 +43,7 @@ export async function POST(request: Request) {
 
   try {
     for (const event of events) {
-      // TEMP diagnostic (2026-09-04): a real 200 delivery landed but no
-      // signature_requests row changed status — logging the non-sensitive
-      // event shape (kind + provider request id, never any header/body
-      // content) to find out why the lookup in applySignatureEvent() came
-      // up empty. Comes back out once explained.
-      console.log(
-        "[clicksign webhook] event received:",
-        JSON.stringify({ kind: event.kind, providerRequestId: event.providerRequestId }),
-      );
       const result = await applySignatureEvent(admin, provider, event);
-      console.log(
-        "[clicksign webhook] apply result:",
-        JSON.stringify({ handled: result.handled, duplicate: result.duplicate }),
-      );
 
       // Side effects only for events this run actually applied (not
       // duplicates/unhandled) and that resolved to a real tenant/contract

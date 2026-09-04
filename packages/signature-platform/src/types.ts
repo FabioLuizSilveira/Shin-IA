@@ -125,6 +125,15 @@ export interface ProviderSigner {
 
 export interface ProviderCreateRequestResult {
   providerRequestId: string;
+  /** A second, optional identifier for whatever sub-resource the
+   * provider's webhook deliveries actually key their events off of, when
+   * that differs from providerRequestId — confirmed necessary live
+   * 2026-09-04: Clicksign's own document_closed/close webhook payloads
+   * carry the DOCUMENT's id, not the envelope id createRequest() returns
+   * as providerRequestId. applySignatureEvent() matches on either. Kept
+   * generic (not "documentId") so a future provider with a different
+   * sub-resource concept can populate the same field. */
+  providerSecondaryId?: string | null;
   signers: ProviderSigner[];
 }
 

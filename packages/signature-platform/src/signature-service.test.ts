@@ -17,7 +17,10 @@ interface Row {
 class FakeQuery {
   private op: "select" | "insert" | "update" = "select";
   private row: Row | Row[] = {};
-  private filters: Array<{ kind: "eq" | "in"; col: string; val: unknown }> = [];
+  private filters: Array<
+    | { kind: "eq" | "in"; col: string; val: unknown }
+    | { kind: "or"; clauses: { col: string; val: unknown }[] }
+  > = [];
   private wantSingle = false;
   private wantMaybe = false;
 
@@ -47,6 +50,16 @@ class FakeQuery {
     this.filters.push({ kind: "in", col, val: vals });
     return this;
   }
+  // Minimal parser for Supabase's `"col.eq.val,col2.eq.val2"` or-string
+  // format — only what applySignatureEvent's dual-identifier lookup uses.
+  or(clauseString: string) {
+    const clauses = clauseString.split(",").map((part) => {
+      const [col, , ...rest] = part.split(".");
+      return { col, val: rest.join(".") };
+    });
+    this.filters.push({ kind: "or", clauses });
+    return this;
+  }
   single() {
     this.wantSingle = true;
     return this;
@@ -57,9 +70,16 @@ class FakeQuery {
   }
 
   private matches(row: Row): boolean {
-    return this.filters.every((f) =>
-      f.kind === "eq" ? row[f.col] === f.val : (f.val as unknown[]).includes(row[f.col]),
-    );
+    return this.filters.every((f) => {
+      switch (f.kind) {
+        case "eq":
+          return row[f.col] === f.val;
+        case "in":
+          return (f.val as unknown[]).includes(row[f.col]);
+        case "or":
+          return f.clauses.some((c) => row[c.col] === c.val);
+      }
+    });
   }
 
   private execute(): {
@@ -241,6 +261,37 @@ describe("applySignatureEvent", () => {
     expect(db.tables["tenant_contract_acceptances"]).toHaveLength(2);
     const methods = db.tables["tenant_contract_acceptances"].map((r) => r.acceptance_method);
     expect(methods.every((m) => m === "electronic_signature_provider")).toBe(true);
+  });
+
+  it("matches a webhook event keyed by provider_document_id, not just provider_request_id", async () => {
+    // Regression test for a real production bug (2026-09-04): Clicksign's
+    // document_closed/close webhooks carry the DOCUMENT id, not the
+    // envelope id stored as provider_request_id — the lookup has to match
+    // on either. Simulates that by giving the row a second id directly
+    // (FakeSignatureProvider itself never produces one) and firing an
+    // event whose providerRequestId is that secondary id, not the primary.
+    const db = new FakeDb();
+    const provider = new FakeSignatureProvider("fake");
+    const created = await createAndSend(db, provider);
+    db.tables["signature_requests"][0].provider_document_id = "secondary-id-123";
+
+    // FakeSignatureProvider's own in-memory request lookup is keyed by its
+    // own providerRequestId — normalizeWebhook() with a synthetic
+    // secondary id it never created would just throw "unknown request".
+    // Constructing the canonical event directly here instead is fine:
+    // this test is specifically about applySignatureEvent()'s lookup, not
+    // about normalizeWebhook() (already covered by other tests).
+    const [signedEvent] = await provider.normalizeWebhook(
+      JSON.stringify({ type: "signature_completed", requestId: created.providerRequestId }),
+      {},
+    );
+    const result = await applySignatureEvent(db as unknown as SupabaseClient, provider, {
+      ...signedEvent,
+      providerRequestId: "secondary-id-123",
+    });
+
+    expect(result.handled).toBe(true);
+    expect(db.tables["signature_requests"][0].status).toBe("signed");
   });
 
   it("surfaces tenantId/contractId/actorId so callers can fire their own app-level side effects", async () => {
