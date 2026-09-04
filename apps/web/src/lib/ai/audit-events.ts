@@ -8,6 +8,10 @@ export const AI_AGENT_EVENTS = {
   TOOL_EXECUTED: "AI_AGENT_TOOL_EXECUTED",
   TOOL_DENIED: "AI_AGENT_TOOL_DENIED",
   TOOL_FAILED: "AI_AGENT_TOOL_FAILED",
+  // Wave 2 — voice transcription (never the transcript text itself in
+  // metadata, only duration/size; the transcript is logged once, for
+  // real, as AI_AGENT_REQUEST when it's actually submitted to the agent).
+  VOICE_TRANSCRIBED: "AI_VOICE_TRANSCRIBED",
 } as const;
 
 export const AI_CREDIT_EVENTS = {

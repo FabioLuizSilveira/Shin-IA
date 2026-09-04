@@ -10,7 +10,10 @@ export type DeepLinkTarget =
   | { type: "document"; contractId: string; id: string }
   | { type: "tracking_alert"; resourceId: string }
   | { type: "invoice"; id: string }
-  | { type: "notification_center" };
+  | { type: "notification_center" }
+  // Added for the Shinã Agent's get_deep_link tool (Wave 2) — apps/mobile
+  // already has a real AssetDetail: {assetId} route (navigation.tsx).
+  | { type: "asset"; id: string };
 
 const SCHEME = "shinacustomer://";
 
@@ -28,5 +31,7 @@ export function buildDeepLinkUrl(target: DeepLinkTarget): string {
       return `${SCHEME}invoices/${target.id}`;
     case "notification_center":
       return `${SCHEME}notifications`;
+    case "asset":
+      return `${SCHEME}assets/${target.id}`;
   }
 }

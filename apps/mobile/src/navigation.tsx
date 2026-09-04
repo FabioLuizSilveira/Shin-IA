@@ -32,6 +32,7 @@ import { useAuth } from "./lib/auth-context";
 import { usePersona } from "./lib/persona-context";
 import { theme } from "./theme";
 import { GradientButton } from "./components/ui";
+import { VoiceRecordButton } from "./components/voice-record-button";
 
 export type RootStackParamList = {
   Login: undefined;
@@ -156,125 +157,129 @@ export function RootNavigator() {
   if (status !== "ready" || !bootstrap) return <CenteredLoader />;
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {bootstrap.user.userType === "tenant_user" && (
-          <>
-            <Stack.Screen name="TenantTabs" component={TenantTabs} />
-            <Stack.Screen
-              name="Clients"
-              component={ClientsScreen}
-              options={{ headerShown: true, title: "Clientes" }}
-            />
-            <Stack.Screen
-              name="Operators"
-              component={OperatorsScreen}
-              options={{ headerShown: true, title: "Operadores" }}
-            />
-            <Stack.Screen
-              name="Contracts"
-              component={ContractsScreen}
-              options={{ headerShown: true, title: "Contratos" }}
-            />
-            <Stack.Screen
-              name="ContractDetail"
-              component={ContractDetailScreen}
-              options={{ headerShown: true, title: "Contrato" }}
-            />
-            <Stack.Screen
-              name="Notifications"
-              component={NotificationsScreen}
-              options={{ headerShown: true, title: "Notificações" }}
-            />
-            <Stack.Screen
-              name="Tracking"
-              component={TrackingScreen}
-              options={{ headerShown: true, title: "Rastreamento" }}
-            />
-            <Stack.Screen
-              name="OperationDetail"
-              component={OperationDetailScreen}
-              options={{ headerShown: true, title: "Operação" }}
-            />
-            <Stack.Screen
-              name="AssetDetail"
-              component={AssetDetailScreen}
-              options={{ headerShown: true, title: "Ativo" }}
-            />
-            <Stack.Screen
-              name="Invoices"
-              component={InvoicesScreen}
-              options={{ headerShown: true, title: "Faturas" }}
-            />
-            <Stack.Screen
-              name="Inspections"
-              component={InspectionsScreen}
-              options={{ headerShown: true, title: "Vistorias" }}
-            />
-            <Stack.Screen
-              name="InspectionCapture"
-              component={InspectionCaptureScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="Infractions"
-              component={InfractionsScreen}
-              options={{ headerShown: true, title: "Infrações" }}
-            />
-            <Stack.Screen
-              name="InfractionDetail"
-              component={InfractionDetailScreen}
-              options={{ headerShown: false }}
-            />
-          </>
-        )}
-        {bootstrap.user.userType === "operator" && (
-          <>
-            <Stack.Screen name="OperatorHome" component={OperatorHomeScreen} />
-            <Stack.Screen
-              name="Inspections"
-              component={InspectionsScreen}
-              options={{ headerShown: true, title: "Minhas Vistorias" }}
-            />
-            <Stack.Screen
-              name="InspectionCapture"
-              component={InspectionCaptureScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="Infractions"
-              component={InfractionsScreen}
-              options={{ headerShown: true, title: "Minhas Infrações" }}
-            />
-          </>
-        )}
-        {bootstrap.user.userType === "unprovisioned" && (
-          <Stack.Screen name="Unprovisioned" component={UnprovisionedScreen} />
-        )}
-        {bootstrap.user.userType === "customer" && (
-          <>
-            <Stack.Screen name="RentalsList" component={RentalsListScreen} />
-            <Stack.Screen name="RentalDetail" component={RentalDetailScreen} />
-            <Stack.Screen name="Renewal" component={RenewalScreen} />
-            <Stack.Screen name="CustomerInvoices" component={CustomerInvoicesScreen} />
-            <Stack.Screen
-              name="ContractDetail"
-              component={ContractDetailScreen}
-              options={{ headerShown: true, title: "Contrato" }}
-            />
-            <Stack.Screen
-              name="Notifications"
-              component={NotificationsScreen}
-              options={{ headerShown: true, title: "Notificações" }}
-            />
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <View style={styles.flexFill}>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {bootstrap.user.userType === "tenant_user" && (
+            <>
+              <Stack.Screen name="TenantTabs" component={TenantTabs} />
+              <Stack.Screen
+                name="Clients"
+                component={ClientsScreen}
+                options={{ headerShown: true, title: "Clientes" }}
+              />
+              <Stack.Screen
+                name="Operators"
+                component={OperatorsScreen}
+                options={{ headerShown: true, title: "Operadores" }}
+              />
+              <Stack.Screen
+                name="Contracts"
+                component={ContractsScreen}
+                options={{ headerShown: true, title: "Contratos" }}
+              />
+              <Stack.Screen
+                name="ContractDetail"
+                component={ContractDetailScreen}
+                options={{ headerShown: true, title: "Contrato" }}
+              />
+              <Stack.Screen
+                name="Notifications"
+                component={NotificationsScreen}
+                options={{ headerShown: true, title: "Notificações" }}
+              />
+              <Stack.Screen
+                name="Tracking"
+                component={TrackingScreen}
+                options={{ headerShown: true, title: "Rastreamento" }}
+              />
+              <Stack.Screen
+                name="OperationDetail"
+                component={OperationDetailScreen}
+                options={{ headerShown: true, title: "Operação" }}
+              />
+              <Stack.Screen
+                name="AssetDetail"
+                component={AssetDetailScreen}
+                options={{ headerShown: true, title: "Ativo" }}
+              />
+              <Stack.Screen
+                name="Invoices"
+                component={InvoicesScreen}
+                options={{ headerShown: true, title: "Faturas" }}
+              />
+              <Stack.Screen
+                name="Inspections"
+                component={InspectionsScreen}
+                options={{ headerShown: true, title: "Vistorias" }}
+              />
+              <Stack.Screen
+                name="InspectionCapture"
+                component={InspectionCaptureScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Infractions"
+                component={InfractionsScreen}
+                options={{ headerShown: true, title: "Infrações" }}
+              />
+              <Stack.Screen
+                name="InfractionDetail"
+                component={InfractionDetailScreen}
+                options={{ headerShown: false }}
+              />
+            </>
+          )}
+          {bootstrap.user.userType === "operator" && (
+            <>
+              <Stack.Screen name="OperatorHome" component={OperatorHomeScreen} />
+              <Stack.Screen
+                name="Inspections"
+                component={InspectionsScreen}
+                options={{ headerShown: true, title: "Minhas Vistorias" }}
+              />
+              <Stack.Screen
+                name="InspectionCapture"
+                component={InspectionCaptureScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Infractions"
+                component={InfractionsScreen}
+                options={{ headerShown: true, title: "Minhas Infrações" }}
+              />
+            </>
+          )}
+          {bootstrap.user.userType === "unprovisioned" && (
+            <Stack.Screen name="Unprovisioned" component={UnprovisionedScreen} />
+          )}
+          {bootstrap.user.userType === "customer" && (
+            <>
+              <Stack.Screen name="RentalsList" component={RentalsListScreen} />
+              <Stack.Screen name="RentalDetail" component={RentalDetailScreen} />
+              <Stack.Screen name="Renewal" component={RenewalScreen} />
+              <Stack.Screen name="CustomerInvoices" component={CustomerInvoicesScreen} />
+              <Stack.Screen
+                name="ContractDetail"
+                component={ContractDetailScreen}
+                options={{ headerShown: true, title: "Contrato" }}
+              />
+              <Stack.Screen
+                name="Notifications"
+                component={NotificationsScreen}
+                options={{ headerShown: true, title: "Notificações" }}
+              />
+            </>
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+      {bootstrap.user.userType === "tenant_user" && <VoiceRecordButton />}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  flexFill: { flex: 1 },
   center: {
     flex: 1,
     alignItems: "center",

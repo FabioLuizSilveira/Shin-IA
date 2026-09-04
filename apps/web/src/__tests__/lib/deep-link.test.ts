@@ -15,5 +15,6 @@ describe("buildDeepLinkUrl", () => {
     );
     expect(buildDeepLinkUrl({ type: "invoice", id: "i-1" })).toBe("shinacustomer://invoices/i-1");
     expect(buildDeepLinkUrl({ type: "notification_center" })).toBe("shinacustomer://notifications");
+    expect(buildDeepLinkUrl({ type: "asset", id: "a-1" })).toBe("shinacustomer://assets/a-1");
   });
 });

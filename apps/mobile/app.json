@@ -47,6 +47,13 @@
         {
           "locationWhenInUsePermission": "O Shinã usa sua localização para registrar onde a vistoria foi realizada (opcional)."
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "O Shinã usa o microfone para você falar com a Shinã por voz.",
+          "recordAudioAndroid": true
+        }
       ]
     ],
     "extra": {
