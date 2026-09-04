@@ -7681,6 +7681,7 @@ export type Database = {
           document_name: string;
           id: string;
           provider: string;
+          provider_document_id: string | null;
           provider_request_id: string | null;
           snapshot_id: string;
           status: Database["public"]["Enums"]["signature_status"];
@@ -7695,6 +7696,7 @@ export type Database = {
           document_name: string;
           id?: string;
           provider: string;
+          provider_document_id?: string | null;
           provider_request_id?: string | null;
           snapshot_id: string;
           status?: Database["public"]["Enums"]["signature_status"];
@@ -7709,6 +7711,7 @@ export type Database = {
           document_name?: string;
           id?: string;
           provider?: string;
+          provider_document_id?: string | null;
           provider_request_id?: string | null;
           snapshot_id?: string;
           status?: Database["public"]["Enums"]["signature_status"];
