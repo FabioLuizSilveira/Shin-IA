@@ -317,7 +317,14 @@ export class ClicksignProvider implements SignatureProvider {
       );
     }
 
-    const fileRes = await fetch(url, { headers: { Authorization: this.apiKey } });
+    // No Authorization header here — confirmed live 2026-09-04 (a real
+    // delivery 400'd until this was removed): this is a presigned S3 URL
+    // (X-Amz-Signature etc., visible in the query string), whose signature
+    // only covers the `host` header. Adding our own Clicksign API key as a
+    // Bearer/raw Authorization header is an extra signed-request header S3
+    // never expected, so it fails signature validation and 400s — the
+    // presigned URL itself IS the auth, nothing else should be attached.
+    const fileRes = await fetch(url);
     if (!fileRes.ok) {
       throw new Error(`ClicksignProvider: signed file download failed (${fileRes.status})`);
     }
