@@ -37,7 +37,11 @@ describe("mapWebhookEventType", () => {
 // testable without a live Clicksign account.
 describe("ClicksignProvider.normalizeWebhook", () => {
   const secret = "test-webhook-secret";
-  const provider = new ClicksignProvider({ apiKey: "unused-in-this-test", webhookSecret: secret });
+  const provider = new ClicksignProvider({
+    apiKey: "unused-in-this-test",
+    webhookSecret: secret,
+    environment: "sandbox",
+  });
 
   // Matches the real Content-Hmac format confirmed against
   // developers.clicksign.com/docs/seguranca-de-webhooks: "sha256=" +

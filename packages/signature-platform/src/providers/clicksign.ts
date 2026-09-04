@@ -11,21 +11,37 @@ import type {
   SignatureStatus,
 } from "../types.js";
 
-// Real Clicksign v3 (Envelope API) adapter. SANDBOX ONLY — deliberately:
-// there is no production base URL constant anywhere in this file, and no
-// env var selects one. Spec section 51 prohibits any production cutover
-// in this phase; making that a structural property of the code (nothing
-// to flip) is stronger than a config default that happens to be sandbox.
-// Activating production is a separate, explicitly-authorized future change
-// to this file, not a flag.
-const SANDBOX_BASE_URL = "https://sandbox.clicksign.com/api/v3";
+// Real Clicksign v3 (Envelope API) adapter. Explicitly authorized to
+// support production 2026-09-04 (was sandbox-only through P1/P2, spec
+// section 51) — `environment` is a required constructor option with no
+// default, so a caller must actively opt in to "production" rather than
+// ever landing there by a silent config gap. Same base-path convention
+// Clicksign's own docs use for every other product (app.clicksign.com for
+// production, sandbox.clicksign.com for sandbox) — not yet exercised
+// against a live production account by this adapter; confirm with one real
+// GET (e.g. getRequest on a throwaway envelope) before trusting it against
+// real signer traffic the way sandbox behavior was confirmed in
+// docs/integrations/CLICKSIGN.md.
+const BASE_URL_BY_ENVIRONMENT = {
+  sandbox: "https://sandbox.clicksign.com/api/v3",
+  production: "https://app.clicksign.com/api/v3",
+} as const;
+
+export type ClicksignEnvironment = keyof typeof BASE_URL_BY_ENVIRONMENT;
 
 export interface ClicksignProviderOptions {
   apiKey: string;
   /** Verifies inbound webhook HMAC signatures — the `secret` Clicksign
-   * returns when you register a webhook via POST /webhooks in the sandbox
-   * dashboard/API. Required for normalizeWebhook() to do anything. */
+   * returns when you register a webhook via POST /webhooks in the target
+   * environment's own dashboard/API. Required for normalizeWebhook() to do
+   * anything. Sandbox and production each mint their own independent
+   * secret (and API key) — never share one across environments. */
   webhookSecret: string;
+  /** No default — every call site must say which environment it means.
+   * Real contracts only ever get real legal signatures under
+   * "production"; every automated test and this session's manual E2E
+   * verification used "sandbox". */
+  environment: ClicksignEnvironment;
 }
 
 interface JsonApiErrorBody {
@@ -78,10 +94,14 @@ export class ClicksignProvider implements SignatureProvider {
 
   private readonly apiKey: string;
   private readonly webhookSecret: string;
+  private readonly baseUrl: string;
+  readonly environment: ClicksignEnvironment;
 
   constructor(options: ClicksignProviderOptions) {
     this.apiKey = options.apiKey;
     this.webhookSecret = options.webhookSecret;
+    this.environment = options.environment;
+    this.baseUrl = BASE_URL_BY_ENVIRONMENT[options.environment];
   }
 
   private async request<T>(
@@ -89,7 +109,7 @@ export class ClicksignProvider implements SignatureProvider {
     path: string,
     body?: Record<string, unknown>,
   ): Promise<T> {
-    const res = await fetch(`${SANDBOX_BASE_URL}${path}`, {
+    const res = await fetch(`${this.baseUrl}${path}`, {
       method,
       headers: {
         Authorization: this.apiKey,

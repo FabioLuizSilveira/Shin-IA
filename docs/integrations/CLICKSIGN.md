@@ -1,12 +1,23 @@
 # Integração Clicksign (Signature Platform, P1)
 
-**Status: implementado contra o sandbox da Clicksign
-(`https://sandbox.clicksign.com/api/v3`). Produção NÃO está implementada
-nem autorizada** — não existe env var, flag ou branch de código que ative
-produção; o único base URL que existe no adapter
-(`packages/signature-platform/src/providers/clicksign.ts`) é o de sandbox.
-Ativar produção exige uma mudança de código futura e separada, explicitamente
-autorizada — nunca um flip de configuração.
+**Status: implementado e verificado ao vivo contra o sandbox da Clicksign
+(`https://sandbox.clicksign.com/api/v3`). Suporte a produção
+(`https://app.clicksign.com/api/v3`) foi adicionado ao código em
+2026-09-04, autorizado explicitamente pelo usuário — mas ainda NÃO foi
+exercitado contra uma conta de produção real.** O adapter
+(`packages/signature-platform/src/providers/clicksign.ts`) agora recebe um
+`environment: "sandbox" | "production"` obrigatório (sem default) no
+construtor, e `createSignatureProvider()` exige a env var
+`CLICKSIGN_ENVIRONMENT` (também sem default — `"sandbox"` ou
+`"production"`, nunca escolhido silenciosamente). `CLICKSIGN_API_KEY` e
+`CLICKSIGN_WEBHOOK_SECRET` precisam ser o par gerado no MESMO ambiente
+apontado por `CLICKSIGN_ENVIRONMENT` — sandbox e produção têm token e
+secret de webhook independentes na Clicksign, nunca compartilhados. O base
+URL de produção segue a mesma convenção que a Clicksign usa pra outros
+produtos (app.clicksign.com), mas isso ainda não foi confirmado com uma
+chamada real — antes de apontar tráfego de verdade pra lá, confirme com um
+`getRequest()` de teste contra um envelope descartável, do jeito que o
+comportamento do sandbox foi confirmado abaixo.
 
 Este documento separa o que foi **confirmado na documentação oficial**
 (`developers.clicksign.com`, consultada ao vivo durante a construção deste

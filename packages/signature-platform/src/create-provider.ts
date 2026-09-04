@@ -19,14 +19,25 @@ export function createSignatureProvider(): SignatureProvider {
     case "fake":
       return new FakeSignatureProvider("fake");
     case "clicksign": {
-      // Sandbox only — see clicksign.ts's own header comment. No env var
-      // here selects sandbox vs production; that branch doesn't exist in
-      // the code at all yet (spec section 51).
+      // CLICKSIGN_ENVIRONMENT has no default, same discipline as
+      // SIGNATURE_PROVIDER itself above: sandbox vs. production changes
+      // whether a signature carries real legal weight, so an operator must
+      // set it explicitly (in either direction) rather than this resolver
+      // ever guessing. Sandbox and production each mint their own
+      // independent API key + webhook secret in the Clicksign dashboard —
+      // CLICKSIGN_API_KEY/CLICKSIGN_WEBHOOK_SECRET must hold whichever
+      // pair matches CLICKSIGN_ENVIRONMENT, never mixed.
+      const environment = process.env.CLICKSIGN_ENVIRONMENT;
+      if (environment !== "sandbox" && environment !== "production") {
+        throw new Error(
+          'CLICKSIGN_ENVIRONMENT must be set to "sandbox" or "production" — no default',
+        );
+      }
       const apiKey = process.env.CLICKSIGN_API_KEY;
       const webhookSecret = process.env.CLICKSIGN_WEBHOOK_SECRET;
       if (!apiKey) throw new Error("CLICKSIGN_API_KEY is not set");
       if (!webhookSecret) throw new Error("CLICKSIGN_WEBHOOK_SECRET is not set");
-      return new ClicksignProvider({ apiKey, webhookSecret });
+      return new ClicksignProvider({ apiKey, webhookSecret, environment });
     }
     default:
       throw new Error(`Unsupported or not-yet-implemented SIGNATURE_PROVIDER: ${provider}`);

@@ -21,6 +21,7 @@ describeIfConfigured("ClicksignProvider — live sandbox E2E", () => {
   const provider = new ClicksignProvider({
     apiKey: apiKey ?? "",
     webhookSecret: process.env.CLICKSIGN_WEBHOOK_SECRET ?? "unused-in-this-test",
+    environment: "sandbox",
   });
 
   it("creates a real envelope, activates it, and can cancel it", async () => {
