@@ -92,6 +92,17 @@ sha256=<hex>` — HMAC-SHA256(key=secret, message=corpo bruto). Esse
 /envelopes/{id}/documents` do achado #6 — a resposta real tem
    `data.links.files.{original,signed,ziped}`, URLs pré-assinadas do S3 da
    Clicksign com expiração curta.
+8. **`default_subject`/`default_message` existem em `attributes` do
+   envelope** (confirmado via `GET /envelopes/{id}` — ambos `null` por
+   padrão numa envelope criada sem eles) e mudam o assunto/corpo do e-mail
+   que o signatário recebe. `createRequest()` agora envia os dois, vindos
+   de `CreateSignatureRequestInput.emailSubject`/`emailMessage`
+   (`apps/web`'s `POST /api/signature-requests` preenche com o nome do
+   tenant). **Isso NÃO muda quem aparece como remetente** — a Clicksign
+   sempre manda pelo nome/e-mail da conta (hoje pessoa física do usuário);
+   trocar isso é configuração da própria conta Clicksign (Configurações →
+   Personalizar → remetente customizado, sujeito ao plano), fora do
+   alcance desta API.
 
 ## Confirmado na documentação oficial
 

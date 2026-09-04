@@ -120,6 +120,16 @@ export class ClicksignProvider implements SignatureProvider {
           remind_interval: "3",
           block_after_refusal: false,
           deadline_partial_signature_action: "closed",
+          // Does not change the sender identity (Clicksign always sends
+          // from the account owner's own name/email — an account-level
+          // setting, not exposed on this endpoint), only the subject/body
+          // text the signer reads in the email. Confirmed present on a
+          // real envelope's own attributes (default_subject/
+          // default_message, both null by default) via GET /envelopes/{id}
+          // 2026-09-04. Falls back to null (Clicksign's own default copy)
+          // when the caller doesn't supply one.
+          default_subject: input.emailSubject ?? null,
+          default_message: input.emailMessage ?? null,
         },
       },
     });

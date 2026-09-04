@@ -126,6 +126,13 @@ export async function POST(req: NextRequest) {
       documentName: `${contractNumber}.pdf`,
       signers: body.signers,
       createdBy: scope.userId,
+      // Clicksign always sends from the account owner's own name/email
+      // (account-level setting, not reachable here) — this only swaps the
+      // subject/body text the signer actually reads, so it names the
+      // tenant instead of Clicksign's own generic "Solicitação de
+      // Assinatura de <conta>" copy.
+      emailSubject: `Assinatura de contrato — ${tenant?.name ?? "Shinã"}`,
+      emailMessage: `${tenant?.name ?? "Shinã"} enviou o contrato ${contractNumber} para sua assinatura eletrônica. Revise o documento e assine pelo link abaixo.`,
     });
 
     void logActivity(scope.db, {

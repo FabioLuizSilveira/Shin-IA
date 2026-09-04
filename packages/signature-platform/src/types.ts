@@ -105,6 +105,17 @@ export interface CreateSignatureRequestInput {
   documentContentType: string;
   documentName: string;
   signers: CreateSignatureRequestSigner[];
+  /** Passed straight through to the provider's own envelope subject/message
+   * fields, when it has any (Clicksign: attributes.default_subject/
+   * default_message on POST /envelopes). This does NOT change who the
+   * email appears to be FROM — that's an account-level setting on the
+   * provider's own dashboard, out of reach from this API — only the
+   * subject line and body text the signer actually reads, so the tenant's
+   * name can appear there instead of Clicksign's own generic copy.
+   * Optional: a provider with no such concept (or the fake provider)
+   * silently ignores these. */
+  emailSubject?: string;
+  emailMessage?: string;
 }
 
 export interface SignatureRequestRecord {
