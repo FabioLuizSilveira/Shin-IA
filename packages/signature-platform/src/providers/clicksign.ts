@@ -328,38 +328,32 @@ export class ClicksignProvider implements SignatureProvider {
     rawBody: string,
     headers: Record<string, string | null>,
   ): Promise<CanonicalSignatureEvent[]> {
-    // HMAC verification — confirmed live 2026-09-04 (a real production
-    // delivery's header list): the real header is `content-hmac`, NOT
-    // x-clicksign-signature (that name came from secondary sources and
-    // never actually arrived on a real delivery — always flagged as
-    // unconfirmed in docs/integrations/CLICKSIGN.md, now corrected).
+    // HMAC verification — confirmed 2026-09-04 against
+    // developers.clicksign.com/docs/seguranca-de-webhooks (a primary
+    // source page that wasn't reachable earlier in this adapter's build;
+    // x-clicksign-signature was a secondary-source guess that never once
+    // matched real traffic). The real header is `Content-Hmac`, its value
+    // is prefixed `sha256=` before the hex digest (the actual bug that
+    // made every earlier candidate fail — length mismatch against an
+    // un-prefixed digest always fails timingSafeEqual before the hash
+    // itself is even compared), and the digest is a standard
+    // HMAC-SHA256(key=secret, message=rawBody) hex digest — the doc's own
+    // "Do not format the JSON before the calculation" note is why this
+    // reads the body as raw text, never JSON.parse()'d first.
     const signatureHeader = headers["content-hmac"] ?? headers["Content-HMAC"];
     if (!signatureHeader) {
       throw new Error("ClicksignProvider: webhook missing content-hmac header");
     }
-
-    // DIAGNOSTIC (temporary, 2026-09-04): exact algorithm/encoding for
-    // content-hmac isn't confirmed yet either — try the plausible HMAC
-    // candidates and log ONLY which ones matched (never the header value
-    // or any computed digest — those aren't safe to put in logs). Once a
-    // real delivery confirms one, this narrows to a single, permanent
-    // comparison and the console.log below comes out.
-    const candidates: [string, string, "hex" | "base64"][] = [
-      ["sha256", "hex", "hex"],
-      ["sha256", "base64", "base64"],
-      ["sha1", "hex", "hex"],
-      ["sha1", "base64", "base64"],
-    ].map(([algo, label, enc]) => [algo, label, enc as "hex" | "base64"]);
-    const matches: string[] = [];
-    for (const [algo, label, encoding] of candidates) {
-      const digest = createHmac(algo, this.webhookSecret).update(rawBody).digest(encoding);
-      const a = Buffer.from(signatureHeader);
-      const b = Buffer.from(digest);
-      if (a.length === b.length && timingSafeEqual(a, b)) matches.push(`hmac-${label}`);
+    const prefix = "sha256=";
+    if (!signatureHeader.startsWith(prefix)) {
+      throw new Error('ClicksignProvider: content-hmac header missing expected "sha256=" prefix');
     }
-    console.log("[ClicksignProvider] content-hmac candidate matches:", matches.join(",") || "none");
-
-    if (matches.length === 0) {
+    const received = signatureHeader.slice(prefix.length);
+    const expected = createHmac("sha256", this.webhookSecret).update(rawBody).digest("hex");
+    const a = Buffer.from(received);
+    const b = Buffer.from(expected);
+    const authentic = a.length === b.length && timingSafeEqual(a, b);
+    if (!authentic) {
       throw new Error("ClicksignProvider: webhook signature verification failed");
     }
 

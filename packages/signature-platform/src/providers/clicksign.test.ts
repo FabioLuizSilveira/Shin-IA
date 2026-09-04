@@ -39,11 +39,11 @@ describe("ClicksignProvider.normalizeWebhook", () => {
   const secret = "test-webhook-secret";
   const provider = new ClicksignProvider({ apiKey: "unused-in-this-test", webhookSecret: secret });
 
-  // sha256/hex is one of the candidate encodings normalizeWebhook() tries
-  // — any candidate matching is sufficient for verification to succeed,
-  // so signing with this one exercises the real accept path.
+  // Matches the real Content-Hmac format confirmed against
+  // developers.clicksign.com/docs/seguranca-de-webhooks: "sha256=" +
+  // HMAC-SHA256(key=secret, message=rawBody) hex digest.
   function sign(rawBody: string): string {
-    return createHmac("sha256", secret).update(rawBody).digest("hex");
+    return "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
   }
 
   it("accepts a correctly-signed document_closed payload and produces a canonical event", async () => {
@@ -64,6 +64,14 @@ describe("ClicksignProvider.normalizeWebhook", () => {
   it("rejects a payload with a missing signature header", async () => {
     const rawBody = JSON.stringify({ event: { name: "close" }, envelope: { id: "env_123" } });
     await expect(provider.normalizeWebhook(rawBody, {})).rejects.toThrow(/missing content-hmac/);
+  });
+
+  it("rejects a content-hmac value missing the sha256= prefix", async () => {
+    const rawBody = JSON.stringify({ event: { name: "close" }, envelope: { id: "env_123" } });
+    const bareDigest = createHmac("sha256", secret).update(rawBody).digest("hex");
+    await expect(
+      provider.normalizeWebhook(rawBody, { "content-hmac": bareDigest }),
+    ).rejects.toThrow(/missing expected "sha256=" prefix/);
   });
 
   it("rejects a payload with a tampered body (signature no longer matches)", async () => {

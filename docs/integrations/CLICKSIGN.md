@@ -52,6 +52,24 @@ attributes:{}}}` — só depois dela a Clicksign de fato manda o e-mail
    agora chama isso automaticamente logo após a ativação. Sem essa
    correção, TODA solicitação de assinatura criada pelo P1/P2 ficava presa
    pra sempre sem nenhum erro visível — o pior tipo de bug silencioso.
+5. **O header real do webhook é `Content-Hmac`, não `x-clicksign-signature`.**
+   Confirmado em duas etapas no dia 2026-09-04: primeiro, um teste real
+   contra produção (assinatura completa de verdade, webhook entregue 3x
+   pela Clicksign) revelou os headers reais recebidos — `content-hmac` era
+   o único específico da Clicksign ali (o resto é infraestrutura de
+   Vercel/Datadog/Sentry); `x-clicksign-signature` nunca apareceu em
+   nenhuma entrega real. Depois, a página primária
+   `developers.clicksign.com/docs/seguranca-de-webhooks` (não alcançável
+   nas buscas durante a construção do P1, só localizada depois de já saber
+   o nome certo do header) confirmou o formato exato: **o valor do header
+   vem prefixado `sha256=` antes do hex digest** — `Content-Hmac:
+sha256=<hex>` — HMAC-SHA256(key=secret, message=corpo bruto). Esse
+   prefixo era a causa raiz de 3 tentativas reais de webhook falharem
+   mesmo já usando o header certo e o algoritmo certo: comparar o valor
+   completo (`sha256=...`) contra um hex digest sem prefixo nunca bate
+   (tamanhos diferentes). A doc também confirma "não formate o JSON antes
+   do cálculo" — por isso o corpo é lido como texto bruto, nunca
+   `JSON.parse()`'d antes da verificação.
 
 ## Confirmado na documentação oficial
 
@@ -85,12 +103,6 @@ nem uma vez contra o sandbox real ainda (o E2E de 2026-09-03 cobriu
 `createRequest`/`getRequest`/`cancelRequest`, não o webhook nem
 `getSigningSession`/`getSignedArtifacts`).
 
-- **Header e algoritmo exatos do HMAC do webhook.** O adapter implementa
-  `x-clicksign-signature` + HMAC-SHA256 sobre o corpo bruto, mas essa
-  combinação veio de fontes secundárias (não uma página da doc oficial que
-  este trabalho conseguiu buscar diretamente) — confirmar registrando um
-  webhook real no sandbox e inspecionando a entrega de verdade antes de
-  depender disso em produção.
 - **Campo do link de assinatura** em `GET
 /envelopes/{id}/signers/{signer_id}` — usado por `getSigningSession()`,
   que não é exercitado pelo fluxo do P1 (a Clicksign manda o link
