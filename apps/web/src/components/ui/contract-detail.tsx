@@ -493,7 +493,7 @@ export function ContractDetail({ contractId, onClose, onStatusChange }: Contract
                     value={assetIdInput}
                     onChange={(e) => setAssetIdInput(e.target.value)}
                     placeholder="ID do ativo"
-                    className="flex-1 text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
+                    className="flex-1 text-xs px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
                   />
                   <button
                     onClick={() => void handleLinkAsset()}
@@ -535,14 +535,14 @@ export function ContractDetail({ contractId, onClose, onStatusChange }: Contract
                     onChange={(e) => setCustomerEmailInput(e.target.value)}
                     placeholder="E-mail do cliente"
                     type="email"
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
+                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
                   />
                   <div className="flex gap-2">
                     <input
                       value={customerNameInput}
                       onChange={(e) => setCustomerNameInput(e.target.value)}
                       placeholder="Nome (opcional)"
-                      className="flex-1 text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
+                      className="flex-1 text-xs px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
                     />
                     <button
                       onClick={() => void handleInviteCustomer()}

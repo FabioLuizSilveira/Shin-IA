@@ -138,14 +138,14 @@ export function ContractSendSignatureModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Nome completo"
-                className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
+                className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
               />
               <input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="E-mail"
                 type="email"
-                className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
+                className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
               />
             </div>
           </div>
@@ -177,7 +177,7 @@ export function ContractSendSignatureModal({
                       onChange={(e) =>
                         updateExtraSigner(idx, { role: e.target.value as ExtraSigner["role"] })
                       }
-                      className="flex-1 text-xs px-2 py-1.5 rounded-lg border border-slate-200"
+                      className="flex-1 text-xs px-2 py-1.5 rounded-lg border border-slate-200 text-slate-900"
                     >
                       {(Object.keys(EXTRA_ROLE_LABEL) as ExtraSigner["role"][]).map((role) => (
                         <option key={role} value={role}>
@@ -196,14 +196,14 @@ export function ContractSendSignatureModal({
                     value={signer.name}
                     onChange={(e) => updateExtraSigner(idx, { name: e.target.value })}
                     placeholder="Nome"
-                    className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200"
+                    className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 text-slate-900 placeholder:text-slate-400"
                   />
                   <input
                     value={signer.email}
                     onChange={(e) => updateExtraSigner(idx, { email: e.target.value })}
                     placeholder="E-mail"
                     type="email"
-                    className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200"
+                    className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200 text-slate-900 placeholder:text-slate-400"
                   />
                 </div>
               ))}
