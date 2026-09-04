@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getMktContext, MktContextError } from "@/lib/context";
-import { resolveAiPolicy, upsertAiPolicy } from "@/lib/ai/policy";
-import type { AiMode, CredentialSource } from "@/lib/ai/types";
+import { createClient } from "@/lib/supabase/server";
+import {
+  resolveAiPolicy,
+  upsertAiPolicy,
+  type AiMode,
+  type CredentialSource,
+} from "@shina/ai-gateway";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +18,8 @@ const SOURCES: CredentialSource[] = ["BYOK", "SHINA"];
 export async function GET() {
   try {
     const ctx = await getMktContext();
-    const policy = await resolveAiPolicy(ctx.workspaceId, ctx.tenantId);
+    const supabase = await createClient();
+    const policy = await resolveAiPolicy(supabase, ctx.workspaceId, ctx.tenantId, "mkt");
     return NextResponse.json({ data: policy });
   } catch (e) {
     if (e instanceof MktContextError) {
@@ -46,13 +52,14 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "preferredSource must be BYOK or SHINA" }, { status: 422 });
     }
 
-    await upsertAiPolicy(ctx.workspaceId, ctx.tenantId, ctx.userId, {
+    const supabase = await createClient();
+    await upsertAiPolicy(supabase, ctx.workspaceId, ctx.tenantId, ctx.userId, {
       mode: body.mode as AiMode,
       preferredSource: (body.preferredSource as CredentialSource | null) ?? null,
       allowShinaFallback: body.allowShinaFallback ?? false,
     });
 
-    const policy = await resolveAiPolicy(ctx.workspaceId, ctx.tenantId);
+    const policy = await resolveAiPolicy(supabase, ctx.workspaceId, ctx.tenantId, "mkt");
     return NextResponse.json({ data: policy });
   } catch (e) {
     if (e instanceof MktContextError) {

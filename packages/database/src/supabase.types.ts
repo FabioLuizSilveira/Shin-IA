@@ -60,6 +60,297 @@ export type Database = {
   };
   public: {
     Tables: {
+      ai_gateway_credit_balances: {
+        Row: {
+          balance: number;
+          tenant_id: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          balance?: number;
+          tenant_id: string;
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          balance?: number;
+          tenant_id?: string;
+          updated_at?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_gateway_credit_balances_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: true;
+            referencedRelation: "ai_gateway_workspaces";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mkt_ai_credit_balances_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_gateway_credit_ledger: {
+        Row: {
+          balance_after: number;
+          created_at: string;
+          credits_delta: number;
+          event_type: string;
+          id: string;
+          metadata: Json;
+          tenant_id: string;
+          usage_id: string | null;
+          workspace_id: string;
+        };
+        Insert: {
+          balance_after: number;
+          created_at?: string;
+          credits_delta: number;
+          event_type: string;
+          id?: string;
+          metadata?: Json;
+          tenant_id: string;
+          usage_id?: string | null;
+          workspace_id: string;
+        };
+        Update: {
+          balance_after?: number;
+          created_at?: string;
+          credits_delta?: number;
+          event_type?: string;
+          id?: string;
+          metadata?: Json;
+          tenant_id?: string;
+          usage_id?: string | null;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_gateway_credit_ledger_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_gateway_workspaces";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mkt_ai_credits_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mkt_ai_credits_usage_id_fkey";
+            columns: ["usage_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_gateway_usage";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_gateway_model_cost_policy: {
+        Row: {
+          capability: string;
+          cost_basis: Json;
+          created_at: string;
+          credit_multiplier: number;
+          effective_from: string;
+          id: string;
+          model: string;
+          provider: string;
+          status: string;
+        };
+        Insert: {
+          capability?: string;
+          cost_basis?: Json;
+          created_at?: string;
+          credit_multiplier?: number;
+          effective_from?: string;
+          id?: string;
+          model: string;
+          provider: string;
+          status?: string;
+        };
+        Update: {
+          capability?: string;
+          cost_basis?: Json;
+          created_at?: string;
+          credit_multiplier?: number;
+          effective_from?: string;
+          id?: string;
+          model?: string;
+          provider?: string;
+          status?: string;
+        };
+        Relationships: [];
+      };
+      ai_gateway_policy: {
+        Row: {
+          allow_shina_fallback: boolean;
+          mode: string;
+          preferred_source: string | null;
+          tenant_id: string;
+          updated_at: string;
+          updated_by: string | null;
+          workspace_id: string;
+        };
+        Insert: {
+          allow_shina_fallback?: boolean;
+          mode?: string;
+          preferred_source?: string | null;
+          tenant_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          workspace_id: string;
+        };
+        Update: {
+          allow_shina_fallback?: boolean;
+          mode?: string;
+          preferred_source?: string | null;
+          tenant_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_gateway_policy_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: true;
+            referencedRelation: "ai_gateway_workspaces";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mkt_ai_policy_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_gateway_usage: {
+        Row: {
+          agent_id: string | null;
+          billing_source: string | null;
+          cost_usd: number | null;
+          created_at: string;
+          credential_source: string | null;
+          credits_consumed: number | null;
+          duration_ms: number | null;
+          entity_id: string | null;
+          entity_type: string | null;
+          estimated_cost_usd: number | null;
+          id: string;
+          idempotency_key: string | null;
+          model: string;
+          operation: string;
+          provider: string;
+          request_id: string;
+          tenant_id: string;
+          tokens_in: number;
+          tokens_out: number;
+          user_id: string | null;
+          workspace_id: string;
+        };
+        Insert: {
+          agent_id?: string | null;
+          billing_source?: string | null;
+          cost_usd?: number | null;
+          created_at?: string;
+          credential_source?: string | null;
+          credits_consumed?: number | null;
+          duration_ms?: number | null;
+          entity_id?: string | null;
+          entity_type?: string | null;
+          estimated_cost_usd?: number | null;
+          id?: string;
+          idempotency_key?: string | null;
+          model: string;
+          operation: string;
+          provider: string;
+          request_id?: string;
+          tenant_id: string;
+          tokens_in?: number;
+          tokens_out?: number;
+          user_id?: string | null;
+          workspace_id: string;
+        };
+        Update: {
+          agent_id?: string | null;
+          billing_source?: string | null;
+          cost_usd?: number | null;
+          created_at?: string;
+          credential_source?: string | null;
+          credits_consumed?: number | null;
+          duration_ms?: number | null;
+          entity_id?: string | null;
+          entity_type?: string | null;
+          estimated_cost_usd?: number | null;
+          id?: string;
+          idempotency_key?: string | null;
+          model?: string;
+          operation?: string;
+          provider?: string;
+          request_id?: string;
+          tenant_id?: string;
+          tokens_in?: number;
+          tokens_out?: number;
+          user_id?: string | null;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_gateway_usage_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_gateway_workspaces";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mkt_ai_usage_tenant_fk";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_gateway_workspaces: {
+        Row: {
+          created_at: string;
+          id: string;
+          owner_app: string;
+          tenant_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id: string;
+          owner_app: string;
+          tenant_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          owner_app?: string;
+          tenant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_gateway_workspaces_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       allocations: {
         Row: {
           asset_id: string;
@@ -5182,145 +5473,6 @@ export type Database = {
           },
         ];
       };
-      mkt_ai_credit_balances: {
-        Row: {
-          balance: number;
-          tenant_id: string;
-          updated_at: string;
-          workspace_id: string;
-        };
-        Insert: {
-          balance?: number;
-          tenant_id: string;
-          updated_at?: string;
-          workspace_id: string;
-        };
-        Update: {
-          balance?: number;
-          tenant_id?: string;
-          updated_at?: string;
-          workspace_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "mkt_ai_credit_balances_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "mkt_ai_credit_balances_workspace_id_fkey";
-            columns: ["workspace_id"];
-            isOneToOne: true;
-            referencedRelation: "mkt_workspaces";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      mkt_ai_credits: {
-        Row: {
-          balance_after: number;
-          created_at: string;
-          credits_delta: number;
-          event_type: string;
-          id: string;
-          metadata: Json;
-          tenant_id: string;
-          usage_id: string | null;
-          workspace_id: string;
-        };
-        Insert: {
-          balance_after: number;
-          created_at?: string;
-          credits_delta: number;
-          event_type: string;
-          id?: string;
-          metadata?: Json;
-          tenant_id: string;
-          usage_id?: string | null;
-          workspace_id: string;
-        };
-        Update: {
-          balance_after?: number;
-          created_at?: string;
-          credits_delta?: number;
-          event_type?: string;
-          id?: string;
-          metadata?: Json;
-          tenant_id?: string;
-          usage_id?: string | null;
-          workspace_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "mkt_ai_credits_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "mkt_ai_credits_usage_id_fkey";
-            columns: ["usage_id"];
-            isOneToOne: false;
-            referencedRelation: "mkt_ai_usage";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "mkt_ai_credits_workspace_id_fkey";
-            columns: ["workspace_id"];
-            isOneToOne: false;
-            referencedRelation: "mkt_workspaces";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      mkt_ai_policy: {
-        Row: {
-          allow_shina_fallback: boolean;
-          mode: string;
-          preferred_source: string | null;
-          tenant_id: string;
-          updated_at: string;
-          updated_by: string | null;
-          workspace_id: string;
-        };
-        Insert: {
-          allow_shina_fallback?: boolean;
-          mode?: string;
-          preferred_source?: string | null;
-          tenant_id: string;
-          updated_at?: string;
-          updated_by?: string | null;
-          workspace_id: string;
-        };
-        Update: {
-          allow_shina_fallback?: boolean;
-          mode?: string;
-          preferred_source?: string | null;
-          tenant_id?: string;
-          updated_at?: string;
-          updated_by?: string | null;
-          workspace_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "mkt_ai_policy_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "mkt_ai_policy_workspace_id_fkey";
-            columns: ["workspace_id"];
-            isOneToOne: true;
-            referencedRelation: "mkt_workspaces";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       mkt_ai_providers: {
         Row: {
           api_key_enc: string | null;
@@ -5377,93 +5529,6 @@ export type Database = {
           },
           {
             foreignKeyName: "mkt_ai_providers_workspace_fk";
-            columns: ["workspace_id"];
-            isOneToOne: false;
-            referencedRelation: "mkt_workspaces";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      mkt_ai_usage: {
-        Row: {
-          agent_id: string | null;
-          billing_source: string | null;
-          cost_usd: number | null;
-          created_at: string;
-          credential_source: string | null;
-          credits_consumed: number | null;
-          duration_ms: number | null;
-          entity_id: string | null;
-          entity_type: string | null;
-          estimated_cost_usd: number | null;
-          id: string;
-          idempotency_key: string | null;
-          model: string;
-          operation: string;
-          provider: string;
-          request_id: string;
-          tenant_id: string;
-          tokens_in: number;
-          tokens_out: number;
-          user_id: string | null;
-          workspace_id: string;
-        };
-        Insert: {
-          agent_id?: string | null;
-          billing_source?: string | null;
-          cost_usd?: number | null;
-          created_at?: string;
-          credential_source?: string | null;
-          credits_consumed?: number | null;
-          duration_ms?: number | null;
-          entity_id?: string | null;
-          entity_type?: string | null;
-          estimated_cost_usd?: number | null;
-          id?: string;
-          idempotency_key?: string | null;
-          model: string;
-          operation: string;
-          provider: string;
-          request_id?: string;
-          tenant_id: string;
-          tokens_in?: number;
-          tokens_out?: number;
-          user_id?: string | null;
-          workspace_id: string;
-        };
-        Update: {
-          agent_id?: string | null;
-          billing_source?: string | null;
-          cost_usd?: number | null;
-          created_at?: string;
-          credential_source?: string | null;
-          credits_consumed?: number | null;
-          duration_ms?: number | null;
-          entity_id?: string | null;
-          entity_type?: string | null;
-          estimated_cost_usd?: number | null;
-          id?: string;
-          idempotency_key?: string | null;
-          model?: string;
-          operation?: string;
-          provider?: string;
-          request_id?: string;
-          tenant_id?: string;
-          tokens_in?: number;
-          tokens_out?: number;
-          user_id?: string | null;
-          workspace_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "mkt_ai_usage_tenant_fk";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "mkt_ai_usage_workspace_fk";
             columns: ["workspace_id"];
             isOneToOne: false;
             referencedRelation: "mkt_workspaces";
@@ -6005,42 +6070,6 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
-      };
-      mkt_model_cost_policy: {
-        Row: {
-          capability: string;
-          cost_basis: Json;
-          created_at: string;
-          credit_multiplier: number;
-          effective_from: string;
-          id: string;
-          model: string;
-          provider: string;
-          status: string;
-        };
-        Insert: {
-          capability?: string;
-          cost_basis?: Json;
-          created_at?: string;
-          credit_multiplier?: number;
-          effective_from?: string;
-          id?: string;
-          model: string;
-          provider: string;
-          status?: string;
-        };
-        Update: {
-          capability?: string;
-          cost_basis?: Json;
-          created_at?: string;
-          credit_multiplier?: number;
-          effective_from?: string;
-          id?: string;
-          model?: string;
-          provider?: string;
-          status?: string;
-        };
-        Relationships: [];
       };
       mkt_swipe_files: {
         Row: {
@@ -8468,6 +8497,35 @@ export type Database = {
           },
         ];
       };
+      tenant_feature_flags: {
+        Row: {
+          enabled: boolean;
+          flag_key: string;
+          tenant_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          enabled?: boolean;
+          flag_key: string;
+          tenant_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          enabled?: boolean;
+          flag_key?: string;
+          tenant_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tenant_feature_flags_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tenant_permissions: {
         Row: {
           action: string;
@@ -8967,8 +9025,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      custom_access_token_hook: { Args: { event: Json }; Returns: Json };
-      mkt_apply_ai_credit_event: {
+      apply_ai_credit_event: {
         Args: {
           p_delta: number;
           p_event_type: string;
@@ -8979,6 +9036,7 @@ export type Database = {
         };
         Returns: number;
       };
+      custom_access_token_hook: { Args: { event: Json }; Returns: Json };
       mkt_current_tenant_id: { Args: never; Returns: string };
       resolve_shina_authorization_context: {
         Args: { p_user_id: string };

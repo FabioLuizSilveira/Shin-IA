@@ -1,5 +1,5 @@
 import { ModelProviderRegistry } from "@shina/ai-platform";
-import { AnthropicModelProvider } from "./anthropic-provider";
+import { AnthropicModelProvider } from "./anthropic-provider.js";
 
 // Process-wide singleton, same pattern @shina/ai-platform's own agent
 // runtime expects — registration is provider identity (which SDK to call),

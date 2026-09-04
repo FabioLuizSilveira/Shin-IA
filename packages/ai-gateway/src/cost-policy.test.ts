@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCredits } from "./cost-policy";
+import { computeCredits } from "./cost-policy.js";
 
 describe("computeCredits", () => {
   it("computes cost from input/output token rates", () => {

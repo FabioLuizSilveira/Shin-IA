@@ -1,20 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { CreditEventType } from "./types.js";
 
-export type CreditEventType =
-  | "CREDIT_GRANT"
-  | "AI_USAGE"
-  | "CREDIT_PURCHASE"
-  | "PLAN_RENEWAL"
-  | "ADJUSTMENT"
-  | "REFUND"
-  | "EXPIRATION";
+export type { CreditEventType } from "./types.js";
 
 /** Read-only pre-check — never mutates the ledger. */
-export async function getCreditBalance(workspaceId: string): Promise<number> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("mkt_ai_credit_balances")
+export async function getCreditBalance(db: SupabaseClient, workspaceId: string): Promise<number> {
+  const { data } = await db
+    .from("ai_gateway_credit_balances")
     .select("balance")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
@@ -33,13 +25,13 @@ export class InsufficientCreditsError extends Error {
 }
 
 /**
- * Applies a signed credit delta atomically via mkt_apply_ai_credit_event()
- * (security-definer Postgres function — see the AI gateway migration).
- * Positive delta = grant, negative = usage/debit. Rejects (raises
- * insufficient_credits) if a debit would take the balance negative.
+ * Applies a signed credit delta atomically via apply_ai_credit_event()
+ * (security-definer Postgres function). Positive delta = grant, negative =
+ * usage/debit. Rejects (raises insufficient_credits) if a debit would take
+ * the balance negative.
  */
 async function applyCreditEvent(
-  supabase: SupabaseClient,
+  db: SupabaseClient,
   input: {
     workspaceId: string;
     tenantId: string;
@@ -49,7 +41,7 @@ async function applyCreditEvent(
     metadata?: Record<string, unknown>;
   },
 ): Promise<number> {
-  const { data, error } = await supabase.rpc("mkt_apply_ai_credit_event", {
+  const { data, error } = await db.rpc("apply_ai_credit_event", {
     p_workspace_id: input.workspaceId,
     p_tenant_id: input.tenantId,
     p_event_type: input.eventType,
@@ -59,7 +51,7 @@ async function applyCreditEvent(
   });
   if (error) {
     if (error.message.includes("insufficient_credits")) {
-      const available = await getCreditBalance(input.workspaceId);
+      const available = await getCreditBalance(db, input.workspaceId);
       throw new InsufficientCreditsError(-input.delta, available);
     }
     throw error;
@@ -67,15 +59,17 @@ async function applyCreditEvent(
   return data as number;
 }
 
-export async function consumeCredits(input: {
-  workspaceId: string;
-  tenantId: string;
-  credits: number;
-  usageId: string;
-  metadata?: Record<string, unknown>;
-}): Promise<number> {
-  const supabase = await createClient();
-  return applyCreditEvent(supabase, {
+export async function consumeCredits(
+  db: SupabaseClient,
+  input: {
+    workspaceId: string;
+    tenantId: string;
+    credits: number;
+    usageId: string;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<number> {
+  return applyCreditEvent(db, {
     workspaceId: input.workspaceId,
     tenantId: input.tenantId,
     eventType: "AI_USAGE",
@@ -85,18 +79,20 @@ export async function consumeCredits(input: {
   });
 }
 
-export async function grantCredits(input: {
-  workspaceId: string;
-  tenantId: string;
-  credits: number;
-  eventType?: Extract<
-    CreditEventType,
-    "CREDIT_GRANT" | "CREDIT_PURCHASE" | "PLAN_RENEWAL" | "ADJUSTMENT" | "REFUND"
-  >;
-  metadata?: Record<string, unknown>;
-}): Promise<number> {
-  const supabase = await createClient();
-  return applyCreditEvent(supabase, {
+export async function grantCredits(
+  db: SupabaseClient,
+  input: {
+    workspaceId: string;
+    tenantId: string;
+    credits: number;
+    eventType?: Extract<
+      CreditEventType,
+      "CREDIT_GRANT" | "CREDIT_PURCHASE" | "PLAN_RENEWAL" | "ADJUSTMENT" | "REFUND"
+    >;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<number> {
+  return applyCreditEvent(db, {
     workspaceId: input.workspaceId,
     tenantId: input.tenantId,
     eventType: input.eventType ?? "CREDIT_GRANT",

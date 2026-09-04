@@ -2,10 +2,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { internalError } from "@/lib/api-error";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
-import { parseJsonResponse, AIProviderError } from "@/lib/ai/anthropic";
-import { runAiGateway, DuplicateRequestError } from "@/lib/ai/gateway";
-import { AiPolicyError } from "@/lib/ai/types";
-import { InsufficientCreditsError } from "@/lib/ai/credits";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { decryptSecret } from "@/lib/crypto";
+import {
+  parseJsonResponse,
+  AIProviderError,
+  runAiGateway,
+  DuplicateRequestError,
+  AiPolicyError,
+  InsufficientCreditsError,
+} from "@shina/ai-gateway";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -99,6 +105,8 @@ Responda SOMENTE com um objeto JSON válido, sem texto adicional, no formato:
 
     const idempotencyKey = req.headers.get("x-idempotency-key");
     const result = await runAiGateway({
+      db: supabase,
+      adminDb: createAdminClient(),
       ctx,
       operation: "generate_ad",
       capability: "text",
@@ -106,6 +114,9 @@ Responda SOMENTE com um objeto JSON válido, sem texto adicional, no formato:
       system,
       prompt,
       idempotencyKey,
+      credentialMode: "auto",
+      product: "mkt",
+      decryptByokKey: decryptSecret,
     });
     const ad = parseJsonResponse<GeneratedAd>(result.text);
 
@@ -137,7 +148,10 @@ Responda SOMENTE com um objeto JSON válido, sem texto adicional, no formato:
 
     // The gateway wrote the usage row before this entity existed — link it
     // now (best-effort, never blocks the response on this).
-    await supabase.from("mkt_ai_usage").update({ entity_id: saved.id }).eq("id", result.usageId);
+    await supabase
+      .from("ai_gateway_usage")
+      .update({ entity_id: saved.id })
+      .eq("id", result.usageId);
 
     return NextResponse.json({ data: saved }, { status: 201 });
   } catch (e) {

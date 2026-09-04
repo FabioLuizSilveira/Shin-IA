@@ -1,18 +1,26 @@
-import { createClient } from "@/lib/supabase/server";
-import { resolveAnthropicKey } from "./byok";
-import { resolveAiPolicy } from "./policy";
-import { estimateCredits, estimateMaxCredits } from "./cost-policy";
-import { consumeCredits, getCreditBalance, InsufficientCreditsError } from "./credits";
-import { getModelProviderRegistry } from "./registry";
-import { analyzeImage, AIProviderError } from "./anthropic";
-import { AiPolicyError, type BillingSource, type CredentialSource } from "./types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveAnthropicKey } from "./byok.js";
+import { resolveAiPolicy } from "./policy.js";
+import { estimateCredits, estimateMaxCredits } from "./cost-policy.js";
+import { consumeCredits, getCreditBalance, InsufficientCreditsError } from "./credits.js";
+import { getModelProviderRegistry } from "./registry.js";
+import { analyzeImage, generateWithMessages, AIProviderError } from "./anthropic.js";
+import type { AnthropicToolDefinition } from "./anthropic.js";
+import {
+  AiPolicyError,
+  SHINA_ONLY_POLICY,
+  type AiPolicy,
+  type BillingSource,
+  type CredentialSource,
+} from "./types.js";
 
-// The single funnel every mkt feature that calls an LLM must go through:
+// The single funnel every caller that calls an LLM must go through:
 //   auth -> workspace context -> AI policy -> provider/credential
 //   resolution -> credit check -> provider call -> usage metering -> ledger
-// No feature route calls generateText()/analyzeImage() with a resolved key
-// directly anymore (see /api/generate, /api/clone, /api/strategy) — this is
-// the "AI Gateway" of docs/ai/AI_PROVIDER_STRATEGY.md.
+// Extracted 2026-09 from apps/mkt/src/lib/ai/gateway.ts (the "AI Gateway"
+// of docs/ai/AI_PROVIDER_STRATEGY.md) so a second consumer (the Shinã
+// Agent Platform in apps/web) shares the same credit ledger/usage meter
+// instead of building a parallel one.
 const DEFAULT_MODEL = "claude-sonnet-5";
 const PROVIDER = "anthropic"; // only provider with a real BYOK+Shinã path today
 
@@ -22,7 +30,20 @@ export class DuplicateRequestError extends Error {
   }
 }
 
+interface AnthropicMessage {
+  role: "user" | "assistant";
+  content: unknown;
+}
+
 interface GatewayInput {
+  /** Session-scoped client (RLS-respecting) — used for usage insert + the
+   * credit RPC. apps/web passes its single admin client here too (it
+   * already bypasses RLS by construction, see apps/web's tenant-context.ts). */
+  db: SupabaseClient;
+  /** Must be an admin/service-role client — the model cost policy table has
+   * zero RLS policies for `authenticated` by design (internal cost is
+   * never customer-visible). */
+  adminDb: SupabaseClient;
   ctx: { workspaceId: string; tenantId: string; userId: string };
   operation: string;
   capability: "text" | "vision";
@@ -31,9 +52,31 @@ interface GatewayInput {
   maxTokens?: number;
   idempotencyKey?: string | null;
   system: string;
-  prompt: string;
+  /** Single-turn convenience — mutually exclusive with `messages`. */
+  prompt?: string;
+  /** Multi-turn / tool-calling loop — raw Anthropic message shape (content
+   * blocks), since ai-platform's ModelMessage can't losslessly round-trip
+   * tool_use/tool_result blocks. Mutually exclusive with `prompt`. */
+  messages?: AnthropicMessage[];
+  tools?: AnthropicToolDefinition[];
   /** Required when capability === "vision". */
   imageUrl?: string;
+  /**
+   * "auto" (default) — resolves the workspace/tenant AiPolicy from
+   * ai_gateway_policy + BYOK, exactly as apps/mkt behaves today.
+   * "shina_only" — skips policy/BYOK resolution entirely and always uses
+   * the platform's own Shinã credential. The Shinã Agent Platform
+   * (apps/web) always passes this — it is SHINA-exclusive by product
+   * decision, there is no code path for a tenant to configure a BYOK key
+   * for the agent.
+   */
+  credentialMode?: "auto" | "shina_only";
+  /** Required product key for platform_subscriptions lookups when
+   * credentialMode is "auto" (e.g. "mkt"). Ignored for "shina_only". */
+  product?: string;
+  /** Injected decrypt for BYOK keys — only needed when credentialMode is
+   * "auto". Not required (and never called) for "shina_only". */
+  decryptByokKey?: (encoded: string) => Promise<string>;
 }
 
 interface GatewayResult {
@@ -45,6 +88,8 @@ interface GatewayResult {
   credentialSource: CredentialSource;
   billingSource: BillingSource;
   creditsConsumed: number | null;
+  toolUses: { id: string; name: string; input: Record<string, unknown> }[];
+  stopReason: string | null;
 }
 
 interface CredentialDecision {
@@ -52,9 +97,9 @@ interface CredentialDecision {
   billingSource: BillingSource;
 }
 
-// Pure decision matrix — no I/O, so it's directly unit-testable (see
-// gateway.test.ts) without mocking Supabase/env. resolveCredential() below
-// is the only caller and supplies the already-resolved inputs.
+// Pure decision matrix — no I/O, directly unit-testable without mocking
+// Supabase/env. resolveCredential() below is the only caller and supplies
+// the already-resolved inputs.
 export function decideCredentialSource(
   mode: "SHINA" | "BYOK" | "HYBRID",
   hasByokKey: boolean,
@@ -74,9 +119,9 @@ export function decideCredentialSource(
   if (mode === "SHINA") return shina();
   if (mode === "BYOK") return byok();
 
-  // HYBRID — deterministic, never a silent fallback (item 8). Preference
-  // defaults to BYOK (never charges Shinã credits unless explicitly
-  // unavailable and fallback is explicitly allowed).
+  // HYBRID — deterministic, never a silent fallback. Preference defaults
+  // to BYOK (never charges Shinã credits unless explicitly unavailable and
+  // fallback is explicitly allowed).
   const preferred = preferredSource ?? "BYOK";
   if (preferred === "BYOK") {
     if (hasByokKey) return byok();
@@ -90,10 +135,26 @@ export function decideCredentialSource(
 }
 
 async function resolveCredential(
-  ctx: GatewayInput["ctx"],
+  input: GatewayInput,
 ): Promise<{ apiKey: string; credentialSource: CredentialSource; billingSource: BillingSource }> {
-  const policy = await resolveAiPolicy(ctx.workspaceId, ctx.tenantId);
-  const byokKey = await resolveAnthropicKey(ctx.workspaceId);
+  let policy: AiPolicy;
+  let byokKey: string | undefined;
+
+  if (input.credentialMode === "shina_only") {
+    policy = SHINA_ONLY_POLICY;
+    byokKey = undefined;
+  } else {
+    if (!input.product) throw new Error("gateway: product is required when credentialMode is auto");
+    policy = await resolveAiPolicy(
+      input.db,
+      input.ctx.workspaceId,
+      input.ctx.tenantId,
+      input.product,
+    );
+    byokKey = input.decryptByokKey
+      ? await resolveAnthropicKey(input.db, input.ctx.workspaceId, input.decryptByokKey)
+      : undefined;
+  }
   const shinaKey = process.env.ANTHROPIC_API_KEY;
 
   let decision: CredentialDecision;
@@ -107,11 +168,9 @@ async function resolveCredential(
     );
   } catch (e) {
     if (e instanceof AiPolicyError) {
-      // Re-throw with the real user-facing message (the pure function only
-      // carries a stable machine code, so tests don't couple to copy).
       const messages: Record<string, string> = {
         shina_not_configured:
-          "IA Shinã não está configurada no servidor no momento. Tente novamente mais tarde ou conecte sua própria chave em Configurações → IA e Modelos.",
+          "IA Shinã não está configurada no servidor no momento. Tente novamente mais tarde.",
         byok_not_configured:
           "Nenhuma credencial de IA conectada para este workspace. Conecte sua chave em Configurações → IA e Modelos, ou mude para IA Shinã.",
         no_credential: "Nenhuma credencial de IA disponível para este workspace.",
@@ -132,11 +191,13 @@ async function resolveCredential(
 }
 
 export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> {
-  const supabase = await createClient();
+  if (!input.prompt && !input.messages) {
+    throw new Error("gateway: either prompt or messages is required");
+  }
 
   if (input.idempotencyKey) {
-    const { data: existing } = await supabase
-      .from("mkt_ai_usage")
+    const { data: existing } = await input.db
+      .from("ai_gateway_usage")
       .select("id")
       .eq("workspace_id", input.ctx.workspaceId)
       .eq("idempotency_key", input.idempotencyKey)
@@ -144,20 +205,20 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
     if (existing) throw new DuplicateRequestError();
   }
 
-  const { apiKey, credentialSource, billingSource } = await resolveCredential(input.ctx);
+  const { apiKey, credentialSource, billingSource } = await resolveCredential(input);
   const model = input.model ?? DEFAULT_MODEL;
   const maxTokens = input.maxTokens ?? 2048;
 
   let estimatedCredits: number | null = null;
   if (billingSource === "SHINA_CREDITS") {
-    estimatedCredits = await estimateMaxCredits({
+    estimatedCredits = await estimateMaxCredits(input.adminDb, {
       provider: PROVIDER,
       model,
       capability: input.capability,
       maxTokens,
     });
     if (estimatedCredits !== null) {
-      const balance = await getCreditBalance(input.ctx.workspaceId);
+      const balance = await getCreditBalance(input.db, input.ctx.workspaceId);
       if (balance < estimatedCredits) {
         throw new InsufficientCreditsError(estimatedCredits, balance);
       }
@@ -169,10 +230,13 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
   let tokensIn: number;
   let tokensOut: number;
   let responseModel: string;
+  let toolUses: { id: string; name: string; input: Record<string, unknown> }[] = [];
+  let stopReason: string | null = null;
 
   if (input.capability === "vision") {
     if (!input.imageUrl)
       throw new AIProviderError("imageUrl is required for vision capability", 500);
+    if (!input.prompt) throw new AIProviderError("prompt is required for vision capability", 500);
     const result = await analyzeImage({
       system: input.system,
       prompt: input.prompt,
@@ -185,6 +249,26 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
     tokensIn = result.tokensIn;
     tokensOut = result.tokensOut;
     responseModel = result.model;
+  } else if (input.messages) {
+    // Multi-turn / tool-calling path — used by the Shinã Agent's tool loop.
+    // Bypasses @shina/ai-platform's ModelProvider abstraction on purpose
+    // (its ModelMessage can't losslessly represent tool_use/tool_result
+    // content blocks) and talks to Anthropic's native message shape
+    // directly, same posture as the existing maintenance-copilot route.
+    const result = await generateWithMessages({
+      system: input.system,
+      messages: input.messages,
+      maxTokens,
+      model,
+      apiKey,
+      tools: input.tools,
+    });
+    text = result.text;
+    tokensIn = result.tokensIn;
+    tokensOut = result.tokensOut;
+    responseModel = result.model;
+    toolUses = result.toolUses;
+    stopReason = result.stopReason;
   } else {
     const response = await getModelProviderRegistry()
       .get("anthropic")
@@ -193,7 +277,7 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
         maxTokens,
         messages: [
           { role: "system", content: input.system },
-          { role: "user", content: input.prompt },
+          { role: "user", content: input.prompt as string },
         ],
         credentials: { apiKey },
       });
@@ -201,13 +285,19 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
     tokensIn = response.usage.promptTokens;
     tokensOut = response.usage.completionTokens;
     responseModel = response.model;
+    toolUses = (response.toolCalls ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      input: t.arguments,
+    }));
+    stopReason = response.finishReason;
   }
   const durationMs = Date.now() - started;
 
   let creditsConsumed: number | null = null;
   let estimatedCostUsd: number | null = null;
   if (billingSource === "SHINA_CREDITS") {
-    const actual = await estimateCredits({
+    const actual = await estimateCredits(input.adminDb, {
       provider: PROVIDER,
       model: responseModel,
       capability: input.capability,
@@ -218,8 +308,8 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
     creditsConsumed = actual?.credits ?? null;
   }
 
-  const { data: usageRow, error: usageError } = await supabase
-    .from("mkt_ai_usage")
+  const { data: usageRow, error: usageError } = await input.db
+    .from("ai_gateway_usage")
     .insert({
       workspace_id: input.ctx.workspaceId,
       tenant_id: input.ctx.tenantId,
@@ -243,10 +333,10 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
 
   // Deduct AFTER the call (exact cost only known post-hoc) — the pre-check
   // above is what satisfies "don't call the provider first, discover no
-  // credit after" (item 6); this is metering the real cost, not the gate.
+  // credit after"; this is metering the real cost, not the gate.
   if (billingSource === "SHINA_CREDITS" && creditsConsumed !== null) {
     try {
-      await consumeCredits({
+      await consumeCredits(input.db, {
         workspaceId: input.ctx.workspaceId,
         tenantId: input.ctx.tenantId,
         credits: creditsConsumed,
@@ -256,8 +346,8 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
     } catch (err) {
       // Provider was already called and the caller already has their
       // result — surfacing this as a hard failure would throw away real
-      // output over a metering race. Known limitation, documented in
-      // docs/ai/AI_PROVIDER_STRATEGY.md: not a silent no-op, it's logged.
+      // output over a metering race. Known limitation: not a silent
+      // no-op, it's logged.
       console.error("[ai-gateway] credit deduction failed post-call", err);
     }
   }
@@ -271,5 +361,7 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
     credentialSource,
     billingSource,
     creditsConsumed,
+    toolUses,
+    stopReason,
   };
 }

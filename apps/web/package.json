@@ -16,6 +16,7 @@
     "@shina/billing-platform": "workspace:*",
     "@shina/blueprint-runtime": "workspace:*",
     "@shina/charts": "workspace:*",
+    "@shina/ai-gateway": "workspace:*",
     "@shina/commercial-platform": "workspace:*",
     "@shina/commission-engine": "workspace:*",
     "@shina/crm-engine": "workspace:*",

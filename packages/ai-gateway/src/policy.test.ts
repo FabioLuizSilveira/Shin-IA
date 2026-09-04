@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { capModeToPlan } from "./policy";
+import { capModeToPlan } from "./policy.js";
 
 describe("capModeToPlan", () => {
   it("keeps the workspace's chosen mode when the plan allows it", () => {

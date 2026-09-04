@@ -1,10 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
-import { parseJsonResponse, AIProviderError } from "@/lib/ai/anthropic";
-import { runAiGateway, DuplicateRequestError } from "@/lib/ai/gateway";
-import { AiPolicyError } from "@/lib/ai/types";
-import { InsufficientCreditsError } from "@/lib/ai/credits";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { decryptSecret } from "@/lib/crypto";
+import {
+  parseJsonResponse,
+  AIProviderError,
+  runAiGateway,
+  DuplicateRequestError,
+  AiPolicyError,
+  InsufficientCreditsError,
+} from "@shina/ai-gateway";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -64,6 +70,8 @@ Responda SOMENTE com JSON válido:
 
     const idempotencyKey = req.headers.get("x-idempotency-key");
     const result = await runAiGateway({
+      db: supabase,
+      adminDb: createAdminClient(),
       ctx,
       operation: "strategy",
       capability: "text",
@@ -72,6 +80,9 @@ Responda SOMENTE com JSON válido:
       system,
       prompt,
       idempotencyKey,
+      credentialMode: "auto",
+      product: "mkt",
+      decryptByokKey: decryptSecret,
     });
     const strategy = parseJsonResponse<Strategy>(result.text);
 
@@ -81,7 +92,10 @@ Responda SOMENTE com JSON válido:
       .eq("id", campaign.id)
       .eq("workspace_id", ctx.workspaceId);
 
-    await supabase.from("mkt_ai_usage").update({ entity_id: campaign.id }).eq("id", result.usageId);
+    await supabase
+      .from("ai_gateway_usage")
+      .update({ entity_id: campaign.id })
+      .eq("id", result.usageId);
 
     return NextResponse.json({ data: strategy });
   } catch (e) {

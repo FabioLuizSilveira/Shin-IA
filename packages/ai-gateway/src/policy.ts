@@ -1,5 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
-import type { AiMode, AiPolicy, CredentialSource } from "./types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AiMode, AiPolicy, CredentialSource } from "./types.js";
 
 const DEFAULT_ALLOWED_PROVIDERS = [
   "anthropic",
@@ -20,19 +20,22 @@ interface PlanAiLimits {
   allowedModels?: string[];
 }
 
-// Reads the mkt plan's usage_limits jsonb (@shina/commercial-platform's
-// plan_versions table — no per-provider contract, this is the same
-// extension point plans already use for other limits). Plan defaults are
-// deliberately conservative: byokAllowed=true, everything else off, until
-// a human sets real numbers on a plan_version (item 26 — no commercial
-// numbers are decided by this code).
-async function resolvePlanAiLimits(tenantId: string): Promise<PlanAiLimits> {
-  const supabase = await createClient();
-  const { data } = await supabase
+// Reads the calling product's plan_versions.usage_limits jsonb
+// (@shina/commercial-platform — no per-provider contract, this is the same
+// extension point plans already use for other limits). `product` is
+// whatever value that product registers in platform_subscriptions (e.g.
+// "mkt"). Plan defaults are deliberately conservative: byokAllowed=true,
+// everything else off, until a human sets real numbers on a plan_version.
+async function resolvePlanAiLimits(
+  db: SupabaseClient,
+  tenantId: string,
+  product: string,
+): Promise<PlanAiLimits> {
+  const { data } = await db
     .from("platform_subscriptions")
     .select("status, plan_versions(usage_limits)")
     .eq("tenant_id", tenantId)
-    .eq("product", "mkt")
+    .eq("product", product)
     .neq("status", "cancelled")
     .order("created_at", { ascending: false })
     .limit(1)
@@ -46,10 +49,9 @@ async function resolvePlanAiLimits(tenantId: string): Promise<PlanAiLimits> {
   return { byokAllowed: true, ...limits };
 }
 
-// Pure — unit-tested directly (see policy.test.ts). A plan can revoke
-// BYOK/hybrid even if the workspace previously set itself to that mode —
-// the plan is the ceiling, the workspace override is the choice within
-// that ceiling, never above it.
+// Pure — unit-tested directly. A plan can revoke BYOK/hybrid even if the
+// workspace previously set itself to that mode — the plan is the ceiling,
+// the workspace override is the choice within that ceiling, never above it.
 export function capModeToPlan(mode: AiMode, byokAllowed: boolean, hybridAllowed: boolean): AiMode {
   if (mode === "BYOK" && !byokAllowed) return "SHINA";
   if (mode === "HYBRID" && !hybridAllowed) return byokAllowed ? "BYOK" : "SHINA";
@@ -58,26 +60,32 @@ export function capModeToPlan(mode: AiMode, byokAllowed: boolean, hybridAllowed:
 
 /**
  * Resolves the effective AI policy for a workspace: the per-workspace
- * override in mkt_ai_policy (if the workspace explicitly set one) layered
- * on top of the plan's defaults. Absence of a workspace row is NOT treated
- * as "Shinã AI is allowed" — the safe default is BYOK-only, matching how
- * every existing workspace already behaves today (item 27).
+ * override in ai_gateway_policy (if the workspace explicitly set one)
+ * layered on top of the plan's defaults. Absence of a workspace row is NOT
+ * treated as "Shinã AI is allowed" — the safe default is BYOK-only.
+ *
+ * Only ever called for BYOK/HYBRID-capable products (apps/mkt). The Shinã
+ * Agent Platform (apps/web) never calls this — it always uses
+ * `SHINA_ONLY_POLICY` from types.ts instead (see gateway.ts).
  */
-export async function resolveAiPolicy(workspaceId: string, tenantId: string): Promise<AiPolicy> {
-  const supabase = await createClient();
-
+export async function resolveAiPolicy(
+  db: SupabaseClient,
+  workspaceId: string,
+  tenantId: string,
+  product: string,
+): Promise<AiPolicy> {
   const [{ data: override }, { data: balanceRow }, planLimits] = await Promise.all([
-    supabase
-      .from("mkt_ai_policy")
+    db
+      .from("ai_gateway_policy")
       .select("mode, preferred_source, allow_shina_fallback")
       .eq("workspace_id", workspaceId)
       .maybeSingle(),
-    supabase
-      .from("mkt_ai_credit_balances")
+    db
+      .from("ai_gateway_credit_balances")
       .select("balance")
       .eq("workspace_id", workspaceId)
       .maybeSingle(),
-    resolvePlanAiLimits(tenantId),
+    resolvePlanAiLimits(db, tenantId, product),
   ]);
 
   const mode: AiMode = (override?.mode as AiMode | undefined) ?? "BYOK";
@@ -98,13 +106,13 @@ export async function resolveAiPolicy(workspaceId: string, tenantId: string): Pr
 }
 
 export async function upsertAiPolicy(
+  db: SupabaseClient,
   workspaceId: string,
   tenantId: string,
   userId: string,
   input: { mode: AiMode; preferredSource?: CredentialSource | null; allowShinaFallback?: boolean },
 ): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase.from("mkt_ai_policy").upsert(
+  const { error } = await db.from("ai_gateway_policy").upsert(
     {
       workspace_id: workspaceId,
       tenant_id: tenantId,

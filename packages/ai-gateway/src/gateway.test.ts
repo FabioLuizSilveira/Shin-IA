@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { decideCredentialSource } from "./gateway";
-import { AiPolicyError } from "./types";
+import { decideCredentialSource } from "./gateway.js";
+import { AiPolicyError } from "./types.js";
 
 describe("decideCredentialSource", () => {
   describe("mode SHINA", () => {

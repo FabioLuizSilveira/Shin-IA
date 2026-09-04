@@ -37,7 +37,7 @@ export async function GET() {
       count("mkt_swipe_files"),
       count("mkt_brand_kits"),
       supabase
-        .from("mkt_ai_usage")
+        .from("ai_gateway_usage")
         .select("tokens_in, tokens_out")
         .eq("workspace_id", ctx.workspaceId),
       supabase

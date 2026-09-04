@@ -3,7 +3,7 @@ import { internalError } from "@/lib/api-error";
 import { getMktContext, MktContextError } from "@/lib/context";
 import { createClient } from "@/lib/supabase/server";
 import { decryptSecret } from "@/lib/crypto";
-import { generateText, AIProviderError } from "@/lib/ai/anthropic";
+import { generateText, AIProviderError } from "@shina/ai-gateway";
 
 export const dynamic = "force-dynamic";
 
