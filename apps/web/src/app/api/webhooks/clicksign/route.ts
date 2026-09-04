@@ -22,6 +22,13 @@ export async function POST(request: Request) {
     "x-clicksign-signature": request.headers.get("x-clicksign-signature"),
   };
 
+  // TEMP diagnostic (2026-09-04): the assumed x-clicksign-signature
+  // header never arrives on real deliveries — log every header name
+  // Clicksign actually sends so the real one can be identified, then
+  // remove this once CLICKSIGN.md's HMAC gap is closed for real. Header
+  // NAMES only (never values — one of them may carry a real secret).
+  console.log("[clicksign webhook] header keys received:", [...request.headers.keys()].join(","));
+
   // Always instantiated fresh from SIGNATURE_PROVIDER — this route never
   // assumes it's Clicksign specifically, even though today it's the only
   // provider registered at this specific URL path (a future second
