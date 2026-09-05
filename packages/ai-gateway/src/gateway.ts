@@ -317,9 +317,14 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
   let creditsConsumed: number | null = null;
   let estimatedCostUsd: number | null = null;
   if (billingSource === "SHINA_CREDITS") {
+    // Cost policy is keyed by the nominal model name requested ("gpt-4o-mini"),
+    // not the dated snapshot the provider actually returns in its response
+    // ("gpt-4o-mini-2024-07-18") -- using responseModel here made loadCostPolicy's
+    // exact match always miss, silently leaving credits_consumed/cost_usd null
+    // for every real call (found via a live production test 2026-09-05).
     const actual = await estimateCredits(input.adminDb, {
       provider,
-      model: responseModel,
+      model,
       capability: input.capability,
       tokensIn,
       tokensOut,
