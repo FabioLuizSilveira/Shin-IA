@@ -3,7 +3,7 @@ import type { TenantScope } from "@/lib/tenant-context";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import type { AgentTool, ToolResult } from "./tool-types";
 import { assertNoTenantIdField } from "./tool-types";
-import type { AnthropicToolDefinition } from "@shina/ai-gateway";
+import type { OpenAiToolDefinition } from "@shina/ai-gateway";
 
 // Defense-in-depth chokepoint: AgentContext -> Tool Registry ->
 // AuthorizationService (permission + feature-flag check here) -> the tool's
@@ -35,11 +35,10 @@ export class AgentToolRegistry {
     return available;
   }
 
-  toDefinitions(tools: AgentTool[]): AnthropicToolDefinition[] {
+  toDefinitions(tools: AgentTool[]): OpenAiToolDefinition[] {
     return tools.map((t) => ({
-      name: t.name,
-      description: t.description,
-      input_schema: t.inputSchema,
+      type: "function" as const,
+      function: { name: t.name, description: t.description, parameters: t.inputSchema },
     }));
   }
 

@@ -4,8 +4,9 @@ import { resolveAiPolicy } from "./policy.js";
 import { estimateCredits, estimateMaxCredits } from "./cost-policy.js";
 import { consumeCredits, getCreditBalance, InsufficientCreditsError } from "./credits.js";
 import { getModelProviderRegistry } from "./registry.js";
-import { analyzeImage, generateWithMessages, AIProviderError } from "./anthropic.js";
-import type { AnthropicToolDefinition } from "./anthropic.js";
+import { analyzeImage, AIProviderError } from "./anthropic.js";
+import { generateWithMessagesOpenAI } from "./openai.js";
+import type { OpenAiMessage, OpenAiToolDefinition } from "./openai.js";
 import {
   AiPolicyError,
   SHINA_ONLY_POLICY,
@@ -21,18 +22,23 @@ import {
 // of docs/ai/AI_PROVIDER_STRATEGY.md) so a second consumer (the Shinã
 // Agent Platform in apps/web) shares the same credit ledger/usage meter
 // instead of building a parallel one.
-const DEFAULT_MODEL = "claude-sonnet-5";
-const PROVIDER = "anthropic"; // only provider with a real BYOK+Shinã path today
+//
+// Two distinct call shapes exist, each pinned to its own provider (not a
+// generic "pick any provider" abstraction):
+//   - prompt/vision (apps/mkt, credentialMode "auto", SHINA/BYOK/HYBRID) —
+//     always Anthropic, unchanged since P1.
+//   - messages (the Shinã Agent's tool-calling loop, credentialMode
+//     "shina_only") — always OpenAI as of 2026-09 (explicit product
+//     decision: apps/web only ever configures OPENAI_API_KEY, never
+//     ANTHROPIC_API_KEY, so the agent runs on OpenAI exclusively instead
+//     of needing a second provider key just for this one surface).
+const ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-5";
+const OPENAI_DEFAULT_MODEL = "gpt-4o-mini";
 
 export class DuplicateRequestError extends Error {
   constructor() {
     super("Esta requisição já foi processada (idempotency key repetida).");
   }
-}
-
-interface AnthropicMessage {
-  role: "user" | "assistant";
-  content: unknown;
 }
 
 interface GatewayInput {
@@ -54,11 +60,11 @@ interface GatewayInput {
   system: string;
   /** Single-turn convenience — mutually exclusive with `messages`. */
   prompt?: string;
-  /** Multi-turn / tool-calling loop — raw Anthropic message shape (content
-   * blocks), since ai-platform's ModelMessage can't losslessly round-trip
-   * tool_use/tool_result blocks. Mutually exclusive with `prompt`. */
-  messages?: AnthropicMessage[];
-  tools?: AnthropicToolDefinition[];
+  /** Multi-turn / tool-calling loop — OpenAI's native message shape (this
+   * path always runs on OpenAI, see the file header comment). Mutually
+   * exclusive with `prompt`. */
+  messages?: OpenAiMessage[];
+  tools?: OpenAiToolDefinition[];
   /** Required when capability === "vision". */
   imageUrl?: string;
   /**
@@ -155,7 +161,14 @@ async function resolveCredential(
       ? await resolveAnthropicKey(input.db, input.ctx.workspaceId, input.decryptByokKey)
       : undefined;
   }
-  const shinaKey = process.env.ANTHROPIC_API_KEY;
+  // shina_only (the Agent's messages/OpenAI path) checks OPENAI_API_KEY;
+  // auto (apps/mkt's prompt/vision/Anthropic path) checks ANTHROPIC_API_KEY —
+  // each credentialMode is permanently paired with its own provider, see
+  // the file header comment.
+  const shinaKey =
+    input.credentialMode === "shina_only"
+      ? process.env.OPENAI_API_KEY
+      : process.env.ANTHROPIC_API_KEY;
 
   let decision: CredentialDecision;
   try {
@@ -206,13 +219,18 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
   }
 
   const { apiKey, credentialSource, billingSource } = await resolveCredential(input);
-  const model = input.model ?? DEFAULT_MODEL;
+  // The messages path always runs on OpenAI (the Shinã Agent), everything
+  // else (prompt/vision, apps/mkt) always runs on Anthropic — see the file
+  // header comment for why this isn't a generic provider selector.
+  const provider = input.messages ? "openai" : "anthropic";
+  const model =
+    input.model ?? (provider === "openai" ? OPENAI_DEFAULT_MODEL : ANTHROPIC_DEFAULT_MODEL);
   const maxTokens = input.maxTokens ?? 2048;
 
   let estimatedCredits: number | null = null;
   if (billingSource === "SHINA_CREDITS") {
     estimatedCredits = await estimateMaxCredits(input.adminDb, {
-      provider: PROVIDER,
+      provider,
       model,
       capability: input.capability,
       maxTokens,
@@ -253,9 +271,11 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
     // Multi-turn / tool-calling path — used by the Shinã Agent's tool loop.
     // Bypasses @shina/ai-platform's ModelProvider abstraction on purpose
     // (its ModelMessage can't losslessly represent tool_use/tool_result
-    // content blocks) and talks to Anthropic's native message shape
-    // directly, same posture as the existing maintenance-copilot route.
-    const result = await generateWithMessages({
+    // shapes) and talks to OpenAI's native message/tool-call format
+    // directly (this path always runs on OpenAI, see the file header
+    // comment) — same posture as the existing maintenance-copilot route's
+    // own direct-to-provider tool loop.
+    const result = await generateWithMessagesOpenAI({
       system: input.system,
       messages: input.messages,
       maxTokens,
@@ -267,7 +287,7 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
     tokensIn = result.tokensIn;
     tokensOut = result.tokensOut;
     responseModel = result.model;
-    toolUses = result.toolUses;
+    toolUses = result.toolCalls.map((t) => ({ id: t.id, name: t.name, input: t.arguments }));
     stopReason = result.stopReason;
   } else {
     const response = await getModelProviderRegistry()
@@ -298,7 +318,7 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
   let estimatedCostUsd: number | null = null;
   if (billingSource === "SHINA_CREDITS") {
     const actual = await estimateCredits(input.adminDb, {
-      provider: PROVIDER,
+      provider,
       model: responseModel,
       capability: input.capability,
       tokensIn,
@@ -314,7 +334,7 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
       workspace_id: input.ctx.workspaceId,
       tenant_id: input.ctx.tenantId,
       user_id: input.ctx.userId,
-      provider: PROVIDER,
+      provider,
       model: responseModel,
       operation: input.operation,
       tokens_in: tokensIn,

@@ -10,7 +10,8 @@ import {
   AiPolicyError,
   InsufficientCreditsError,
   DuplicateRequestError,
-  AIProviderError,
+  OpenAIProviderError,
+  type OpenAiMessage,
 } from "@shina/ai-gateway";
 
 export const dynamic = "force-dynamic";
@@ -27,16 +28,6 @@ REGRAS OBRIGATÓRIAS:
 - Responda em português do Brasil, de forma direta e objetiva.`;
 
 const MAX_TURNS = 4;
-
-interface AnthropicContentBlock {
-  type: string;
-  id?: string;
-  name?: string;
-  input?: Record<string, unknown>;
-  text?: string;
-  tool_use_id?: string;
-  content?: string;
-}
 
 export async function POST(req: NextRequest) {
   const scope = await requireTenantScope();
@@ -77,9 +68,7 @@ export async function POST(req: NextRequest) {
   const availableTools = await registry.listAvailable(scope, ctx);
   const toolDefinitions = registry.toDefinitions(availableTools);
 
-  const messages: { role: "user" | "assistant"; content: unknown }[] = [
-    { role: "user", content: body.query.trim() },
-  ];
+  const messages: OpenAiMessage[] = [{ role: "user", content: body.query.trim() }];
   const toolsUsed: string[] = [];
   let totalCreditsConsumed = 0;
 
@@ -99,7 +88,7 @@ export async function POST(req: NextRequest) {
       });
       totalCreditsConsumed += result.creditsConsumed ?? 0;
 
-      if (result.stopReason !== "tool_use" || result.toolUses.length === 0) {
+      if (result.stopReason !== "tool_calls" || result.toolUses.length === 0) {
         void logActivity(scope.db, {
           tenantId: scope.tenantId,
           actorId: scope.userId,
@@ -113,16 +102,16 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      const assistantContent: AnthropicContentBlock[] = result.toolUses.map((t) => ({
-        type: "tool_use",
-        id: t.id,
-        name: t.name,
-        input: t.input,
-      }));
-      if (result.text) assistantContent.unshift({ type: "text", text: result.text });
-      messages.push({ role: "assistant", content: assistantContent });
+      messages.push({
+        role: "assistant",
+        content: result.text || null,
+        tool_calls: result.toolUses.map((t) => ({
+          id: t.id,
+          type: "function",
+          function: { name: t.name, arguments: JSON.stringify(t.input) },
+        })),
+      });
 
-      const toolResults: AnthropicContentBlock[] = [];
       for (const toolUse of result.toolUses) {
         void logActivity(scope.db, {
           tenantId: scope.tenantId,
@@ -151,13 +140,12 @@ export async function POST(req: NextRequest) {
           metadata: { tool: toolUse.name },
         });
 
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: toolUse.id,
+        messages.push({
+          role: "tool",
+          tool_call_id: toolUse.id,
           content: JSON.stringify(toolResult.ok ? toolResult.data : { error: toolResult.error }),
         });
       }
-      messages.push({ role: "user", content: toolResults });
     }
 
     return NextResponse.json(
@@ -182,7 +170,7 @@ export async function POST(req: NextRequest) {
     if (e instanceof DuplicateRequestError) {
       return NextResponse.json({ error: e.message, code: "duplicate_request" }, { status: 409 });
     }
-    if (e instanceof AIProviderError) {
+    if (e instanceof OpenAIProviderError) {
       return NextResponse.json({ error: e.message }, { status: e.status });
     }
     throw e;

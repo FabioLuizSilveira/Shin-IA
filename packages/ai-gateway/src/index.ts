@@ -21,3 +21,11 @@ export {
   type AnthropicToolUse,
   type AnthropicResult,
 } from "./anthropic.js";
+export {
+  generateWithMessagesOpenAI,
+  OpenAIProviderError,
+  type OpenAiToolDefinition,
+  type OpenAiToolCall,
+  type OpenAiMessage,
+  type OpenAiResult,
+} from "./openai.js";
