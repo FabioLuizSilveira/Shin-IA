@@ -1,4 +1,5 @@
 import type { AgentTool } from "../tool-types";
+import { computeAttentionSummary } from "../attention-summary";
 import {
   resolvePlanDue,
   deriveHealthScoreInputs,
@@ -295,22 +296,13 @@ export const getMaintenanceInsightsTool: AgentTool<{ status?: string }> = {
   },
 };
 
-interface AttentionItem {
-  source: { type: string; id: string };
-  reason: string;
-  severity: "low" | "medium" | "high";
-  recommendedAction: string;
-}
-
 // The cross-domain aggregator the spec's "o que precisa da minha atenção
-// hoje" example asks for. No such aggregator existed anywhere in the
-// codebase (confirmed by audit) — this fans out to 3 real, cheap,
-// deterministic reads (maintenance_insights, contracts expiring soon,
-// signature requests stuck pending) and normalizes each into the spec's
-// {source, reason, severity, recommendedAction} shape. Deliberately never
-// calls /api/ai/insights or /api/maintenance/auditor/run — those are an
-// LLM call and a write/compute action respectively, neither of which this
-// read-only summary may silently trigger.
+// hoje" example asks for. Logic lives in ../attention-summary.ts (shared
+// with Wave 8's daily_summary automation — never two implementations of
+// "what needs attention"). Deliberately never calls /api/ai/insights or
+// /api/maintenance/auditor/run — those are an LLM call and a
+// write/compute action respectively, neither of which this read-only
+// summary may silently trigger.
 export const getAttentionSummaryTool: AgentTool<Record<string, never>> = {
   name: "get_attention_summary",
   description:
@@ -318,72 +310,7 @@ export const getAttentionSummaryTool: AgentTool<Record<string, never>> = {
   inputSchema: { type: "object", properties: {} },
   requiredFeature: "agent.tools.intelligence",
   async execute(_args, _ctx, scope) {
-    const items: AttentionItem[] = [];
-
-    const { data: insights } = await scope.db
-      .from("maintenance_insights")
-      .select("id, asset_id, type, severity, message")
-      .eq("tenant_id", scope.tenantId)
-      .eq("status", "open");
-    for (const i of insights ?? []) {
-      items.push({
-        source: { type: i.asset_id ? "asset" : "fleet", id: i.asset_id ?? i.id },
-        reason: i.message,
-        severity: i.severity === "high" ? "high" : "medium",
-        recommendedAction:
-          i.type === "critical_health_asset"
-            ? "Revisar plano de manutenção do ativo"
-            : i.type === "stale_recommendations"
-              ? "Tratar recomendações de manutenção pendentes"
-              : "Revisar saúde geral da frota",
-      });
-    }
-
-    const now = new Date();
-    const cutoff = new Date(now.getTime() + 15 * 86_400_000);
-    const { data: contracts } = await scope.db
-      .from("contracts")
-      .select("id, period_ends_at, organizations(name)")
-      .eq("tenant_id", scope.tenantId)
-      .eq("status", "active")
-      .is("deleted_at", null)
-      .gte("period_ends_at", now.toISOString())
-      .lte("period_ends_at", cutoff.toISOString());
-    for (const c of contracts ?? []) {
-      const org = c.organizations as unknown as { name: string } | null;
-      items.push({
-        source: { type: "contract", id: c.id },
-        reason: `Contrato${org?.name ? ` de ${org.name}` : ""} vence em ${new Date(c.period_ends_at as string).toLocaleDateString("pt-BR")}.`,
-        severity: "medium",
-        recommendedAction: "Verificar renovação ou encerramento do contrato",
-      });
-    }
-
-    const staleCutoff = new Date(now.getTime() - 3 * 86_400_000).toISOString();
-    const { data: pendingSignatures } = await scope.db
-      .from("signature_requests")
-      .select(
-        "id, contract_id, status, created_at, contracts!inner(id, tenant_id, organizations(name))",
-      )
-      .eq("contracts.tenant_id", scope.tenantId)
-      .in("status", ["sent", "in_progress"])
-      .lte("created_at", staleCutoff);
-    for (const s of pendingSignatures ?? []) {
-      const contract = s.contracts as unknown as {
-        id: string;
-        organizations: { name: string } | null;
-      };
-      items.push({
-        source: { type: "contract", id: s.contract_id as string },
-        reason: `Assinatura do contrato${contract?.organizations?.name ? ` de ${contract.organizations.name}` : ""} está pendente há mais de 3 dias.`,
-        severity: "medium",
-        recommendedAction: "Cobrar assinatura ou reenviar solicitação",
-      });
-    }
-
-    const severityOrder = { high: 0, medium: 1, low: 2 };
-    items.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
-
+    const items = await computeAttentionSummary(scope.db, scope.tenantId);
     return { ok: true, data: items };
   },
 };

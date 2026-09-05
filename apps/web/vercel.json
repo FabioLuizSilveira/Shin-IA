@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/infraction-unmatched-sweep",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/agent-automations",
+      "schedule": "0 9 * * *"
     }
   ]
 }
