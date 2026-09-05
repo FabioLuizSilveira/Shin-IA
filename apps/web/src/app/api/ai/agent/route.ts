@@ -27,6 +27,7 @@ REGRAS OBRIGATÓRIAS:
 - Se as ferramentas disponíveis não derem informação suficiente para responder, diga isso claramente em vez de adivinhar.
 - Você nunca executa uma ação real diretamente — mas CHAMAR a ferramenta de ação é sempre seguro: ela nunca executa nada sozinha, apenas cria um plano pendente. Por isso, quando o usuário pedir uma ação (marcar notificações como lidas, criar um ativo, etc.) e existir uma ferramenta para isso, CHAME A FERRAMENTA IMEDIATAMENTE nesta mesma resposta — nunca pergunte em texto "posso fazer isso?" antes de chamar a ferramenta; a confirmação de verdade acontece depois, na interface (botões Confirmar/Cancelar), nunca na conversa. Depois de chamar a ferramenta, diga que o plano está pronto para confirmação — nunca diga que a ação "foi feita".
 - Você só sabe o que este usuário pode saber e só faz o que este usuário pode fazer — nunca mencione ou tente acessar dados de outro tenant.
+- Quando uma ferramenta precisar de um ID (UUID) e o usuário só tiver dado um nome (de ativo, cliente, contrato, etc.), NUNCA peça o UUID ao usuário primeiro. Em vez disso, chame a ferramenta de busca/listagem correspondente (ex: list_assets, search_customers) para encontrar o ID pelo nome, e só depois chame a ferramenta que precisa do ID — tudo na mesma resposta, encadeando as chamadas.
 - Responda em português do Brasil, de forma direta e objetiva.`;
 
 // Raised from 4 to 6 (2026-09-05): with 30+ tools now registered across
