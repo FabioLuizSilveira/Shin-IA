@@ -28,6 +28,7 @@ import { getInfractionsTool } from "./infractions";
 import { getResourceLocationTool, getTrackingEventsTool } from "./tracking";
 import { getInvoicesTool, getBillingSummaryTool } from "./billing";
 import { generateBasicReportTool } from "./reporting";
+import { searchTenantKnowledgeTool } from "./knowledge";
 
 const allTools: AgentTool[] = [];
 allTools.push(createHelpTool(() => allTools.map((t) => t.name)));
@@ -53,6 +54,7 @@ allTools.push(getInfractionsTool);
 allTools.push(getResourceLocationTool, getTrackingEventsTool);
 allTools.push(getInvoicesTool, getBillingSummaryTool);
 allTools.push(generateBasicReportTool);
+allTools.push(searchTenantKnowledgeTool);
 
 export function buildAgentToolRegistry() {
   return createAgentToolRegistry(allTools);

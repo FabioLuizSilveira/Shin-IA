@@ -111,3 +111,59 @@ export async function generateWithMessagesOpenAI(options: {
     stopReason: choice?.finish_reason ?? null,
   };
 }
+
+const OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings";
+const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
+
+export interface OpenAiEmbeddingResult {
+  embeddings: number[][];
+  tokensIn: number;
+  model: string;
+}
+
+// Wave 5 (Tenant Knowledge) — a separate endpoint/response shape from chat
+// completions, so its own function rather than overloading
+// generateWithMessagesOpenAI. Batches all inputs into one request (OpenAI's
+// embeddings endpoint accepts an array natively) — callers chunking a
+// document should pass every chunk at once, not one call per chunk.
+export async function generateEmbeddingsOpenAI(options: {
+  input: string[];
+  model?: string;
+  apiKey?: string;
+}): Promise<OpenAiEmbeddingResult> {
+  const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new OpenAIProviderError(
+      "OPENAI_API_KEY não configurada. Configure a variável de ambiente no servidor.",
+      503,
+    );
+  }
+  if (options.input.length === 0)
+    return { embeddings: [], tokensIn: 0, model: options.model ?? DEFAULT_EMBEDDING_MODEL };
+
+  const model = options.model ?? DEFAULT_EMBEDDING_MODEL;
+  const res = await fetch(OPENAI_EMBEDDINGS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ model, input: options.input }),
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new OpenAIProviderError(
+      body?.error?.message ?? `OpenAI embeddings API error (${res.status})`,
+      res.status === 429 ? 429 : 502,
+    );
+  }
+
+  const json = (await res.json()) as {
+    model: string;
+    data: { embedding: number[]; index: number }[];
+    usage: { prompt_tokens: number };
+  };
+  const embeddings = [...json.data].sort((a, b) => a.index - b.index).map((d) => d.embedding);
+  return { embeddings, tokensIn: json.usage.prompt_tokens, model: json.model };
+}

@@ -23,9 +23,12 @@ export {
 } from "./anthropic.js";
 export {
   generateWithMessagesOpenAI,
+  generateEmbeddingsOpenAI,
   OpenAIProviderError,
   type OpenAiToolDefinition,
   type OpenAiToolCall,
   type OpenAiMessage,
   type OpenAiResult,
+  type OpenAiEmbeddingResult,
 } from "./openai.js";
+export { runEmbeddingGateway } from "./embeddings.js";
