@@ -57,3 +57,92 @@ export const getContractSignatureStatusTool: AgentTool<{ contractId: string }> =
     return { ok: true, data: status };
   },
 };
+
+// Same columns as GET /api/contracts/[id]/route.ts.
+const DETAIL_SELECT =
+  "id, type, status, value_amount, value_currency, period_starts_at, period_ends_at, created_at, organizations(id, name, type, document, email)";
+
+export const getContractTool: AgentTool<{ contractId: string }> = {
+  name: "get_contract",
+  description: "Detalhes de um contrato específico do tenant, pelo ID.",
+  inputSchema: {
+    type: "object",
+    properties: { contractId: { type: "string", description: "UUID do contrato" } },
+    required: ["contractId"],
+  },
+  requiredPermission: "tenant.contracts.view",
+  requiredFeature: "agent.tools.contracts",
+  async execute(args, _ctx, scope) {
+    const { data, error } = await scope.db
+      .from("contracts")
+      .select(DETAIL_SELECT)
+      .eq("id", args.contractId)
+      .eq("tenant_id", scope.tenantId)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    if (!data) return { ok: false, error: "contract not found" };
+    return { ok: true, data };
+  },
+};
+
+export const getContractsExpiringTool: AgentTool<{ withinDays?: number }> = {
+  name: "get_contracts_expiring",
+  description: "Lista contratos ativos que vencem dentro de um número de dias (padrão 30).",
+  inputSchema: {
+    type: "object",
+    properties: {
+      withinDays: {
+        type: "number",
+        description: "Janela em dias a partir de hoje, padrão 30, máximo 365",
+      },
+    },
+  },
+  requiredPermission: "tenant.contracts.view",
+  requiredFeature: "agent.tools.contracts",
+  async execute(args, _ctx, scope) {
+    const days = args.withinDays && args.withinDays > 0 ? Math.min(args.withinDays, 365) : 30;
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + days * 86_400_000);
+    const { data, error } = await scope.db
+      .from("contracts")
+      .select(SELECT)
+      .eq("tenant_id", scope.tenantId)
+      .eq("status", "active")
+      .is("deleted_at", null)
+      .gte("period_ends_at", now.toISOString())
+      .lte("period_ends_at", cutoff.toISOString())
+      .order("period_ends_at", { ascending: true })
+      .limit(25);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, data };
+  },
+};
+
+export const getCustomerContractsTool: AgentTool<{ organizationId: string }> = {
+  name: "get_customer_contracts",
+  description: "Lista os contratos de um cliente/organização específico.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      organizationId: { type: "string", description: "UUID da organização/cliente" },
+    },
+    required: ["organizationId"],
+  },
+  requiredPermission: "tenant.contracts.view",
+  requiredFeature: "agent.tools.contracts",
+  async execute(args, _ctx, scope) {
+    // Scoped by this tenant's own contracts regardless of whether
+    // organizationId is real or belongs to another tenant — an id from
+    // another tenant simply matches nothing here, never leaks their data.
+    const { data, error } = await scope.db
+      .from("contracts")
+      .select(SELECT)
+      .eq("tenant_id", scope.tenantId)
+      .eq("organization_id", args.organizationId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(25);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, data };
+  },
+};
