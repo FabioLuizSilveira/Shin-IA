@@ -29,7 +29,13 @@ REGRAS OBRIGATÓRIAS:
 - Você só sabe o que este usuário pode saber e só faz o que este usuário pode fazer — nunca mencione ou tente acessar dados de outro tenant.
 - Responda em português do Brasil, de forma direta e objetiva.`;
 
-const MAX_TURNS = 4;
+// Raised from 4 to 6 (2026-09-05): with 30+ tools now registered across
+// Waves 3-7, a query needing 2 chained calls (e.g. resolve an asset name
+// via list_assets, then call get_asset_health_score with its id) started
+// hitting the old cap under gpt-4o-mini — a real tool-selection/chaining
+// limitation, not something this constant alone fixes, but it buys enough
+// room for the common 2-3 step case to converge instead of hard-failing.
+const MAX_TURNS = 6;
 
 export async function POST(req: NextRequest) {
   const scope = await requireTenantScope();
