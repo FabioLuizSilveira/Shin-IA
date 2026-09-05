@@ -14,6 +14,17 @@ export const AI_AGENT_EVENTS = {
   VOICE_TRANSCRIBED: "AI_VOICE_TRANSCRIBED",
 } as const;
 
+// Wave 6 — Guided Actions. PROPOSED fires from the tool loop (never a
+// mutation), the rest from the confirm/cancel routes.
+export const AI_ACTION_EVENTS = {
+  PROPOSED: "AI_ACTION_PROPOSED",
+  CONFIRMED: "AI_ACTION_CONFIRMED",
+  EXECUTED: "AI_ACTION_EXECUTED",
+  EXECUTION_FAILED: "AI_ACTION_EXECUTION_FAILED",
+  CANCELLED: "AI_ACTION_CANCELLED",
+  DENIED: "AI_ACTION_DENIED",
+} as const;
+
 export const AI_CREDIT_EVENTS = {
   RESERVED: "AI_CREDIT_RESERVED",
   USAGE: "AI_CREDIT_USAGE",

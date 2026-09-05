@@ -12,13 +12,26 @@ import { useState, useRef, useEffect } from "react";
 import { X, Send, Sparkles } from "lucide-react";
 import { useToast } from "@shina/design-system";
 
+interface ActionPlan {
+  id: string;
+  toolName: string;
+  riskLevel: string;
+  summary: string;
+}
+
 interface ShinaMessage {
   role: "user" | "assistant";
   text: string;
+  actionPlans?: ActionPlan[];
 }
 
 interface AgentApiResponse {
-  data?: { text: string; toolsUsed: string[]; creditsConsumed: number };
+  data?: {
+    text: string;
+    toolsUsed: string[];
+    creditsConsumed: number;
+    pendingActionPlans?: { id: string; toolName: string; riskLevel: string; summary: string }[];
+  };
   error?: string;
   code?: string;
 }
@@ -38,6 +51,8 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
   const [messages, setMessages] = useState<ShinaMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [resolvingPlanId, setResolvingPlanId] = useState<string | null>(null);
+  const [resolvedPlanIds, setResolvedPlanIds] = useState<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -77,11 +92,39 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
         return;
       }
 
-      setMessages((m) => [...m, { role: "assistant", text: json.data?.text ?? "" }]);
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          text: json.data?.text ?? "",
+          actionPlans: json.data?.pendingActionPlans,
+        },
+      ]);
     } catch {
       show({ message: "Shinã não conseguiu responder agora. Tente novamente.", variant: "danger" });
     } finally {
       setSending(false);
+    }
+  }
+
+  async function resolvePlan(planId: string, action: "confirm" | "cancel") {
+    setResolvingPlanId(planId);
+    try {
+      const res = await fetch(`/api/ai/agent/actions/${planId}/${action}`, { method: "POST" });
+      const json = (await res.json().catch(() => ({}))) as { data?: unknown; error?: string };
+      if (!res.ok) {
+        show({ message: json.error ?? "Não foi possível concluir a ação.", variant: "danger" });
+        return;
+      }
+      setResolvedPlanIds((s) => new Set(s).add(planId));
+      show({
+        message: action === "confirm" ? "Ação confirmada e executada." : "Ação cancelada.",
+        variant: "success",
+      });
+    } catch {
+      show({ message: "Não foi possível concluir a ação.", variant: "danger" });
+    } finally {
+      setResolvingPlanId(null);
     }
   }
 
@@ -110,7 +153,10 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
             </p>
           )}
           {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              key={i}
+              className={`flex flex-col gap-2 ${m.role === "user" ? "items-end" : "items-start"}`}
+            >
               <div
                 className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap ${
                   m.role === "user"
@@ -120,6 +166,39 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
               >
                 {m.text}
               </div>
+              {m.actionPlans?.map((plan) => {
+                const resolved = resolvedPlanIds.has(plan.id);
+                return (
+                  <div
+                    key={plan.id}
+                    className="max-w-[85%] w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 px-4 py-3 text-sm"
+                  >
+                    <p className="text-slate-700 dark:text-slate-200">{plan.summary}</p>
+                    {resolved ? (
+                      <p className="mt-2 text-xs text-slate-400">Concluído.</p>
+                    ) : (
+                      <div className="mt-2.5 flex gap-2">
+                        <button
+                          type="button"
+                          disabled={resolvingPlanId === plan.id}
+                          onClick={() => void resolvePlan(plan.id, "confirm")}
+                          className="px-3 py-1.5 rounded-lg bg-shina-blue text-white text-xs font-medium disabled:opacity-60 cursor-pointer border-0"
+                        >
+                          Confirmar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={resolvingPlanId === plan.id}
+                          onClick={() => void resolvePlan(plan.id, "cancel")}
+                          className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium disabled:opacity-60 cursor-pointer border-0"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ))}
           {sending && (

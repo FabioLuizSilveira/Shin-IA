@@ -4,7 +4,9 @@ import { isFeatureEnabled } from "@/lib/feature-flags";
 import { logActivity } from "@/lib/activity-log";
 import { buildAgentContext } from "@/lib/ai/agent-context";
 import { buildAgentToolRegistry } from "@/lib/ai/tools";
-import { AI_AGENT_EVENTS } from "@/lib/ai/audit-events";
+import { buildMutationToolRegistry } from "@/lib/ai/actions/tools";
+import type { ProposedPlan } from "@/lib/ai/actions/mutation-registry";
+import { AI_AGENT_EVENTS, AI_ACTION_EVENTS } from "@/lib/ai/audit-events";
 import {
   runAiGateway,
   AiPolicyError,
@@ -23,7 +25,7 @@ REGRAS OBRIGATÓRIAS:
 - Você só pode obter informações através das ferramentas (tools) fornecidas. Nunca invente dados, nunca acesse ou mencione acessar o banco de dados diretamente, nunca gere SQL.
 - Toda afirmação sobre dados reais deve vir literalmente do resultado de uma ferramenta chamada nesta conversa.
 - Se as ferramentas disponíveis não derem informação suficiente para responder, diga isso claramente em vez de adivinhar.
-- Você nunca decide ou executa uma ação real (aprovar, cancelar, assinar, etc.) — nesta fase você só consulta e explica; qualquer ação real é feita por um humano na interface do Shinã.
+- Você nunca executa uma ação real diretamente. Quando o usuário pedir uma ação (marcar notificações como lidas, criar um ativo, etc.) e existir uma ferramenta para isso, você PROPÕE um plano — a ferramenta cria um plano pendente, que só é executado depois que um humano confirma explicitamente na interface. Nunca diga que a ação "foi feita" — diga que o plano está pronto para confirmação.
 - Você só sabe o que este usuário pode saber e só faz o que este usuário pode fazer — nunca mencione ou tente acessar dados de outro tenant.
 - Responda em português do Brasil, de forma direta e objetiva.`;
 
@@ -66,10 +68,17 @@ export async function POST(req: NextRequest) {
 
   const registry = buildAgentToolRegistry();
   const availableTools = await registry.listAvailable(scope, ctx);
-  const toolDefinitions = registry.toDefinitions(availableTools);
+  const mutationRegistry = buildMutationToolRegistry();
+  const availableMutationTools = await mutationRegistry.listAvailable(scope, ctx);
+  const toolDefinitions = [
+    ...registry.toDefinitions(availableTools),
+    ...mutationRegistry.toDefinitions(availableMutationTools),
+  ];
+  const mutationToolNames = new Set(availableMutationTools.map((t) => t.name));
 
   const messages: OpenAiMessage[] = [{ role: "user", content: body.query.trim() }];
   const toolsUsed: string[] = [];
+  const pendingActionPlans: ProposedPlan[] = [];
   let totalCreditsConsumed = 0;
 
   try {
@@ -98,7 +107,12 @@ export async function POST(req: NextRequest) {
           metadata: { toolsUsed, creditsConsumed: totalCreditsConsumed },
         });
         return NextResponse.json({
-          data: { text: result.text, toolsUsed, creditsConsumed: totalCreditsConsumed },
+          data: {
+            text: result.text,
+            toolsUsed,
+            creditsConsumed: totalCreditsConsumed,
+            pendingActionPlans: pendingActionPlans.length ? pendingActionPlans : undefined,
+          },
         });
       }
 
@@ -121,6 +135,42 @@ export async function POST(req: NextRequest) {
           action: AI_AGENT_EVENTS.TOOL_REQUESTED,
           metadata: { tool: toolUse.name, input: toolUse.input },
         });
+
+        if (mutationToolNames.has(toolUse.name)) {
+          const proposal = await mutationRegistry.propose(
+            toolUse.name,
+            toolUse.input,
+            ctx,
+            scope,
+            availableMutationTools,
+          );
+          toolsUsed.push(toolUse.name);
+
+          void logActivity(scope.db, {
+            tenantId: scope.tenantId,
+            actorId: scope.userId,
+            entityType: "ai_agent",
+            entityId: requestId,
+            action: proposal.ok ? AI_ACTION_EVENTS.PROPOSED : AI_ACTION_EVENTS.DENIED,
+            metadata: { tool: toolUse.name },
+          });
+
+          if (proposal.ok) pendingActionPlans.push(proposal.plan);
+          messages.push({
+            role: "tool",
+            tool_call_id: toolUse.id,
+            content: JSON.stringify(
+              proposal.ok
+                ? {
+                    status: "pending_confirmation",
+                    planId: proposal.plan.id,
+                    summary: proposal.plan.summary,
+                  }
+                : { error: proposal.error },
+            ),
+          });
+          continue;
+        }
 
         const toolResult = await registry.execute(
           toolUse.name,
