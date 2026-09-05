@@ -22,7 +22,7 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://wokoqmoulsvzikkdcmfc.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indva29xbW91bHN2emlra2RjbWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMTg5MzQsImV4cCI6MjA5Nzg5NDkzNH0.ooIrP6ruo95JkSay9N_IAnr6XDQU7hgs_YPBmU_F9js",
-        "EXPO_PUBLIC_SHINAIA_API_URL": "http://192.168.1.194:3002",
+        "EXPO_PUBLIC_SHINAIA_API_URL": "https://app.shinaia.com.br",
         "EXPO_PUBLIC_ENABLE_MOCKS": "0",
         "EXPO_PUBLIC_PERF_TRACE": "1",
         "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBiOwgvKL2w_JScnZNHEsuguiRdipXKoh4",
