@@ -358,6 +358,27 @@ export interface InfractionCaseDetail {
   payments: InfractionPaymentItem[];
 }
 
+// Self-service closure round (docs/architecture/INFRACTIONS_ENGINE.md) —
+// operator and customer detail shapes are deliberately narrower than the
+// staff one above (InfractionCaseDetail): no payments, no other party's
+// data, only what that persona's own mobile route actually returns.
+export interface InfractionDriverIdentificationItem {
+  id: string;
+  status: string;
+  operator_acknowledgment: "confirmed" | "disputed" | null;
+  operator_acknowledged_at: string | null;
+  operator_notes: string | null;
+}
+export interface OperatorInfractionCaseDetail {
+  case: InfractionCaseListItem;
+  driverIdentifications: InfractionDriverIdentificationItem[];
+}
+export interface CustomerInfractionCaseDetail {
+  case: InfractionCaseListItem;
+  deadlines: InfractionDeadlineItem[];
+  disputes: InfractionDisputeItem[];
+}
+
 export const shinaia = {
   // Pre-auth — the mobile login screen's "Demonstração" button. Signs in as
   // one of two real, dedicated demo accounts against the real Veloz Rent a
@@ -782,6 +803,37 @@ export const shinaia = {
   ) => mutate<{ id: string }>("POST", `/api/infractions/${caseId}/payment`, input),
   createInfractionDispute: (caseId: string, input: { partyType: string; description: string }) =>
     mutate<{ id: string }>("POST", `/api/infractions/${caseId}/disputes`, input),
+
+  // Self-service closure round — operator (acknowledge/dispute a driver
+  // identification pointed at them) and customer (view + dispute their
+  // own case) infraction routes.
+  operatorInfractionDetail: (caseId: string) =>
+    request<OperatorInfractionCaseDetail>("GET", `/api/mobile/operator-infractions/${caseId}`).then(
+      (data) => ({ data, source: "live" as const }),
+    ),
+  respondDriverIdentification: (
+    caseId: string,
+    driverIdentificationId: string,
+    input: { acknowledgment: "confirmed" | "disputed"; notes?: string },
+  ) =>
+    mutate<{ ok: true }>(
+      "POST",
+      `/api/mobile/operator-infractions/${caseId}/driver-identification/${driverIdentificationId}/respond`,
+      input,
+    ),
+  customerInfractions: () =>
+    request<InfractionCaseListItem[]>("GET", "/api/mobile/customer/infractions").then((data) => ({
+      data,
+      source: "live" as const,
+    })),
+  customerInfractionDetail: (caseId: string) =>
+    request<CustomerInfractionCaseDetail>("GET", `/api/mobile/customer/infractions/${caseId}`).then(
+      (data) => ({ data, source: "live" as const }),
+    ),
+  createCustomerInfractionDispute: (
+    caseId: string,
+    input: { description: string; reason?: string },
+  ) => mutate<{ id: string }>("POST", `/api/mobile/customer/infractions/${caseId}/dispute`, input),
 };
 
 export { ApiError };

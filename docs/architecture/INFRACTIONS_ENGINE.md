@@ -392,3 +392,47 @@ com sucesso (1520 módulos, sem erros) — mesma profundidade de verificação u
 Segue de fato fora de escopo — decisão deliberada, não esquecimento —: self-service de escrita
 do operador (reconhecer/contestar indicação de condutor pelo celular) e qualquer tela de
 cliente (nenhuma rota de infração exposta ao cliente existe ainda).
+
+## Fechamento do self-service (operador + cliente) — entregue (2026-09-05)
+
+Dos 3 itens que seguiam fora de escopo, 2 foram fechados nesta rodada; o terceiro (integração
+oficial Senatran/RENAINF/DETRAN) permanece genuinamente bloqueado — confirmado com o usuário que
+nenhum convênio/credencial existe ainda (ver `SENATRAN_INFRACTIONS.md`, que também registra uma
+decisão real tomada agora: automatizar protocolo oficial via API **está autorizado** quando/se
+uma integração real existir, removendo a barreira de decisão jurídica que antes exigiria uma
+segunda aprovação — não desbloqueia código nenhum hoje, só remove essa segunda aprovação futura).
+
+**Self-service do operador**: novas colunas `operator_acknowledgment`/`operator_acknowledged_at`/
+`operator_notes` em `infraction_driver_identifications` (migration `20260911000000`) — deliberadamente
+separadas da coluna `status` já existente, que segue o workflow oficial gerenciado por staff
+(pending/ready/submitted/accepted/rejected/expired). `POST /api/mobile/operator-infractions/:id/
+driver-identification/:driverIdentificationId/respond` registra o que o próprio operador respondeu
+("sim, era eu" / "não fui eu") — nunca toca a coluna de status oficial. Uma resposta "disputed"
+reaproveita o mecanismo real de `infraction_disputes` (o mesmo que a rota de staff e agora também a
+de cliente usam), nunca um conceito de contestação paralelo — `party_type`/`party_id` sempre forçados
+no servidor para a própria identidade do operador, nunca aceitos do corpo da requisição. Nova rota
+`GET /api/mobile/operator-infractions/:id` (faltava — só a lista existia) permite ao app saber qual
+indicação de condutor está esperando resposta. Tela nova `OperatorInfractionDetailScreen`
+(deliberadamente mais enxuta que a tela de staff — nenhum controle de responsabilidade/pagamento),
+lista de infrações do operador agora navegável (antes só cartões inertes).
+
+**Tela de cliente**: `resolveInfractionVisibility()` ganhou o tipo `"customer"` (a lacuna que o
+próprio comentário do código já previa como aditiva) — carregando o conjunto de `tenantIds` que o
+cliente tem vínculo real (mesmo padrão de `customerOrganizationIds()` já usado por contratos), não
+um único `tenantId`, já que uma identidade de cliente pode (raramente) ter vínculo com mais de um
+tenant. 3 rotas novas: `GET /api/mobile/customer/infractions` (lista), `GET .../infractions/:id`
+(detalhe deliberadamente mais enxuto que o de staff — sem pagamentos, sem indicação de condutor de
+outra parte, só o que o próprio cliente precisa saber), `POST .../infractions/:id/dispute` (fecha o
+lado "respond" da permission `customer.infractions.respond`, seedada desde a Fase B mas nunca checada
+em rota nenhuma até agora). Telas novas `CustomerInfractionsScreen`/`CustomerInfractionDetailScreen`,
+com ponto de entrada na tela inicial do cliente (`RentalsListScreen`, mesmo padrão do cartão
+"PAGAMENTOS" já existente).
+
+**Testes**: `mobile-infractions-scope.test.ts` estendido — 5 testes novos de isolamento cliente×cliente
+(A não vê B, B não vê A simétrico, sem `customer_id` nunca visível, `customer_id` coincidente num
+tenant sem vínculo real também rejeitado), mais o teste de resolução do tipo `customer` corrigido (não
+resolve mais `null`). 17/17 testes do arquivo passam. Isolamento das 4 rotas HTTP novas verificado ao
+vivo contra produção, mesmo método já estabelecido pela Fase J (não unit test de handler — este módulo
+já documentou por que isso não funciona bem contra o preview local desta sessão). 206/206 testes de
+`apps/web` (0 regressão); typecheck limpo em todo o monorepo; `apps/mobile`: `tsc --noEmit` limpo,
+`expo export --platform android` empacota com sucesso.

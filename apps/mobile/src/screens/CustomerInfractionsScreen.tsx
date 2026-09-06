@@ -7,14 +7,12 @@ import { Card, ScreenHeader, Chip, T } from "../components/ui";
 import { AsyncScreen } from "../components/async-screen";
 import { useAsyncData } from "../lib/use-async-data";
 import { shinaia, type InfractionCaseListItem } from "../lib/shinaia-api";
-import { usePersona } from "../lib/persona-context";
 import type { RootStackParamList } from "../navigation";
 
-// Mobile screens phase (docs/architecture/INFRACTIONS_ENGINE.md) — mirrors
-// InspectionsScreen's list pattern, including the same staff/operator
-// scope split. Self-service closure round: operator rows are now
-// pressable too, navigating to OperatorInfractionDetailScreen (its own,
-// narrower screen — never the staff one) instead of being inert.
+// Self-service closure round (docs/architecture/INFRACTIONS_ENGINE.md) —
+// closes the "qualquer tela de cliente" gap. Mirrors InfractionsScreen's
+// list pattern exactly, scoped to GET /api/mobile/customer/infractions
+// (customer_id ownership, never every tenant case).
 const STATUS_LABEL: Record<string, string> = {
   received: "Recebida",
   matching: "Vinculando ativo",
@@ -62,35 +60,28 @@ function formatCents(cents: number | null, currency = "BRL"): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency });
 }
 
-export function InfractionsScreen() {
+export function CustomerInfractionsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { bootstrap } = usePersona();
-  const scope = bootstrap?.user.userType === "operator" ? "operator" : "staff";
-  const fetcher = useCallback(() => shinaia.infractions({ scope }), [scope]);
+  const fetcher = useCallback(() => shinaia.customerInfractions(), []);
   const { state, refreshing, reload } = useAsyncData(fetcher);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.surface }}>
-      <ScreenHeader
-        title="Infrações"
-        subtitle={scope === "operator" ? "Vinculadas a mim" : undefined}
-        brand
-      />
+      <ScreenHeader title="Minhas Infrações" brand />
       <AsyncScreen
         state={state}
         refreshing={refreshing}
         onRetry={() => void reload(true)}
         emptyTitle="Nenhuma infração"
-        emptySubtitle={
-          scope === "operator"
-            ? "Nenhuma infração vinculada a você no momento."
-            : "Nenhuma infração registrada ainda."
-        }
+        emptySubtitle="Nenhuma infração registrada em seu nome."
       >
         {(cases: InfractionCaseListItem[]) => (
           <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
-            {cases.map((item) => {
-              const content = (
+            {cases.map((item) => (
+              <Pressable
+                key={item.id}
+                onPress={() => navigation.navigate("CustomerInfractionDetail", { caseId: item.id })}
+              >
                 <Card style={{ gap: 4 }}>
                   <View
                     style={{
@@ -125,20 +116,8 @@ export function InfractionsScreen() {
                     </Text>
                   </View>
                 </Card>
-              );
-              return (
-                <Pressable
-                  key={item.id}
-                  onPress={() =>
-                    scope === "staff"
-                      ? navigation.navigate("InfractionDetail", { caseId: item.id })
-                      : navigation.navigate("OperatorInfractionDetail", { caseId: item.id })
-                  }
-                >
-                  {content}
-                </Pressable>
-              );
-            })}
+              </Pressable>
+            ))}
           </View>
         )}
       </AsyncScreen>

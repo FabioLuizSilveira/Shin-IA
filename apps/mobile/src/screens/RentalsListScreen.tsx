@@ -100,6 +100,18 @@ export function RentalsListScreen({ navigation }: Props) {
             </Pressable>
           )}
 
+          {/* Self-service closure round (INFRACTIONS_ENGINE.md) — entry
+              point to the new customer infractions screen, same pattern
+              as the PAGAMENTOS card above. */}
+          <Pressable onPress={() => navigation.navigate("CustomerInfractions")}>
+            <Card>
+              <Text style={T.text(theme.font.sm, theme.colors.brandSecondary)}>INFRAÇÕES</Text>
+              <Text style={[T.text(), { marginTop: theme.spacing.xs }]}>
+                Ver infrações registradas em seu nome
+              </Text>
+            </Card>
+          </Pressable>
+
           {rentals.length === 0 ? (
             <EmptyState
               icon="car-outline"

@@ -28,6 +28,9 @@ import { InspectionsScreen } from "./screens/InspectionsScreen";
 import { InspectionCaptureScreen } from "./screens/InspectionCaptureScreen";
 import { InfractionsScreen } from "./screens/InfractionsScreen";
 import { InfractionDetailScreen } from "./screens/InfractionDetailScreen";
+import { OperatorInfractionDetailScreen } from "./screens/OperatorInfractionDetailScreen";
+import { CustomerInfractionsScreen } from "./screens/CustomerInfractionsScreen";
+import { CustomerInfractionDetailScreen } from "./screens/CustomerInfractionDetailScreen";
 import { useAuth } from "./lib/auth-context";
 import { usePersona } from "./lib/persona-context";
 import { theme } from "./theme";
@@ -56,6 +59,9 @@ export type RootStackParamList = {
   InspectionCapture: { inspectionId: string };
   Infractions: undefined;
   InfractionDetail: { caseId: string };
+  OperatorInfractionDetail: { caseId: string };
+  CustomerInfractions: undefined;
+  CustomerInfractionDetail: { caseId: string };
 };
 
 export type TenantTabParamList = {
@@ -248,6 +254,11 @@ export function RootNavigator() {
                 component={InfractionsScreen}
                 options={{ headerShown: true, title: "Minhas Infrações" }}
               />
+              <Stack.Screen
+                name="OperatorInfractionDetail"
+                component={OperatorInfractionDetailScreen}
+                options={{ headerShown: false }}
+              />
             </>
           )}
           {bootstrap.user.userType === "unprovisioned" && (
@@ -268,6 +279,16 @@ export function RootNavigator() {
                 name="Notifications"
                 component={NotificationsScreen}
                 options={{ headerShown: true, title: "Notificações" }}
+              />
+              <Stack.Screen
+                name="CustomerInfractions"
+                component={CustomerInfractionsScreen}
+                options={{ headerShown: true, title: "Minhas Infrações" }}
+              />
+              <Stack.Screen
+                name="CustomerInfractionDetail"
+                component={CustomerInfractionDetailScreen}
+                options={{ headerShown: false }}
               />
             </>
           )}

@@ -45,7 +45,16 @@ const customer: MobileContext = {
   userId: "u4",
   email: null,
   customerId: "cust-A",
-  organizations: [],
+  organizations: [{ organizationId: "org-1", tenantId: "tenant-1" }],
+  db: {} as never,
+};
+
+const customerB: MobileContext = {
+  userType: "customer",
+  userId: "u5",
+  email: null,
+  customerId: "cust-B",
+  organizations: [{ organizationId: "org-2", tenantId: "tenant-1" }],
   db: {} as never,
 };
 
@@ -67,8 +76,12 @@ describe("resolveInfractionVisibility", () => {
     });
   });
 
-  it("customer resolves to null -- no customer-facing infraction route exists yet (documented gap)", () => {
-    expect(resolveInfractionVisibility(customer)).toBeNull();
+  it("customer gets a customer-scoped descriptor carrying every linked tenant id (self-service closure round)", () => {
+    expect(resolveInfractionVisibility(customer)).toEqual({
+      kind: "customer",
+      tenantIds: ["tenant-1"],
+      customerId: "cust-A",
+    });
   });
 
   it("unprovisioned resolves to null", () => {
@@ -116,5 +129,38 @@ describe("isInfractionVisible — cross-actor isolation", () => {
 
   it("unprovisioned sees nothing, regardless of row content", () => {
     expect(isInfractionVisible(caseA, resolveInfractionVisibility(unprovisioned))).toBe(false);
+  });
+});
+
+describe("isInfractionVisible — customer isolation", () => {
+  const caseCustomerA = { tenant_id: "tenant-1", operator_id: null, customer_id: "cust-A" };
+  const caseCustomerB = { tenant_id: "tenant-1", operator_id: null, customer_id: "cust-B" };
+  const caseNoCustomer = { tenant_id: "tenant-1", operator_id: null, customer_id: null };
+  const caseOtherTenantSameCustomerId = {
+    tenant_id: "tenant-2",
+    operator_id: null,
+    customer_id: "cust-A",
+  };
+
+  it("Customer A can see their own case", () => {
+    expect(isInfractionVisible(caseCustomerA, resolveInfractionVisibility(customer))).toBe(true);
+  });
+
+  it("Customer A CANNOT see Customer B's case", () => {
+    expect(isInfractionVisible(caseCustomerB, resolveInfractionVisibility(customer))).toBe(false);
+  });
+
+  it("Customer B CANNOT see Customer A's case (symmetric check)", () => {
+    expect(isInfractionVisible(caseCustomerA, resolveInfractionVisibility(customerB))).toBe(false);
+  });
+
+  it("a customer never sees a case with no customer_id set", () => {
+    expect(isInfractionVisible(caseNoCustomer, resolveInfractionVisibility(customer))).toBe(false);
+  });
+
+  it("a customer_id match in a tenant the customer has no real link to is still rejected", () => {
+    expect(
+      isInfractionVisible(caseOtherTenantSameCustomerId, resolveInfractionVisibility(customer)),
+    ).toBe(false);
   });
 });

@@ -76,10 +76,17 @@ ser assumido:
   contrato, mas nenhum dos dois foi implementado).
 - `TO_BE_CONFIRMED`: se indicação de condutor e defesa/recurso têm protocolo oficial via API
   (`supportsDriverIdentification`/`supportsAppealSubmission`) ou são sempre um processo manual em
-  portal — isso é explicitamente **proibido de automatizar sem integração autorizada** (item
-  59/60 do spec original: nenhuma indicação/contestação automática em portal oficial sem
-  integração já autorizada) — mesmo que a API exista, protocolar automaticamente é uma decisão de
-  produto/jurídica separada da integração técnica.
+  portal — permanece `TO_BE_CONFIRMED` tecnicamente (nenhuma API real foi identificada ainda), mas
+  a decisão de produto/jurídica que antes bloqueava isso **já foi tomada** (2026-09-05, usuário):
+  automatizar o protocolo oficial via API está autorizado, quando/se uma integração real existir.
+  Isso não desbloqueia nenhum código agora — ainda não existe API nenhuma para chamar — só remove
+  a barreira de decisão que antes exigiria uma segunda aprovação separada da integração técnica.
+
+**Status geral (2026-09-05, confirmado com o usuário): nenhum convênio/credencial com qualquer
+órgão (RENAINF/Serpro/DETRAN/municipal) existe ainda.** A integração oficial continua
+genuinamente bloqueada em fatos do mundo real, não em código — segue exatamente como descrito
+abaixo, sem nenhuma implementação nova.
+
 - `TO_BE_CONFIRMED`: SLA/rate limit/custo de qualquer uma dessas APIs, se existirem.
 
 ## Onde plugar quando (e se) isso for confirmado
