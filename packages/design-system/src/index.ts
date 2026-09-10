@@ -43,3 +43,10 @@ export {
   type CommandGroup,
   type CommandItem,
 } from "./components/command-palette";
+
+// Discovery wizard primitives (Intelligent Onboarding — Wave 2)
+export { Stepper, type StepperProps, type StepperStep } from "./components/stepper";
+export { RadioCard, type RadioCardProps } from "./components/radio-card";
+export { Chip, type ChipProps } from "./components/chip";
+export { Toggle, type ToggleProps } from "./components/toggle";
+export { RangeSlider, type RangeSliderProps } from "./components/range-slider";

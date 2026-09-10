@@ -9,6 +9,11 @@ import { ErrorState } from "../components/error-state";
 import { SuccessState } from "../components/success-state";
 import { Progress } from "../components/progress";
 import { Table } from "../components/table";
+import { Stepper } from "../components/stepper";
+import { RadioCard } from "../components/radio-card";
+import { Chip } from "../components/chip";
+import { Toggle } from "../components/toggle";
+import { RangeSlider } from "../components/range-slider";
 import { cn } from "../utils/cn";
 
 describe("cn", () => {
@@ -142,5 +147,95 @@ describe("Table", () => {
     );
     fireEvent.click(screen.getByText("Campanha A"));
     expect(onRowClick).toHaveBeenCalledWith({ name: "Campanha A" });
+  });
+});
+
+describe("Stepper", () => {
+  it("marca o passo atual com aria-current e mostra concluídos", () => {
+    render(
+      <Stepper
+        steps={[
+          { id: "a", label: "Perfil" },
+          { id: "b", label: "Recomendação" },
+          { id: "c", label: "Revisão" },
+        ]}
+        current={1}
+      />,
+    );
+    expect(screen.getByText("Recomendação").closest("button")).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+  });
+
+  it("permite clicar em passos já concluídos", () => {
+    const onStepClick = vi.fn();
+    render(
+      <Stepper
+        steps={[
+          { id: "a", label: "Perfil" },
+          { id: "b", label: "Recomendação" },
+        ]}
+        current={1}
+        onStepClick={onStepClick}
+      />,
+    );
+    fireEvent.click(screen.getByText("Perfil"));
+    expect(onStepClick).toHaveBeenCalledWith(0);
+  });
+});
+
+describe("RadioCard", () => {
+  it("expõe role radio e aria-checked, dispara onSelect", () => {
+    const onSelect = vi.fn();
+    render(
+      <RadioCard title="Alugo carros" description="Locação" selected={false} onSelect={onSelect} />,
+    );
+    const card = screen.getByRole("radio");
+    expect(card).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(card);
+    expect(onSelect).toHaveBeenCalledOnce();
+  });
+
+  it("usa role checkbox quando multiple", () => {
+    render(<RadioCard title="Motos" selected onSelect={() => {}} multiple />);
+    expect(screen.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
+  });
+});
+
+describe("Chip", () => {
+  it("é interativo (role checkbox) e alterna", () => {
+    const onToggle = vi.fn();
+    render(<Chip label="Guincho" selected={false} onToggle={onToggle} />);
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(onToggle).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Toggle", () => {
+  it("role switch, inverte o valor ao clicar", () => {
+    const onChange = vi.fn();
+    render(<Toggle checked={false} onChange={onChange} label="Rastreamento" />);
+    fireEvent.click(screen.getByRole("switch"));
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+});
+
+describe("RangeSlider", () => {
+  it("emite o novo valor numérico e mostra o valueLabel", () => {
+    const onChange = vi.fn();
+    render(
+      <RangeSlider
+        value={10}
+        min={0}
+        max={100}
+        onChange={onChange}
+        label="Ativos"
+        valueLabel="10 ativos"
+      />,
+    );
+    expect(screen.getByText("10 ativos")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "42" } });
+    expect(onChange).toHaveBeenCalledWith(42);
   });
 });
