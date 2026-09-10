@@ -40,3 +40,34 @@ export {
   type RetentionRule,
   type RetentionAction,
 } from "./retention-policy.js";
+
+// WAVE 2 — Intelligent Onboarding discovery & recommendation
+export {
+  listDiscoveryQuestions,
+  nextDiscoveryQuestion,
+  isDiscoveryComplete,
+  questionApplies,
+  type DiscoveryQuestion,
+  type DiscoveryQuestionType,
+  type DiscoveryOption,
+  type DiscoveryAnswer,
+} from "./discovery.js";
+export {
+  resolveBlueprint,
+  resolveBlueprintWithRules,
+  loadActiveBlueprintResolverRules,
+  type BlueprintResolution,
+  type ResolverProfileInput,
+  type RecommendationReason,
+} from "./blueprint-resolver.js";
+export {
+  resolvePlan,
+  resolvePlanWithRules,
+  loadActivePlanResolverRules,
+  type PlanResolution,
+} from "./plan-resolver.js";
+export {
+  buildOnboardingRecommendation,
+  type OnboardingRecommendation,
+  type RecommendedPlan,
+} from "./recommendation.js";
