@@ -86,7 +86,7 @@ export default function TenantLegalReacceptPage() {
           </p>
         </div>
 
-        <div className="h-40 overflow-y-auto px-3.5 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+        <div className="h-40 overflow-y-auto px-3.5 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-xs text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-line">
           {contract ? (
             <>
               <p className="font-semibold text-slate-800 dark:text-slate-200 mb-1">
