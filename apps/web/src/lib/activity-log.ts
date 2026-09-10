@@ -13,6 +13,14 @@ export async function logActivity(
     entityId: string;
     action: string;
     metadata?: Record<string, unknown>;
+    // Wave 1 (Intelligent Onboarding) — additive: lets a multi-step flow
+    // (discovery → recommendation → contract → provisioning) be
+    // reconstructed from one correlationId, and distinguishes a tenant
+    // user from a Shinã operator (assisted sales) or the system. Every
+    // pre-existing caller omits these and inserts NULLs, unchanged.
+    actorType?: "tenant_user" | "shina_operator" | "system";
+    correlationId?: string;
+    sessionId?: string;
   },
 ): Promise<void> {
   const { error } = await db.from("tenant_activity_log").insert({
@@ -22,6 +30,9 @@ export async function logActivity(
     entity_id: entry.entityId,
     action: entry.action,
     metadata: entry.metadata ?? {},
+    actor_type: entry.actorType ?? null,
+    correlation_id: entry.correlationId ?? null,
+    session_id: entry.sessionId ?? null,
   });
   if (error) console.error("[activity-log]", error.message);
 }
