@@ -96,3 +96,14 @@ export {
   type PlaceholderHit,
   type FreezeResult,
 } from "./contract-composition.js";
+
+// WAVE 4 — Intelligent Onboarding provisioning gate + run log
+export {
+  checkProvisioningReadiness,
+  resolveProvisioningPlan,
+  createProvisioningRun,
+  finishProvisioningRun,
+  type ProvisioningReadiness,
+  type ProvisioningPlan,
+  type ProvisioningStep,
+} from "./provisioning.js";
