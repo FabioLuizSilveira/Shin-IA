@@ -71,3 +71,28 @@ export {
   type OnboardingRecommendation,
   type RecommendedPlan,
 } from "./recommendation.js";
+
+// WAVE 3 — Intelligent Onboarding pricing + contract composition
+export {
+  computePricing,
+  computePricingWithRules,
+  loadActivePricingRules,
+  type PricingInput,
+  type PricingResult,
+  type PricingLineItem,
+} from "./pricing.js";
+export {
+  composeOnboardingContract,
+  freezeOnboardingContract,
+  verifyFrozenContractHash,
+  validateContractReadiness,
+  detectPlaceholders,
+  renderAnnex,
+  resolveContractExecutionMode,
+  type ComposeInput,
+  type ComposedContract,
+  type ContractReadiness,
+  type ContractExecutionMode,
+  type PlaceholderHit,
+  type FreezeResult,
+} from "./contract-composition.js";
