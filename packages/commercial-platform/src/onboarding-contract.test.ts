@@ -109,11 +109,12 @@ describe("WAVE 3 — readiness gate", () => {
 });
 
 describe("WAVE 3 — execution mode", () => {
-  it("commitment >= 12m or material change => electronic signature", () => {
-    expect(resolveContractExecutionMode({ commitmentPeriodMonths: 12 })).toBe(
+  it("commitment > 12m or material change => electronic signature; 12m is click-accept", () => {
+    expect(resolveContractExecutionMode({ commitmentPeriodMonths: 24 })).toBe(
       "electronic_signature",
     );
     expect(resolveContractExecutionMode({ materialChange: true })).toBe("electronic_signature");
+    expect(resolveContractExecutionMode({ commitmentPeriodMonths: 12 })).toBe("click_accept");
     expect(resolveContractExecutionMode({ commitmentPeriodMonths: 0 })).toBe("click_accept");
   });
 });

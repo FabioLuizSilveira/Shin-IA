@@ -257,13 +257,14 @@ export async function verifyFrozenContractHash(
   return { valid: true };
 }
 
-/** The signed-contract path is required when a commitment or a material
- *  contract change is involved; a simple click-accept otherwise. */
+/** The signed-contract path is required for a long commitment (more than the
+ *  standard 12-month term) or a material contract change; a simple
+ *  click-accept covers the standard case. */
 export function resolveContractExecutionMode(config: {
   commitmentPeriodMonths?: number | null;
   materialChange?: boolean;
 }): ContractExecutionMode {
-  if ((config.commitmentPeriodMonths ?? 0) >= 12 || config.materialChange) {
+  if ((config.commitmentPeriodMonths ?? 0) > 12 || config.materialChange) {
     return "electronic_signature";
   }
   return "click_accept";
