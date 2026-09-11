@@ -107,3 +107,12 @@ export {
   type ProvisioningPlan,
   type ProvisioningStep,
 } from "./provisioning.js";
+
+// WAVE 5 — Intelligent Onboarding lifecycle (operate / evolve / offboard)
+export {
+  computeConfigurationDelta,
+  resolveOffboardingPlan,
+  type ConfigurationDelta,
+  type ConfigurationSnapshotForDelta,
+  type OffboardingPlan,
+} from "./lifecycle.js";
