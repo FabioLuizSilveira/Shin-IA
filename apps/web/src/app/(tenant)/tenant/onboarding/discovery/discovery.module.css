@@ -1,0 +1,70 @@
+/*
+ * WAVE 6 -- scoped @shina/tokens values (light / platform), computed by hand
+ * from packages/tokens/src/{theme,colors,gradients}.ts. Scoped to this one
+ * class instead of mounting @shina/theme's ShinaThemeProvider globally --
+ * that provider writes onto document.documentElement (data-theme, the
+ * `.dark` class, every --shina-* variable) with no unmount cleanup, and
+ * apps/web's existing pages key their own dark: Tailwind classes off that
+ * same `.dark` class. Mounting it app-wide would repaint every other page
+ * for as long as this route is active. This keeps the blast radius to the
+ * wizard subtree only.
+ *
+ * If @shina/tokens' palette ever changes, regenerate by evaluating
+ * themeToCssVariables(createTheme({ mode: "light", product: "platform" }))
+ * -- see packages/theme/src/css-variables.ts. Only the color/surface/border/
+ * gradient/semantic variables are listed: no component under this route
+ * uses the spacing/radius/duration/z-index --shina-* variables.
+ */
+.scope {
+  --shina-primary: #2563eb;
+  --shina-primary-hover: #2563eb;
+  --shina-primary-pressed: #1e40af;
+  --shina-accent: #2563eb;
+
+  --shina-text-title: #0f172a;
+  --shina-text-primary: #0f172a;
+  --shina-text-secondary: #475569;
+  --shina-text-tertiary: #64748b;
+  --shina-text-disabled: #94a3b8;
+
+  --shina-surface-background: #ffffff;
+  --shina-surface-deep: #f8fafc;
+  --shina-surface-raised: #ffffff;
+  --shina-surface-glass: #f8fafc;
+  --shina-surface-glass-hover: #f1f5f9;
+  --shina-surface-overlay: rgba(15, 23, 42, 0.4);
+
+  --shina-border-subtle: #f1f5f9;
+  --shina-border-default: #e2e8f0;
+  --shina-border-strong: #cbd5e1;
+  --shina-border-focus: #2563eb66;
+
+  --shina-gradient: linear-gradient(135deg, #2563eb, #06b6d4);
+  --shina-glow: none;
+
+  /* semantic text tones deliberately darkened from @shina/tokens' literal
+     values (#34D399/#FBBF24/#F87171/#60A5FA) -- those are dark-background
+     pastels; on this scope's white background they read as low-contrast. */
+  --shina-success: #10b981;
+  --shina-success-bg: rgba(16, 185, 129, 0.12);
+  --shina-success-text: #059669;
+  --shina-success-border: rgba(16, 185, 129, 0.25);
+
+  --shina-warning: #f59e0b;
+  --shina-warning-bg: rgba(245, 158, 11, 0.12);
+  --shina-warning-text: #b45309;
+  --shina-warning-border: rgba(245, 158, 11, 0.25);
+
+  --shina-danger: #ef4444;
+  --shina-danger-bg: rgba(239, 68, 68, 0.12);
+  --shina-danger-text: #b91c1c;
+  --shina-danger-border: rgba(239, 68, 68, 0.25);
+
+  --shina-info: #3b82f6;
+  --shina-info-bg: rgba(59, 130, 246, 0.12);
+  --shina-info-text: #1d4ed8;
+  --shina-info-border: rgba(59, 130, 246, 0.25);
+
+  background: var(--shina-surface-background);
+  color: var(--shina-text-primary);
+}
