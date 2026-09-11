@@ -139,9 +139,12 @@ export async function POST(req: NextRequest) {
       retencaoResumo: retentionSummary || "Conforme Política de Retenção da Shinã",
     };
 
+    // Execution mode is driven by the COMMERCIAL terms (commitment length),
+    // not by contract_versions.material_change — the latter means "existing
+    // tenants must re-accept this text", a different concern from "this new
+    // deal needs a wet signature".
     const executionMode = resolveContractExecutionMode({
       commitmentPeriodMonths: config.commitment_period_months,
-      materialChange: contractVersion.material_change,
     });
 
     const composeInput: ComposeInput = {

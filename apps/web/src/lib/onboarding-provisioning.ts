@@ -73,6 +73,12 @@ export async function runOnboardingProvisioning(
   try {
     // 1. blueprints
     const runtime = createBlueprintRuntime(db);
+    const { data: alreadyInstalled } = await db
+      .from("blueprint_instances")
+      .select("blueprint_id")
+      .eq("tenant_id", input.tenantId);
+    const installedIds = new Set((alreadyInstalled ?? []).map((r) => r.blueprint_id as string));
+
     for (const blueprintId of plan.blueprintIds) {
       let manifest;
       try {
@@ -85,13 +91,24 @@ export async function runOnboardingProvisioning(
         });
         continue;
       }
+      // Idempotent: a blueprint the tenant already has is a skipped step —
+      // not a re-install, which the installer would reject on required-field
+      // validation before it even reaches its own already-installed check.
+      if (installedIds.has(blueprintId)) {
+        await applyBlueprintToAssetTypes(db, input.tenantId, manifest);
+        steps.push({
+          step: `blueprint:${blueprintId}`,
+          status: "skipped",
+          detail: "already installed",
+        });
+        continue;
+      }
       try {
         await runtime.install(input.tenantId, blueprintId, {}, input.actorId);
         await applyBlueprintToAssetTypes(db, input.tenantId, manifest);
         steps.push({ step: `blueprint:${blueprintId}`, status: "ok" });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        // already-installed is idempotent success
         steps.push({
           step: `blueprint:${blueprintId}`,
           status: /already installed/i.test(msg) ? "skipped" : "failed",
@@ -102,17 +119,15 @@ export async function runOnboardingProvisioning(
 
     // 2. feature flags (control plane) — enable each, upsert
     for (const flag of plan.featureFlags) {
-      const { error } = await db
-        .from("tenant_feature_flags")
-        .upsert(
-          {
-            tenant_id: input.tenantId,
-            flag_key: flag,
-            enabled: true,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "tenant_id,flag_key" },
-        );
+      const { error } = await db.from("tenant_feature_flags").upsert(
+        {
+          tenant_id: input.tenantId,
+          flag_key: flag,
+          enabled: true,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "tenant_id,flag_key" },
+      );
       steps.push({ step: `flag:${flag}`, status: error ? "failed" : "ok", detail: error?.message });
     }
 
