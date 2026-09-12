@@ -11,7 +11,14 @@
 // bolted-on WhatsApp clone, the opposite of what's asked.
 
 import { useCallback, useEffect, useState } from "react";
-import { Send, MessageCircle, UserPlus, CheckCircle2, Inbox as InboxIcon } from "lucide-react";
+import {
+  Send,
+  MessageCircle,
+  UserPlus,
+  CheckCircle2,
+  Inbox as InboxIcon,
+  Sparkles,
+} from "lucide-react";
 
 interface ConversationRow {
   id: string;
@@ -63,6 +70,7 @@ export function MessagingInbox() {
   const [loadingList, setLoadingList] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   const [notEnabled, setNotEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,6 +131,27 @@ export function MessagingInbox() {
     if (!selectedId) return;
     await fetch(`/api/messaging/conversations/${selectedId}/assign`, { method: "POST" });
     await loadList(filter);
+  }
+
+  async function handleSuggest() {
+    if (!selectedId) return;
+    setSuggesting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/messaging/conversations/${selectedId}/suggest`, {
+        method: "POST",
+      });
+      const json = (await res.json()) as { data?: { text?: string }; error?: string };
+      if (!res.ok || !json.data?.text) {
+        setError(json.error ?? "Não foi possível gerar uma sugestão");
+        return;
+      }
+      // COPILOT mode (spec section 19): fills the draft, never sends —
+      // the operator still has to review and press Send.
+      setDraft(json.data.text);
+    } finally {
+      setSuggesting(false);
+    }
   }
 
   async function handleClose() {
@@ -272,6 +301,15 @@ export function MessagingInbox() {
             {error && <p className="px-4 pb-1 text-xs text-red-500">{error}</p>}
 
             <div className="p-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleSuggest()}
+                disabled={suggesting}
+                title="Sugerir resposta com IA — você ainda revisa e envia"
+                className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-0 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-60"
+              >
+                <Sparkles className={`w-4 h-4 ${suggesting ? "animate-pulse" : ""}`} />
+              </button>
               <input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
