@@ -221,6 +221,24 @@ async function ensureParticipant(
 }
 
 /**
+ * Business-initiated counterpart to the webhook-triggered path above — used
+ * by notify.ts (spec section 16: Contract/Vistoria/Manutenção/etc. events
+ * reaching a customer/operator over WhatsApp) to get-or-create the
+ * conversation for a contact BEFORE any message exists yet, rather than
+ * only reacting to an inbound one.
+ */
+export async function getOrCreateConversationForContact(
+  db: SupabaseClient,
+  channel: MessagingChannel,
+  externalWaId: string,
+): Promise<{ conversationId: string; resolved: ResolvedContact }> {
+  const resolved = await resolveContactByPhone(db, channel.tenantId, externalWaId);
+  const conversation = await findOrCreateConversation(db, channel, externalWaId, resolved);
+  await ensureParticipant(db, channel.tenantId, conversation.id, externalWaId, null, resolved);
+  return { conversationId: conversation.id, resolved };
+}
+
+/**
  * Applies a canonical event to the DB. STOP conditions this enforces:
  * cross-tenant leakage (tenant is derived from the channel row, never the
  * event) and hash/duplicate-mismatch-ignored equivalents (idempotency log

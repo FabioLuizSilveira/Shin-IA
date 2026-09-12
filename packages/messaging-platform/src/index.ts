@@ -11,9 +11,15 @@ export {
   markChannelConnected,
   getAccessTokenForChannel,
   applyMessagingEvent,
+  getOrCreateConversationForContact,
   getMessagingChannel,
   listMessagingChannels,
 } from "./messaging-service.js";
+export {
+  notifyContactViaWhatsApp,
+  type NotifyContactInput,
+  type NotifyContactResult,
+} from "./notify.js";
 export {
   evaluateSendPolicy,
   type PolicyDecision,

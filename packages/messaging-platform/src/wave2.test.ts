@@ -208,6 +208,21 @@ describe("WAVE 2 — ContactResolver", () => {
     expect(resolved.type).toBe("unknown");
     expect(resolved.customerId).toBeNull();
   });
+
+  // Regression: an earlier version prefiltered operators/persons/
+  // organizations with a raw SQL ILIKE over the digit suffix, which
+  // silently missed real matches whenever the stored phone had a
+  // formatting separator (dash/space) inside the matched digit run —
+  // confirmed live against hosted Supabase before this fix.
+  it("resolves a dash-formatted operator phone (no ILIKE false negative)", async () => {
+    const db = new FakeDb();
+    db.tables.operators = [
+      { id: "op1", tenant_id: "t1", full_name: "Motorista", phone: "+55 11 91234-5678" },
+    ];
+    const resolved = await resolveContactByPhone(asClient(db), "t1", "5511912345678");
+    expect(resolved.type).toBe("operator");
+    expect(resolved.operatorId).toBe("op1");
+  });
 });
 
 describe("WAVE 2 — inbound message resolves and stamps the participant/sender", () => {

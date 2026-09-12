@@ -87,12 +87,17 @@ export async function resolveContactByPhone(
     }
   }
 
-  // 2. operator (tenant's own driver/field staff).
+  // 2. operator (tenant's own driver/field staff). No ILIKE prefilter here
+  // (or below) — none of these tables store a normalized phone column, so
+  // a formatted number like "+55 11 91234-5678" does not literally end
+  // with the digit suffix being searched for (the "-" breaks the run) and
+  // a SQL substring filter would silently miss a real match. Fetch the
+  // tenant's rows (bounded — this is a per-tenant staff/contact list, not
+  // an unbounded table) and compare normalized digits in application code.
   const { data: operators } = await db
     .from("operators")
     .select("id, full_name, phone")
-    .eq("tenant_id", tenantId)
-    .ilike("phone", `%${suffix}`);
+    .eq("tenant_id", tenantId);
   const operator = (operators ?? []).find((o) => matches(o.phone, externalWaId));
   if (operator) {
     return {
@@ -109,8 +114,7 @@ export async function resolveContactByPhone(
   const { data: persons } = await db
     .from("persons")
     .select("id, first_name, last_name, phone")
-    .eq("tenant_id", tenantId)
-    .ilike("phone", `%${suffix}`);
+    .eq("tenant_id", tenantId);
   const person = (persons ?? []).find((p) => matches(p.phone, externalWaId));
   if (person) {
     return {
@@ -127,8 +131,7 @@ export async function resolveContactByPhone(
   const { data: organizations } = await db
     .from("organizations")
     .select("id, name, phone")
-    .eq("tenant_id", tenantId)
-    .ilike("phone", `%${suffix}`);
+    .eq("tenant_id", tenantId);
   const organization = (organizations ?? []).find((o) => matches(o.phone, externalWaId));
   if (organization) {
     return {

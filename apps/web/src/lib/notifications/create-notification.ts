@@ -2,6 +2,7 @@
 import { deliverPushForNotification } from "@/lib/push/delivery";
 import { ExpoPushProvider } from "@/lib/push/expo-provider";
 import type { DeepLinkTarget } from "@/lib/push/deep-link";
+import { deliverWhatsAppForNotification } from "@/lib/messaging-notification-delivery";
 
 const pushProvider = new ExpoPushProvider();
 
@@ -75,4 +76,21 @@ export async function createNotification({
     { id: created.id, tenant_id: tenantId, recipient_external_ref: recipientExternalRef, priority },
     { deepLink },
   ).catch((err) => console.error("[create-notification] push delivery failed", err));
+
+  // WAVE 3 (Shinã Messaging Platform) — same fire-and-forget posture: a
+  // tenant with no connected WhatsApp channel, no messaging_whatsapp
+  // entitlement, or a recipient with no phone on file simply doesn't get
+  // this leg, silently. Only ever targets a real "customer:<id>"/
+  // "operator:<id>" recipient, never a tenant-wide broadcast.
+  void deliverWhatsAppForNotification(
+    admin,
+    {
+      id: created.id,
+      tenant_id: tenantId,
+      recipient_external_ref: recipientExternalRef,
+      subject,
+      body,
+    },
+    { deepLink },
+  ).catch((err) => console.error("[create-notification] whatsapp delivery failed", err));
 }
