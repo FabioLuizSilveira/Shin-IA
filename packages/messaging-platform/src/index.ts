@@ -26,3 +26,35 @@ export {
   type SendOutboundTextInput,
   type SendOutboundResult,
 } from "./outbound.js";
+export {
+  resolveContactByPhone,
+  resolvedContactParticipantType,
+  type ResolvedContact,
+  type ResolvedContactType,
+} from "./contact-resolver.js";
+export {
+  listConversations,
+  getConversation,
+  listMessages,
+  assignConversation,
+  closeConversation,
+  reopenConversation,
+  getUnreadCounts,
+  type ConversationFilter,
+  type ListConversationsInput,
+  type UnreadSummary,
+} from "./conversation-service.js";
+export {
+  grantConsent,
+  revokeConsent,
+  getConsentHistory,
+  type ConsentRecord,
+} from "./consent-service.js";
+export {
+  createTemplateDraft,
+  submitTemplateForApproval,
+  applyTemplateStatusFromProvider,
+  listTemplates,
+  type MessageTemplateRecord,
+} from "./template-service.js";
+export { getUsageSummary, type UsageSummary } from "./usage-service.js";

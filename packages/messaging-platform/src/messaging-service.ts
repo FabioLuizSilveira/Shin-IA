@@ -6,6 +6,11 @@ import type {
   MessagingChannelStatus,
   MessagingConnectionMode,
 } from "./types.js";
+import {
+  resolveContactByPhone,
+  resolvedContactParticipantType,
+  type ResolvedContact,
+} from "./contact-resolver.js";
 
 // Gateway-agnostic DB-writing core — mirrors @shina/signature-platform's
 // signature-service.ts shape exactly. Reads only a CanonicalMessagingEvent,
@@ -115,16 +120,14 @@ export async function markChannelConnected(
     .single();
   if (error || !data) throw error ?? new Error("failed to mark channel connected");
 
-  await db
-    .from("messaging_channel_credentials")
-    .upsert(
-      {
-        messaging_channel_id: channelId,
-        access_token: accessToken,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "messaging_channel_id" },
-    );
+  await db.from("messaging_channel_credentials").upsert(
+    {
+      messaging_channel_id: channelId,
+      access_token: accessToken,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "messaging_channel_id" },
+  );
 
   return rowToChannel(data as ChannelRow);
 }
@@ -164,6 +167,7 @@ async function findOrCreateConversation(
   db: SupabaseClient,
   channel: MessagingChannel,
   externalConversationKey: string,
+  resolved: ResolvedContact,
 ): Promise<{ id: string }> {
   const { data: existing } = await db
     .from("conversations")
@@ -181,6 +185,8 @@ async function findOrCreateConversation(
       messaging_channel_id: channel.id,
       external_conversation_key: externalConversationKey,
       status: "open",
+      contact_id: resolved.personId,
+      customer_id: resolved.customerId,
     })
     .select("id")
     .single();
@@ -194,6 +200,7 @@ async function ensureParticipant(
   conversationId: string,
   externalWaId: string,
   displayName: string | null,
+  resolved: ResolvedContact,
 ): Promise<void> {
   const { data: existing } = await db
     .from("conversation_participants")
@@ -205,9 +212,11 @@ async function ensureParticipant(
   await db.from("conversation_participants").insert({
     tenant_id: tenantId,
     conversation_id: conversationId,
-    participant_type: "unknown_contact",
+    participant_type: resolvedContactParticipantType(resolved.type),
+    customer_id: resolved.customerId,
+    operator_id: resolved.operatorId,
     external_wa_id: externalWaId,
-    display_name: displayName,
+    display_name: resolved.displayName ?? displayName,
   });
 }
 
@@ -255,7 +264,27 @@ export async function applyMessagingEvent(
 
   if (event.kind === "message_received" && event.inboundMessage) {
     const im = event.inboundMessage;
-    const conversation = await findOrCreateConversation(db, channel, im.externalConversationKey);
+    const resolved: ResolvedContact = await resolveContactByPhone(
+      db,
+      channel.tenantId,
+      im.externalSenderId,
+    ).catch(
+      () =>
+        ({
+          type: "unknown",
+          customerId: null,
+          operatorId: null,
+          personId: null,
+          organizationId: null,
+          displayName: null,
+        }) as ResolvedContact,
+    );
+    const conversation = await findOrCreateConversation(
+      db,
+      channel,
+      im.externalConversationKey,
+      resolved,
+    );
     conversationId = conversation.id;
     await ensureParticipant(
       db,
@@ -263,6 +292,7 @@ export async function applyMessagingEvent(
       conversation.id,
       im.externalSenderId,
       im.externalSenderName,
+      resolved,
     );
 
     const { data: message, error: msgError } = await db
@@ -271,7 +301,7 @@ export async function applyMessagingEvent(
         tenant_id: channel.tenantId,
         conversation_id: conversation.id,
         direction: "inbound",
-        sender_type: "unknown_contact",
+        sender_type: resolvedContactParticipantType(resolved.type),
         provider_message_id: im.providerMessageId,
         type: im.type,
         body: im.body,
