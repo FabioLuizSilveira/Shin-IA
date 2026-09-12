@@ -27,6 +27,7 @@
     "@shina/infractions-engine": "workspace:*",
     "@shina/inspection-engine": "workspace:*",
     "@shina/maintenance-engine": "workspace:*",
+    "@shina/messaging-platform": "workspace:*",
     "@shina/landing": "workspace:*",
     "@shina/reporting-engine": "workspace:*",
     "@shina/signature-platform": "workspace:*",
