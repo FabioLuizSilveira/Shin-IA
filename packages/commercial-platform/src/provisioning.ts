@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { hashContent } from "./hash.js";
 import { resolveRequiredContract } from "./contract-requirement.js";
+import {
+  resolveOperationProfilesForProfile,
+  type ResolvedOperationProfile,
+} from "./operation-type-mapping.js";
 
 // WAVE 4 — the provisioning GATE + run log. The actual orchestration
 // (blueprint install, feature flags) lives in the app layer because it needs
@@ -114,6 +118,8 @@ export interface ProvisioningPlan {
   quotas: Record<string, number>;
   planId: string | null;
   planVersionId: string | null;
+  /** WAVE 4 (Multi-Operation Business Architecture v2) — the operation profiles this tenant's confirmed BusinessProfile implies (one per distinct operation type across primaryVertical + additionalVerticals). Resolution only here; the app-layer orchestrator (runOnboardingProvisioning) is what actually persists operation_profiles rows, idempotently. */
+  operationProfiles: ResolvedOperationProfile[];
 }
 
 /** What to provision, derived from the frozen config + its business profile's
@@ -134,6 +140,7 @@ export async function resolveProvisioningPlan(
   const quotas = (config.quotas as Record<string, number>) ?? {};
 
   let blueprintIds: string[] = [];
+  let operationProfiles: ResolvedOperationProfile[] = [];
   if (config.business_profile_id) {
     const { data: profile } = await db
       .from("business_profiles")
@@ -141,15 +148,18 @@ export async function resolveProvisioningPlan(
       .eq("id", config.business_profile_id)
       .maybeSingle();
     if (profile) {
-      const verticalKeys = [
-        profile.primary_vertical as string,
-        ...((profile.additional_verticals as string[]) ?? []),
-      ];
+      const primaryVertical = profile.primary_vertical as string;
+      const additionalVerticals = (profile.additional_verticals as string[]) ?? [];
+      const verticalKeys = [primaryVertical, ...additionalVerticals];
       const { data: verticals } = await db
         .from("verticals")
         .select("key, blueprint_id")
         .in("key", verticalKeys);
       blueprintIds = [...new Set((verticals ?? []).map((v) => v.blueprint_id as string))].sort();
+      operationProfiles = resolveOperationProfilesForProfile({
+        primaryVertical,
+        additionalVerticals,
+      });
     }
   }
 
@@ -163,6 +173,7 @@ export async function resolveProvisioningPlan(
     quotas,
     planId: (config.plan_id as string) ?? null,
     planVersionId: (config.plan_version_id as string) ?? null,
+    operationProfiles,
   };
 }
 

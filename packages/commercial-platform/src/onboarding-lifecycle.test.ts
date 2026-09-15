@@ -73,6 +73,53 @@ describe("WAVE 5 — configuration delta", () => {
   });
 });
 
+// WAVE 4 — Multi-Operation Business Architecture v2: "Add Operation"
+// lifecycle (spec section 40). A tenant that starts with vehicle_rental and
+// later adds towing_service must get a Commercial + Contract Delta, not a
+// silent reprovision.
+describe("WAVE 4 — operation delta (Add Operation lifecycle)", () => {
+  const opBase = { ...base, operationTypes: ["vehicle_rental"] };
+
+  it("a config with no operationTypes behaves exactly like before (backward compatible)", () => {
+    const d = computeConfigurationDelta(base, { ...base });
+    expect(d.operationsAdded).toEqual([]);
+    expect(d.operationsRemoved).toEqual([]);
+  });
+
+  it("adding a new operation is a material change — new contract AND reprovision", () => {
+    const d = computeConfigurationDelta(opBase, {
+      ...opBase,
+      operationTypes: ["vehicle_rental", "towing_service"],
+    });
+    expect(d.operationsAdded).toEqual(["towing_service"]);
+    expect(d.operationsRemoved).toEqual([]);
+    expect(d.requiresNewContract).toBe(true);
+    expect(d.requiresReprovisioning).toBe(true);
+    expect(d.reasons.some((r) => r.includes("Operações adicionadas"))).toBe(true);
+  });
+
+  it("removing an operation is operational-only — reprovision, no new contract", () => {
+    const withTwo = { ...opBase, operationTypes: ["vehicle_rental", "towing_service"] };
+    const d = computeConfigurationDelta(withTwo, {
+      ...withTwo,
+      operationTypes: ["vehicle_rental"],
+    });
+    expect(d.operationsRemoved).toEqual(["towing_service"]);
+    expect(d.requiresNewContract).toBe(false);
+    expect(d.requiresReprovisioning).toBe(true);
+  });
+
+  it("adding and removing different operations in the same delta are both reported", () => {
+    const d = computeConfigurationDelta(
+      { ...opBase, operationTypes: ["vehicle_rental", "towing_service"] },
+      { ...opBase, operationTypes: ["vehicle_rental", "passenger_transport"] },
+    );
+    expect(d.operationsAdded).toEqual(["passenger_transport"]);
+    expect(d.operationsRemoved).toEqual(["towing_service"]);
+    expect(d.requiresNewContract).toBe(true); // an addition alone makes it material
+  });
+});
+
 describe("WAVE 5 — offboarding plan", () => {
   it("resolves from the current published retention policy", async () => {
     const db = {

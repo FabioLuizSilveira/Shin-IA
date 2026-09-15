@@ -213,6 +213,34 @@ describe("WAVE 4 — provisioning plan + run log", () => {
     expect(plan.quotas.assets).toBe(50);
   });
 
+  it("a single-operation profile resolves exactly one primary operationProfile", async () => {
+    const db = await seed("click_accept");
+    const plan = await resolveProvisioningPlan(asClient(db), {
+      tenantId: "t1",
+      commercialConfigurationId: "cfg1",
+    });
+    expect(plan.operationProfiles).toEqual([
+      { vertical: "rental-cars", type: "vehicle_rental", role: "primary" },
+    ]);
+  });
+
+  // WAVE 4 — Multi-Operation Business Architecture v2 gate: "one commercial
+  // lifecycle for multi-operation Tenant" — the provisioning plan must
+  // resolve every operation, not just the primary vertical's.
+  it("a multi-operation profile resolves all three distinct operation types", async () => {
+    const db = await seed("click_accept");
+    db.tables.business_profiles[0].additional_verticals = ["guincho", "passenger-transport"];
+    const plan = await resolveProvisioningPlan(asClient(db), {
+      tenantId: "t1",
+      commercialConfigurationId: "cfg1",
+    });
+    expect(plan.operationProfiles).toEqual([
+      { vertical: "rental-cars", type: "vehicle_rental", role: "primary" },
+      { vertical: "guincho", type: "towing_service", role: "secondary" },
+      { vertical: "passenger-transport", type: "passenger_transport", role: "secondary" },
+    ]);
+  });
+
   it("createProvisioningRun refuses a second active run for the same snapshot", async () => {
     const db = await seed("click_accept");
     await createProvisioningRun(asClient(db), {

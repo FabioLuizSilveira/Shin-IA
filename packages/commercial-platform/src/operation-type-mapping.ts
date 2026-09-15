@@ -37,6 +37,31 @@ export interface ResolvedOperationProfile {
   role: "primary" | "secondary";
 }
 
+const OPERATION_TYPE_LABEL_PT: Record<BusinessOperationType, string> = {
+  vehicle_rental: "Locação de veículos",
+  motorcycle_rental: "Locação de motos",
+  towing_service: "Guincho / reboque",
+  passenger_transport: "Fretamento / transporte de passageiros",
+  equipment_rental: "Locação de equipamentos",
+  forklift_operation: "Empilhadeiras",
+  aerial_platform_operation: "Plataformas elevatórias",
+  munk_operation: "Caminhão Munck",
+  crane_operation: "Guindastes",
+  agricultural_equipment: "Máquinas agrícolas",
+  other: "Outra operação",
+};
+
+/** WAVE 4 (Multi-Operation Business Architecture v2) — a jargon-free, human-readable summary of a tenant's resolved operations, for injection into the contract annex ("operation-specific terms", spec section 31) — e.g. "Locação de veículos (principal), Guincho / reboque, Fretamento / transporte de passageiros". Pure, no DB. */
+export function summarizeOperationProfiles(profiles: ResolvedOperationProfile[]): string {
+  if (profiles.length === 0) return "Nenhuma operação selecionada";
+  return profiles
+    .map((p) => {
+      const label = OPERATION_TYPE_LABEL_PT[p.type];
+      return p.role === "primary" ? `${label} (principal)` : label;
+    })
+    .join(", ");
+}
+
 /**
  * Resolves the full set of operation profiles implied by a BusinessProfile's
  * primaryVertical + additionalVerticals — one entry per DISTINCT operation

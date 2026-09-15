@@ -33,6 +33,7 @@ export {
   type CommercialConfigSource,
   type CommercialConfigStatus,
   type CommercialQuotas,
+  type OperationConfigLineItem,
 } from "./commercial-configuration.js";
 export {
   resolveCurrentRetentionPolicy,
@@ -75,6 +76,7 @@ export {
 export {
   mapVerticalToOperationType,
   resolveOperationProfilesForProfile,
+  summarizeOperationProfiles,
   type ResolvedOperationProfile,
 } from "./operation-type-mapping.js";
 

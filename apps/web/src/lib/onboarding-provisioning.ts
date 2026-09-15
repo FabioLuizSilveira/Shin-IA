@@ -5,6 +5,9 @@ import {
   createProvisioningRun,
   finishProvisioningRun,
   markCommercialConfigurationAccepted,
+  listOperationProfiles,
+  createOperationProfile,
+  setPrimaryOperationProfile,
   type ProvisioningStep,
 } from "@shina/commercial-platform";
 import { createBlueprintRuntime } from "@/lib/blueprint-runtime-factory";
@@ -131,7 +134,59 @@ export async function runOnboardingProvisioning(
       steps.push({ step: `flag:${flag}`, status: error ? "failed" : "ok", detail: error?.message });
     }
 
-    // 3. freeze the commercial configuration (accepted → read-only). The
+    // 3. operation profiles (Multi-Operation Business Architecture v2,
+    //    WAVE 4) — one per distinct operation type the resolved plan
+    //    implies. Idempotent: a type the tenant already has an active
+    //    profile for is a skipped step, never a duplicate. The primary
+    //    role is (re)applied every run so a re-provision after adding a
+    //    new primary operation (spec section 40) stays in sync.
+    if (plan.operationProfiles.length > 0) {
+      const existing = await listOperationProfiles(db, input.tenantId);
+      const existingByType = new Map(existing.map((p) => [p.type, p]));
+      let primaryProfileId: string | null = null;
+
+      for (const resolved of plan.operationProfiles) {
+        const already = existingByType.get(resolved.type);
+        if (already) {
+          steps.push({
+            step: `operation_profile:${resolved.type}`,
+            status: "skipped",
+            detail: "already exists",
+          });
+          if (resolved.role === "primary") primaryProfileId = already.id;
+          continue;
+        }
+        try {
+          const created = await createOperationProfile(db, {
+            tenantId: input.tenantId,
+            type: resolved.type,
+          });
+          steps.push({ step: `operation_profile:${resolved.type}`, status: "ok" });
+          if (resolved.role === "primary") primaryProfileId = created.id;
+        } catch (e) {
+          steps.push({
+            step: `operation_profile:${resolved.type}`,
+            status: "failed",
+            detail: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+
+      if (primaryProfileId) {
+        try {
+          await setPrimaryOperationProfile(db, input.tenantId, primaryProfileId);
+          steps.push({ step: "operation_profile:set_primary", status: "ok" });
+        } catch (e) {
+          steps.push({
+            step: "operation_profile:set_primary",
+            status: "failed",
+            detail: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+    }
+
+    // 4. freeze the commercial configuration (accepted → read-only). The
     //    commercial_terms_snapshot link is resolved from the acceptance if
     //    present; otherwise null (assisted pilot may not have one yet).
     const { data: acc } = await db

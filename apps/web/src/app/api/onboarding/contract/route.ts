@@ -6,6 +6,8 @@ import {
   resolveContractExecutionMode,
   resolveRequiredContract,
   resolveCurrentRetentionPolicy,
+  resolveOperationProfilesForProfile,
+  summarizeOperationProfiles,
   type ComposeInput,
 } from "@shina/commercial-platform";
 import { internalError } from "@/lib/api-error";
@@ -112,6 +114,27 @@ export async function POST(req: NextRequest) {
       retentionSummary = "";
     }
 
+    // WAVE 4 (Multi-Operation Business Architecture v2) — "operation-specific
+    // terms" (spec section 31): the annex names every operation the tenant
+    // runs, not just the plan's primary vertical, resolved the same
+    // deterministic way the discovery recommendation does.
+    let operacoesContratadas = "Conforme Pedido Comercial";
+    if (config.business_profile_id) {
+      const { data: bp } = await scope.db
+        .from("business_profiles")
+        .select("primary_vertical, additional_verticals")
+        .eq("id", config.business_profile_id)
+        .maybeSingle();
+      if (bp?.primary_vertical) {
+        operacoesContratadas = summarizeOperationProfiles(
+          resolveOperationProfilesForProfile({
+            primaryVertical: bp.primary_vertical as string,
+            additionalVerticals: (bp.additional_verticals as string[]) ?? [],
+          }),
+        );
+      }
+    }
+
     const rep = body.representative ?? {};
     const extra = body.extraTerms ?? {};
     const vars: Record<string, string | number> = {
@@ -137,6 +160,7 @@ export async function POST(req: NextRequest) {
       representanteTenantNome: rep.tenantName ?? "",
       representanteTenantCargo: rep.tenantRole ?? "",
       retencaoResumo: retentionSummary || "Conforme Política de Retenção da Shinã",
+      operacoesContratadas,
     };
 
     // Execution mode is driven by the COMMERCIAL terms (commitment length),

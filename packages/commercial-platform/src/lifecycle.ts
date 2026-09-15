@@ -15,12 +15,16 @@ export interface ConfigurationSnapshotForDelta {
   quotas: Record<string, number>;
   commitmentPeriodMonths: number | null;
   totalMonthlyCents: number | null;
+  /** WAVE 4 (Multi-Operation Business Architecture v2) — distinct BusinessOperationType values the tenant runs, e.g. ["vehicle_rental", "towing_service"]. Optional/defaults to [] so pre-existing single-operation callers need no change (spec section 40's "Add Operation" lifecycle). */
+  operationTypes?: string[];
 }
 
 export interface ConfigurationDelta {
   planChange: { from: string | null; to: string | null; direction: "up" | "down" | "same" } | null;
   extensionsAdded: string[];
   extensionsRemoved: string[];
+  operationsAdded: string[];
+  operationsRemoved: string[];
   quotaChanges: Array<{ key: string; from: number | null; to: number | null }>;
   commitmentChange: { from: number | null; to: number | null } | null;
   priceDeltaCents: number | null;
@@ -65,6 +69,14 @@ export function computeConfigurationDelta(
   if (extensionsRemoved.length)
     reasons.push(`Extensões removidas: ${extensionsRemoved.join(", ")}.`);
 
+  const curOps = new Set(current.operationTypes ?? []);
+  const propOps = new Set(proposed.operationTypes ?? []);
+  const operationsAdded = [...propOps].filter((o) => !curOps.has(o)).sort();
+  const operationsRemoved = [...curOps].filter((o) => !propOps.has(o)).sort();
+  if (operationsAdded.length) reasons.push(`Operações adicionadas: ${operationsAdded.join(", ")}.`);
+  if (operationsRemoved.length)
+    reasons.push(`Operações removidas: ${operationsRemoved.join(", ")}.`);
+
   const quotaKeys = [
     ...new Set([...Object.keys(current.quotas), ...Object.keys(proposed.quotas)]),
   ].sort();
@@ -93,19 +105,25 @@ export function computeConfigurationDelta(
       : null;
 
   // Material change (needs a fresh contract acceptance/signature): a plan
-  // change, a longer commitment, or any price increase. Removing extensions
-  // or a downgrade is non-material — reprovision only.
+  // change, a longer commitment, any price increase, or a NEW operation
+  // (spec section 40: adding a business line is a Commercial + Contract
+  // Delta, not just a reprovision — the tenant is agreeing to run more than
+  // it originally contracted). Removing extensions/operations or a
+  // downgrade is non-material — reprovision only.
   const requiresNewContract =
     Boolean(planChange && planChange.direction !== "same") ||
     Boolean(commitmentChange && (commitmentChange.to ?? 0) > (commitmentChange.from ?? 0)) ||
-    (priceDeltaCents ?? 0) > 0;
+    (priceDeltaCents ?? 0) > 0 ||
+    operationsAdded.length > 0;
 
   // Reprovisioning needed whenever the installed surface changes: plan,
-  // extensions, or blueprint-affecting quotas.
+  // extensions, operations, or blueprint-affecting quotas.
   const requiresReprovisioning =
     Boolean(planChange) ||
     extensionsAdded.length > 0 ||
     extensionsRemoved.length > 0 ||
+    operationsAdded.length > 0 ||
+    operationsRemoved.length > 0 ||
     quotaChanges.length > 0;
 
   if (requiresNewContract)
@@ -118,6 +136,8 @@ export function computeConfigurationDelta(
     planChange,
     extensionsAdded,
     extensionsRemoved,
+    operationsAdded,
+    operationsRemoved,
     quotaChanges,
     commitmentChange,
     priceDeltaCents,

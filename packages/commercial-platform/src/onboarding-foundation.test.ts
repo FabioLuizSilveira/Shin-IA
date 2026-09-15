@@ -226,6 +226,45 @@ describe("commercial_configurations — draft lifecycle", () => {
     expect((updated.prices as { monthlyCents: number }).monthlyCents).toBe(59900);
     expect(updated.pricingVersion).toBe(3);
   });
+
+  // WAVE 4 — Multi-Operation Business Architecture v2: per-operation line
+  // items (spec section 31's operationConfigurations), descriptive only —
+  // no per-operation pricing model exists yet.
+  it("round-trips operationConfigurations for a multi-operation tenant", async () => {
+    const db = makeDb();
+    const cfg = await createCommercialConfiguration(db, {
+      tenantId: "t1",
+      source: "self_service",
+      createdBy: "u1",
+      operationConfigurations: [
+        { operationType: "vehicle_rental", assetQuantity: 42 },
+        { operationType: "towing_service", assetQuantity: 3 },
+        { operationType: "passenger_transport", assetQuantity: 8 },
+      ],
+    });
+    expect(cfg.operationConfigurations).toHaveLength(3);
+    expect(cfg.operationConfigurations[1]).toEqual({
+      operationType: "towing_service",
+      assetQuantity: 3,
+    });
+
+    const updated = await updateCommercialConfiguration(db, cfg.id, {
+      operationConfigurations: [{ operationType: "vehicle_rental", assetQuantity: 45 }],
+    });
+    expect(updated.operationConfigurations).toEqual([
+      { operationType: "vehicle_rental", assetQuantity: 45 },
+    ]);
+  });
+
+  it("defaults operationConfigurations to an empty array for a single-operation tenant", async () => {
+    const db = makeDb();
+    const cfg = await createCommercialConfiguration(db, {
+      tenantId: "t1",
+      source: "self_service",
+      createdBy: "u1",
+    });
+    expect(cfg.operationConfigurations).toEqual([]);
+  });
 });
 
 describe("retention_policies", () => {

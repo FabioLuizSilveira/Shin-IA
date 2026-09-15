@@ -18,12 +18,19 @@ export interface CommercialQuotas {
   aiCredits?: number;
 }
 
+/** WAVE 4 (Multi-Operation Business Architecture v2) — a per-operation line item (spec section 31). Deliberately descriptive only: this prompt does not define per-operation pricing rules, so there is no price field here — pricing stays in the flat `prices`/plan mechanism until a real per-operation pricing model is designed. */
+export interface OperationConfigLineItem {
+  operationType: string;
+  assetQuantity?: number | null;
+}
+
 export interface CommercialConfigInput {
   tenantId: string;
   businessProfileId?: string | null;
   planId?: string | null;
   planVersionId?: string | null;
   extensions?: string[];
+  operationConfigurations?: OperationConfigLineItem[];
   quotas?: CommercialQuotas;
   integrations?: string[];
   billingCycle?: "monthly" | "yearly" | null;
@@ -44,6 +51,7 @@ export interface CommercialConfiguration {
   planId: string | null;
   planVersionId: string | null;
   extensions: string[];
+  operationConfigurations: OperationConfigLineItem[];
   quotas: CommercialQuotas;
   integrations: string[];
   billingCycle: "monthly" | "yearly" | null;
@@ -68,6 +76,7 @@ interface Row {
   plan_id: string | null;
   plan_version_id: string | null;
   extensions: string[];
+  operation_configurations: OperationConfigLineItem[];
   quotas: CommercialQuotas;
   integrations: string[];
   billing_cycle: "monthly" | "yearly" | null;
@@ -93,6 +102,7 @@ function fromRow(r: Row): CommercialConfiguration {
     planId: r.plan_id,
     planVersionId: r.plan_version_id,
     extensions: r.extensions ?? [],
+    operationConfigurations: r.operation_configurations ?? [],
     quotas: r.quotas ?? {},
     integrations: r.integrations ?? [],
     billingCycle: r.billing_cycle,
@@ -135,6 +145,7 @@ export async function createCommercialConfiguration(
       plan_id: input.planId ?? null,
       plan_version_id: input.planVersionId ?? null,
       extensions: input.extensions ?? [],
+      operation_configurations: input.operationConfigurations ?? [],
       quotas: input.quotas ?? {},
       integrations: input.integrations ?? [],
       billing_cycle: input.billingCycle ?? null,
@@ -173,6 +184,8 @@ export async function updateCommercialConfiguration(
   if (patch.planId !== undefined) dbPatch.plan_id = patch.planId;
   if (patch.planVersionId !== undefined) dbPatch.plan_version_id = patch.planVersionId;
   if (patch.extensions !== undefined) dbPatch.extensions = patch.extensions;
+  if (patch.operationConfigurations !== undefined)
+    dbPatch.operation_configurations = patch.operationConfigurations;
   if (patch.quotas !== undefined) dbPatch.quotas = patch.quotas;
   if (patch.integrations !== undefined) dbPatch.integrations = patch.integrations;
   if (patch.billingCycle !== undefined) dbPatch.billing_cycle = patch.billingCycle;
