@@ -50,6 +50,12 @@ export interface BusinessProfile {
   createdBy: string;
   createdAt: string;
   confirmedAt: string | null;
+  /** WAVE 1 (Multi-Operation Business Architecture v2) — points at the tenant's
+   *  current primary OperationProfile (operation-profile.ts). Null until a
+   *  caller explicitly promotes one via setPrimaryOperationProfile(); legacy
+   *  primaryVertical/additionalVerticals[] remain the source of truth for
+   *  the existing discovery/blueprint-resolver flow and are untouched. */
+  primaryOperationId: string | null;
 }
 
 interface Row {
@@ -71,6 +77,7 @@ interface Row {
   created_by: string;
   created_at: string;
   confirmed_at: string | null;
+  primary_operation_id: string | null;
 }
 
 function fromRow(r: Row): BusinessProfile {
@@ -93,6 +100,7 @@ function fromRow(r: Row): BusinessProfile {
     createdBy: r.created_by,
     createdAt: r.created_at,
     confirmedAt: r.confirmed_at,
+    primaryOperationId: r.primary_operation_id ?? null,
   };
 }
 

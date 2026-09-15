@@ -116,3 +116,24 @@ export {
   type ConfigurationSnapshotForDelta,
   type OffboardingPlan,
 } from "./lifecycle.js";
+
+// WAVE 1 — Multi-Operation Business Architecture v2 (domain layer)
+export {
+  createOperationProfile,
+  listOperationProfiles,
+  getOperationProfile,
+  setPrimaryOperationProfile,
+  setOperationProfileStatus,
+  type BusinessOperationType,
+  type OperationProfile,
+  type OperationProfileInput,
+  type OperationProfileRole,
+  type OperationProfileStatus,
+  type OperationProfileCharacteristics,
+  type PassengerTransportCharacteristics,
+  type TransportServiceModel,
+  type TransportPurpose,
+  type TowingCharacteristics,
+  type TowingServiceModel,
+  type GenericCharacteristics,
+} from "./operation-profile.js";
