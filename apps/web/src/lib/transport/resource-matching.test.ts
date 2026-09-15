@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   matchVehiclesForCapacity,
   matchVehiclesByCapacityField,
+  matchAvailableVehiclesByFleetType,
   matchDriversForFleetType,
   type AssetForMatching,
   type ResourceForMatching,
@@ -68,6 +69,31 @@ describe("matchVehiclesByCapacityField", () => {
     expect(matchVehiclesByCapacityField(bulkTrucks, "capacityTons", 15).map((a) => a.id)).toEqual([
       "b3",
     ]);
+  });
+});
+
+// Towing's own dispatch runtime — matching by fleet type, not capacity.
+describe("matchAvailableVehiclesByFleetType", () => {
+  const assets: AssetForMatching[] = [
+    { id: "t1", status: "available", metadata: { fleetType: "tow_truck" } },
+    { id: "t2", status: "busy", metadata: { fleetType: "tow_truck" } },
+    { id: "t3", status: "available", metadata: { fleetType: "van" } },
+    { id: "t4", status: "available", metadata: {} }, // untagged
+  ];
+
+  it("matches only available vehicles tagged with the requested fleet type", () => {
+    const matched = matchAvailableVehiclesByFleetType(assets, "tow_truck");
+    expect(matched.map((a) => a.id)).toEqual(["t1"]);
+  });
+
+  it("never matches an unavailable tow truck", () => {
+    const matched = matchAvailableVehiclesByFleetType(assets, "tow_truck");
+    expect(matched.map((a) => a.id)).not.toContain("t2");
+  });
+
+  it("never matches an untagged vehicle — the opposite default from driver matching, since a multi-operation tenant has plenty of available vehicles of the wrong kind", () => {
+    const matched = matchAvailableVehiclesByFleetType(assets, "tow_truck");
+    expect(matched.map((a) => a.id)).not.toContain("t4");
   });
 });
 

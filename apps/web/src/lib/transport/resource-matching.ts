@@ -61,6 +61,24 @@ export function matchVehiclesByCapacityField(
 }
 
 /**
+ * Vehicles tagged for a specific fleet type (e.g. "tow_truck") — used where
+ * capacity doesn't apply (towing doesn't have a numeric capacity the way
+ * seats/liters/m³ do; what matters is "is this actually a tow truck").
+ * Deliberately the OPPOSITE default from matchDriversForFleetType: an
+ * untagged asset does NOT match, since a multi-operation tenant (e.g. one
+ * running rental + towing) will have plenty of available vehicles that are
+ * simply the wrong kind for a towing dispatch — unlike a driver, where "no
+ * restriction recorded" is a reasonable default for a single-operation
+ * tenant that never bothered tagging its one fleet type.
+ */
+export function matchAvailableVehiclesByFleetType(
+  assets: AssetForMatching[],
+  fleetType: string,
+): AssetForMatching[] {
+  return assets.filter((a) => a.status === "available" && a.metadata.fleetType === fleetType);
+}
+
+/**
  * Drivers available for a given fleet type. A driver whose metadata doesn't
  * declare canOperateFleetTypes is treated as unrestricted (no capability
  * data recorded yet — never silently EXCLUDED for missing data, since that

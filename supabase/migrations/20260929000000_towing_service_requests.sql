@@ -1,0 +1,12 @@
+-- Multi-Operation Business Architecture v2 — Towing's own dispatch runtime
+-- (flagged as open after Wave 3, which only built Passenger Transport's
+-- Route/Schedule/Trip; towing's own Service Request -> Resource -> Vehicle
+-- -> Operator -> Allocation -> Dispatch -> Tracking -> Completion -> Billing
+-- flow, spec sections 8-9, was never wired to a runtime).
+--
+-- Pure REUSE, same as passenger_trip in 20260925000000: a towing service
+-- request IS an operations row, not a new aggregate/status lifecycle. The
+-- resource_id (operator) + asset_id (tow truck) dual link, the scheduled
+-- window, the status enum and the GiST double-booking guards are reused
+-- unmodified — this migration only adds the new operation_type value.
+alter type operation_type add value if not exists 'towing_service_request';

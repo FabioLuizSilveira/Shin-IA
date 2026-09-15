@@ -4,7 +4,11 @@ import { requireTenantScope, hasTenantPermission } from "@/lib/tenant-context";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { getEntitlements } from "@shina/commercial-platform";
 import { extractOperationRequest } from "@/lib/ai/operation-request-extraction";
-import { matchVehiclesForCapacity, type AssetForMatching } from "@/lib/transport/resource-matching";
+import {
+  matchVehiclesForCapacity,
+  matchAvailableVehiclesByFleetType,
+  type AssetForMatching,
+} from "@/lib/transport/resource-matching";
 import { newCorrelationId } from "@/lib/audit-event";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +22,10 @@ export const dynamic = "force-dynamic";
 //
 // "Resource actions" (spec section 25, partial): when the extraction is
 // confident about passengerCount, this also surfaces compatible vehicles
-// (Wave 3's matchVehiclesForCapacity, reused as-is) — READ-ONLY, no
-// allocation, no Trip created. A human still creates the Trip explicitly.
+// (Wave 3's matchVehiclesForCapacity, reused as-is); for a towing_request
+// it surfaces available tow trucks (matchAvailableVehiclesByFleetType,
+// towing's own dispatch runtime) — READ-ONLY, no allocation, no Trip/
+// Service Request created. A human still creates it explicitly.
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const scope = await requireTenantScope();
@@ -85,7 +91,24 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       }));
     }
 
-    return NextResponse.json({ data: { ...result, compatibleVehicles } });
+    let compatibleTowTrucks: Array<{ id: string; name: string }> = [];
+    if (result.intent === "towing_request") {
+      const { data: assets } = await scope.db
+        .from("assets")
+        .select("id, name, status, metadata")
+        .eq("tenant_id", scope.tenantId)
+        .eq("category", "vehicle");
+      const matched = matchAvailableVehiclesByFleetType(
+        (assets ?? []) as AssetForMatching[],
+        "tow_truck",
+      );
+      compatibleTowTrucks = matched.map((a) => ({
+        id: a.id,
+        name: (a as unknown as { name: string }).name,
+      }));
+    }
+
+    return NextResponse.json({ data: { ...result, compatibleVehicles, compatibleTowTrucks } });
   } catch (err) {
     return internalError(err);
   }
