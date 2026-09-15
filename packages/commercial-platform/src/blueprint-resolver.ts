@@ -137,10 +137,9 @@ export function resolveBlueprintWithRules(
     }
   }
 
+  const additionalVerticals = (profile.additionalVerticals ?? []).filter((v) => v !== primary);
   const additionalBlueprintIds = uniqueSorted(
-    (profile.additionalVerticals ?? [])
-      .filter((v) => v !== primary)
-      .map((v) => rules.verticals[v]?.baseBlueprintId ?? rules.defaultBlueprintId),
+    additionalVerticals.map((v) => rules.verticals[v]?.baseBlueprintId ?? rules.defaultBlueprintId),
   );
   if (additionalBlueprintIds.length > 0) {
     reasons.push({
@@ -148,6 +147,30 @@ export function resolveBlueprintWithRules(
       message: `Atividades adicionais mapeadas para: ${additionalBlueprintIds.join(", ")}.`,
       inputs: { additionalVerticals: profile.additionalVerticals, additionalBlueprintIds },
     });
+  }
+
+  // WAVE 2 (Multi-Operation Business Architecture v2) — a tenant running
+  // several operations simultaneously needs the union of every operation's
+  // required/optional capabilities, not just the primary one's. Merged and
+  // deduplicated here (spec section 29: "Capabilities compartilhadas são
+  // deduplicadas") rather than left as a bare list of extra blueprint ids.
+  for (const vertical of additionalVerticals) {
+    const rule = rules.verticals[vertical];
+    if (!rule) continue;
+    const newRequired = rule.requiredCapabilities.filter((c) => !requiredCapabilities.includes(c));
+    if (newRequired.length > 0) {
+      requiredCapabilities.push(...newRequired);
+      reasons.push({
+        code: "CAPABILITY_FROM_ADDITIONAL_VERTICAL",
+        message: `Atividade adicional "${vertical}" acrescentou as capacidades: ${newRequired.join(", ")}.`,
+        inputs: { vertical, capabilities: newRequired },
+      });
+    }
+    for (const c of rule.optionalCapabilities) {
+      if (!requiredCapabilities.includes(c) && !optionalCapabilities.includes(c)) {
+        optionalCapabilities.push(c);
+      }
+    }
   }
 
   return {

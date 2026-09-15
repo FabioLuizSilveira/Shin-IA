@@ -57,10 +57,26 @@ interface Recommendation {
   reasons: Array<{ code: string; message: string }>;
 }
 
-function questionApplies(q: DiscoveryQuestion, primaryVertical: string | null): boolean {
+function questionApplies(q: DiscoveryQuestion, verticals: string[]): boolean {
   if (q.appliesToVerticals.length === 0) return true;
-  if (!primaryVertical) return false;
-  return q.appliesToVerticals.includes(primaryVertical);
+  if (verticals.length === 0) return false;
+  return q.appliesToVerticals.some((v) => verticals.includes(v));
+}
+
+/** Same rule as @shina/commercial-platform's collectSelectedVerticals — the
+ *  primary_activity answer plus every value picked in other_activities
+ *  (WAVE 2 — Multi-Operation Business Architecture v2), so a tenant running
+ *  rental + towing + passenger transport sees every operation's own
+ *  follow-up questions, not just the primary's. */
+function collectSelectedVerticals(answers: Answer[]): string[] {
+  const primary = answers.find((a) => a.questionKey === "primary_activity")?.value;
+  const additional = answers.find((a) => a.questionKey === "other_activities")?.value;
+  const verticals = new Set<string>();
+  if (typeof primary === "string" && primary) verticals.add(primary);
+  if (Array.isArray(additional)) {
+    for (const v of additional) if (typeof v === "string" && v) verticals.add(v);
+  }
+  return [...verticals];
 }
 
 /** Same adaptive rule as @shina/commercial-platform's nextDiscoveryQuestion,
@@ -68,12 +84,11 @@ function questionApplies(q: DiscoveryQuestion, primaryVertical: string | null): 
  *  service-role Supabase package for one tiny pure function. */
 function nextQuestion(questions: DiscoveryQuestion[], answers: Answer[]): DiscoveryQuestion | null {
   const answered = new Set(answers.map((a) => a.questionKey));
-  const primary = answers.find((a) => a.questionKey === "primary_activity")?.value;
-  const primaryVertical = typeof primary === "string" ? primary : null;
+  const verticals = collectSelectedVerticals(answers);
   const ordered = [...questions].sort((a, b) => a.sortOrder - b.sortOrder);
   for (const q of ordered) {
     if (answered.has(q.key)) continue;
-    if (!questionApplies(q, primaryVertical)) continue;
+    if (!questionApplies(q, verticals)) continue;
     return q;
   }
   return null;
@@ -122,9 +137,8 @@ export function DiscoveryWizard() {
   const answeredCount = answers.length;
   const totalApplicable = useMemo(() => {
     if (!questions) return 0;
-    const primary = answers.find((a) => a.questionKey === "primary_activity")?.value;
-    const primaryVertical = typeof primary === "string" ? primary : null;
-    return questions.filter((q) => questionApplies(q, primaryVertical)).length;
+    const verticals = collectSelectedVerticals(answers);
+    return questions.filter((q) => questionApplies(q, verticals)).length;
   }, [questions, answers]);
 
   function commitAnswer(value: unknown) {
@@ -286,12 +300,7 @@ export function DiscoveryWizard() {
   }
 
   const steps = questions
-    .filter((q) =>
-      questionApplies(
-        q,
-        answers.find((a) => a.questionKey === "primary_activity")?.value as string,
-      ),
-    )
+    .filter((q) => questionApplies(q, collectSelectedVerticals(answers)))
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((q) => ({
       id: q.key,

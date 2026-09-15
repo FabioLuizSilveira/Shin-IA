@@ -7,6 +7,10 @@ import {
   type ResolverProfileInput,
 } from "./blueprint-resolver.js";
 import { resolvePlan, type PlanResolution } from "./plan-resolver.js";
+import {
+  resolveOperationProfilesForProfile,
+  type ResolvedOperationProfile,
+} from "./operation-type-mapping.js";
 
 // WAVE 2 — the composed, EXPLAINABLE recommendation. `reasons` is assembled
 // only from rule outputs (blueprint + plan resolvers, both deterministic) —
@@ -30,6 +34,8 @@ export interface OnboardingRecommendation {
   contractTemplateKey: string | null;
   retentionSummary: string | null;
   reasons: RecommendationReason[];
+  /** WAVE 2 (Multi-Operation Business Architecture v2) — the operation profile(s) this recommendation implies, resolved (not yet persisted) from primaryVertical/additionalVerticals. Actually creating operation_profiles rows happens later, on confirmation/provisioning. */
+  operationProfiles: ResolvedOperationProfile[];
 }
 
 async function resolvePublishedPlanVersion(
@@ -103,5 +109,6 @@ export async function buildOnboardingRecommendation(
     contractTemplateKey: (verticalRow.data?.contract_template_key as string) ?? null,
     retentionSummary: (retention.data?.summary as string) ?? null,
     reasons,
+    operationProfiles: resolveOperationProfilesForProfile(profile),
   };
 }

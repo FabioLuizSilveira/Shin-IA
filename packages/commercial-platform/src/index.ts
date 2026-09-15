@@ -47,6 +47,7 @@ export {
   nextDiscoveryQuestion,
   isDiscoveryComplete,
   questionApplies,
+  collectSelectedVerticals,
   type DiscoveryQuestion,
   type DiscoveryQuestionType,
   type DiscoveryOption,
@@ -71,6 +72,11 @@ export {
   type OnboardingRecommendation,
   type RecommendedPlan,
 } from "./recommendation.js";
+export {
+  mapVerticalToOperationType,
+  resolveOperationProfilesForProfile,
+  type ResolvedOperationProfile,
+} from "./operation-type-mapping.js";
 
 // WAVE 3 — Intelligent Onboarding pricing + contract composition
 export {

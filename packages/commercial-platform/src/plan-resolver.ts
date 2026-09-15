@@ -99,16 +99,25 @@ export function resolvePlanWithRules(
     }
   }
 
-  // 2. per-vertical floor
-  const floor = rules.verticalFloor[blueprint.primaryVertical];
-  if (floor) {
+  // 2. per-vertical floor — WAVE 2 (Multi-Operation Business Architecture
+  // v2): every operation the tenant runs can impose its own floor, not just
+  // the primary one. A rental-motorcycles primary (starter) with guincho as
+  // an additional activity must still be floored at guincho's professional
+  // requirement.
+  const allVerticals = [
+    blueprint.primaryVertical,
+    ...("additionalVerticals" in profile ? (profile.additionalVerticals ?? []) : []),
+  ];
+  for (const vertical of allVerticals) {
+    const floor = rules.verticalFloor[vertical];
+    if (!floor) continue;
     const before = plan;
     plan = higherPlan(rank, plan, floor);
     if (plan !== before || plan === floor) {
       reasons.push({
         code: "PLAN_FLOOR_VERTICAL",
-        message: `A atividade "${blueprint.primaryVertical}" exige no mínimo o plano "${floor}".`,
-        inputs: { primaryVertical: blueprint.primaryVertical, floorPlanKey: floor },
+        message: `A atividade "${vertical}" exige no mínimo o plano "${floor}".`,
+        inputs: { vertical, floorPlanKey: floor },
       });
     }
   }
@@ -143,9 +152,10 @@ export function resolvePlanWithRules(
     });
   }
 
-  // 5. optional add-ons (informational, never auto-selected)
+  // 5. optional add-ons (informational, never auto-selected) — union across
+  // every selected vertical, not just the primary one.
   const optionalAddOns = [
-    ...new Set(rules.optionalAddOnsByVertical[blueprint.primaryVertical] ?? []),
+    ...new Set(allVerticals.flatMap((v) => rules.optionalAddOnsByVertical[v] ?? [])),
   ].sort();
 
   void allCaps;

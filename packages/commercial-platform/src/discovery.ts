@@ -73,34 +73,41 @@ export async function listDiscoveryQuestions(db: SupabaseClient): Promise<Discov
   return (data as Row[] | null)?.map(fromRow) ?? [];
 }
 
-/** True when the question is relevant given the chosen primary vertical. */
-export function questionApplies(
-  question: DiscoveryQuestion,
-  primaryVertical: string | null,
-): boolean {
+/** True when the question is relevant given the tenant's selected vertical(s) — the primary one, or (WAVE 2 — Multi-Operation Business Architecture v2) any additional one picked in "other_activities". A tenant running rental + towing + passenger transport must see every operation's own follow-up questions, not just the primary's. */
+export function questionApplies(question: DiscoveryQuestion, verticals: string[]): boolean {
   if (question.appliesToVerticals.length === 0) return true;
-  if (!primaryVertical) return false;
-  return question.appliesToVerticals.includes(primaryVertical);
+  if (verticals.length === 0) return false;
+  return question.appliesToVerticals.some((v) => verticals.includes(v));
+}
+
+/** The full set of operation verticals selected so far: the primary_activity answer plus every value picked in other_activities (WAVE 2 — Multi-Operation Business Architecture v2). Order-independent, deduplicated. */
+export function collectSelectedVerticals(answers: DiscoveryAnswer[]): string[] {
+  const primary = answers.find((a) => a.questionKey === "primary_activity")?.value;
+  const additional = answers.find((a) => a.questionKey === "other_activities")?.value;
+  const verticals = new Set<string>();
+  if (typeof primary === "string" && primary) verticals.add(primary);
+  if (Array.isArray(additional)) {
+    for (const v of additional) if (typeof v === "string" && v) verticals.add(v);
+  }
+  return [...verticals];
 }
 
 /**
  * The next unanswered, applicable question — or null when discovery is
- * complete. Deterministic: depends only on (questions, answers). The primary
- * vertical is read from the `primary_activity` answer as soon as it exists.
+ * complete. Deterministic: depends only on (questions, answers). Considers
+ * every selected vertical (primary + additional), not just the primary one.
  */
 export function nextDiscoveryQuestion(
   questions: DiscoveryQuestion[],
   answers: DiscoveryAnswer[],
 ): DiscoveryQuestion | null {
   const answered = new Set(answers.map((a) => a.questionKey));
-  const primaryAnswer = answers.find((a) => a.questionKey === "primary_activity");
-  const primaryVertical =
-    primaryAnswer && typeof primaryAnswer.value === "string" ? primaryAnswer.value : null;
+  const verticals = collectSelectedVerticals(answers);
 
   const ordered = [...questions].sort((a, b) => a.sortOrder - b.sortOrder);
   for (const q of ordered) {
     if (answered.has(q.key)) continue;
-    if (!questionApplies(q, primaryVertical)) continue;
+    if (!questionApplies(q, verticals)) continue;
     return q;
   }
   return null;
@@ -112,10 +119,8 @@ export function isDiscoveryComplete(
   answers: DiscoveryAnswer[],
 ): boolean {
   const answered = new Set(answers.map((a) => a.questionKey));
-  const primaryAnswer = answers.find((a) => a.questionKey === "primary_activity");
-  const primaryVertical =
-    primaryAnswer && typeof primaryAnswer.value === "string" ? primaryAnswer.value : null;
+  const verticals = collectSelectedVerticals(answers);
   return questions
-    .filter((q) => q.required && questionApplies(q, primaryVertical))
+    .filter((q) => q.required && questionApplies(q, verticals))
     .every((q) => answered.has(q.key));
 }
