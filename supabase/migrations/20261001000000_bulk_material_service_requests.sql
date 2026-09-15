@@ -1,0 +1,12 @@
+-- Multi-Operation Business Architecture v2 — bulk-material-transport's own
+-- dispatch runtime (same "wave 2" treatment as towing and water-tank-truck,
+-- per the user: "segue com a wave 2 pro transporte de areia e pedra").
+--
+-- Pure REUSE, identical shape to water_tank_service_request
+-- (20260930000000): a bulk material service request IS an operations row.
+-- Matched by CAPACITY like water-tank (not a fleet-type tag like towing),
+-- but bulk material has two possible units — cubic meters OR tons — so
+-- matching picks whichever metadata field (capacityCubicMeters /
+-- capacityTons) the request actually asked for, both already supported by
+-- matchVehiclesByCapacityField (built when the taxonomy was added).
+alter type operation_type add value if not exists 'bulk_material_service_request';

@@ -137,8 +137,49 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       }));
     }
 
+    let compatibleBulkMaterialTrucks: Array<{
+      id: string;
+      name: string;
+      capacityCubicMeters: number | null;
+      capacityTons: number | null;
+    }> = [];
+    const bulkQuantity = result.bulkMaterialFields?.quantity;
+    if (
+      result.intent === "bulk_material_request" &&
+      typeof bulkQuantity === "number" &&
+      bulkQuantity > 0
+    ) {
+      // Default to cubic meters when the model didn't extract a unit — the
+      // more common way this material is quoted in Brazilian Portuguese
+      // ("preciso de 10 de areia" almost always means m³, not toneladas).
+      const field =
+        result.bulkMaterialFields?.quantityUnit === "tons" ? "capacityTons" : "capacityCubicMeters";
+      const { data: assets } = await scope.db
+        .from("assets")
+        .select("id, name, status, metadata")
+        .eq("tenant_id", scope.tenantId)
+        .eq("category", "vehicle");
+      const matched = matchVehiclesByCapacityField(
+        (assets ?? []) as AssetForMatching[],
+        field,
+        bulkQuantity,
+      );
+      compatibleBulkMaterialTrucks = matched.map((a) => ({
+        id: a.id,
+        name: (a as unknown as { name: string }).name,
+        capacityCubicMeters: a.metadata.capacityCubicMeters ?? null,
+        capacityTons: a.metadata.capacityTons ?? null,
+      }));
+    }
+
     return NextResponse.json({
-      data: { ...result, compatibleVehicles, compatibleTowTrucks, compatibleWaterTankTrucks },
+      data: {
+        ...result,
+        compatibleVehicles,
+        compatibleTowTrucks,
+        compatibleWaterTankTrucks,
+        compatibleBulkMaterialTrucks,
+      },
     });
   } catch (err) {
     return internalError(err);

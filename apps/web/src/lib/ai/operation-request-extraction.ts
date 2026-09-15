@@ -31,20 +31,21 @@ const EXTRACTION_SYSTEM_PROMPT = `Você é a Shinã, extraindo dados estruturado
 
 REGRAS OBRIGATÓRIAS:
 - Responda APENAS com um objeto JSON válido, sem markdown, sem comentários, sem texto antes ou depois.
-- Classifique "intent" como exatamente um destes valores: "passenger_transport_request", "towing_request", "water_tank_request", "unclear".
+- Classifique "intent" como exatamente um destes valores: "passenger_transport_request", "towing_request", "water_tank_request", "bulk_material_request", "unclear".
 - NUNCA invente um valor que não esteja explícito na conversa. Se um campo não estiver claro, OMITA-o do objeto de campos e liste sua chave em "ambiguousFields".
 - Se a conversa não tiver contexto suficiente para determinar a intenção, use intent="unclear" e explique em "ambiguousFields".
 - Nunca assuma data, cidade, horário ou quantidade que não tenha sido dita explicitamente.
 
 Formato de saída exato:
 {
-  "intent": "passenger_transport_request" | "towing_request" | "water_tank_request" | "unclear",
+  "intent": "passenger_transport_request" | "towing_request" | "water_tank_request" | "bulk_material_request" | "unclear",
   "transportFields": { "origin"?: string, "destination"?: string, "date"?: string, "departureTime"?: string, "returnTime"?: string, "passengerCount"?: number },
   "towingFields": { "customerHint"?: string, "vehicleDescription"?: string, "location"?: string },
   "waterTankFields": { "deliveryLocation"?: string, "litersRequested"?: number, "customerHint"?: string },
+  "bulkMaterialFields": { "deliveryLocation"?: string, "materialType"?: "sand" | "gravel" | "crushed_stone" | "soil" | "other", "quantity"?: number, "quantityUnit"?: "cubic_meters" | "tons", "customerHint"?: string },
   "ambiguousFields": string[]
 }
-Omita "transportFields" se intent não for passenger_transport_request; omita "towingFields" se intent não for towing_request; omita "waterTankFields" se intent não for water_tank_request.`;
+Omita "transportFields" se intent não for passenger_transport_request; omita "towingFields" se intent não for towing_request; omita "waterTankFields" se intent não for water_tank_request; omita "bulkMaterialFields" se intent não for bulk_material_request.`;
 
 const MAX_HISTORY_MESSAGES = 12;
 
@@ -69,10 +70,21 @@ export interface WaterTankRequestFields {
   customerHint?: string;
 }
 
+export type BulkMaterialRequestType = "sand" | "gravel" | "crushed_stone" | "soil" | "other";
+
+export interface BulkMaterialRequestFields {
+  deliveryLocation?: string;
+  materialType?: BulkMaterialRequestType;
+  quantity?: number;
+  quantityUnit?: "cubic_meters" | "tons";
+  customerHint?: string;
+}
+
 export type ExtractedOperationIntent =
   | "passenger_transport_request"
   | "towing_request"
   | "water_tank_request"
+  | "bulk_material_request"
   | "unclear";
 
 export interface OperationRequestExtraction {
@@ -82,6 +94,7 @@ export interface OperationRequestExtraction {
   transportFields?: TransportRequestFields;
   towingFields?: TowingRequestFields;
   waterTankFields?: WaterTankRequestFields;
+  bulkMaterialFields?: BulkMaterialRequestFields;
   ambiguousFields: string[];
   needsConfirmation: boolean;
   creditsConsumed?: number;
@@ -92,6 +105,7 @@ interface RawExtraction {
   transportFields?: unknown;
   towingFields?: unknown;
   waterTankFields?: unknown;
+  bulkMaterialFields?: unknown;
   ambiguousFields?: unknown;
 }
 
@@ -114,6 +128,7 @@ function parseModelOutput(text: string): OperationRequestExtraction | null {
     "passenger_transport_request",
     "towing_request",
     "water_tank_request",
+    "bulk_material_request",
     "unclear",
   ];
   const intent = validIntents.includes(raw.intent as ExtractedOperationIntent)
@@ -138,6 +153,9 @@ function parseModelOutput(text: string): OperationRequestExtraction | null {
   }
   if (intent === "water_tank_request" && typeof raw.waterTankFields === "object") {
     result.waterTankFields = raw.waterTankFields as WaterTankRequestFields;
+  }
+  if (intent === "bulk_material_request" && typeof raw.bulkMaterialFields === "object") {
+    result.bulkMaterialFields = raw.bulkMaterialFields as BulkMaterialRequestFields;
   }
   return result;
 }

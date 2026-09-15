@@ -155,6 +155,32 @@ describe("WAVE 5 — extractOperationRequest", () => {
     expect(result.needsConfirmation).toBe(false);
   });
 
+  it("extracts a confident bulk_material_request", async () => {
+    mockRunAiGateway.mockResolvedValueOnce({
+      text: JSON.stringify({
+        intent: "bulk_material_request",
+        bulkMaterialFields: {
+          deliveryLocation: "Obra Rua das Flores",
+          materialType: "sand",
+          quantity: 12,
+          quantityUnit: "cubic_meters",
+        },
+        ambiguousFields: [],
+      }),
+      creditsConsumed: 2,
+    });
+    const db = seed();
+    const result = await extractOperationRequest(asClient(db), {
+      tenantId: "t1",
+      conversationId: "conv1",
+    });
+    expect(result.extracted).toBe(true);
+    expect(result.intent).toBe("bulk_material_request");
+    expect(result.bulkMaterialFields?.materialType).toBe("sand");
+    expect(result.bulkMaterialFields?.quantity).toBe(12);
+    expect(result.needsConfirmation).toBe(false);
+  });
+
   it("needsConfirmation is true whenever ambiguousFields is non-empty — never assumed silently", async () => {
     mockRunAiGateway.mockResolvedValueOnce({
       text: JSON.stringify({
