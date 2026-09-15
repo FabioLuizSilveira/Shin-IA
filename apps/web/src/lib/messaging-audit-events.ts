@@ -26,4 +26,13 @@ export const MESSAGING_AUDIT_EVENTS = {
   AI_ACTION_REQUESTED: "AI_ACTION_REQUESTED",
   AI_ACTION_EXECUTED: "AI_ACTION_EXECUTED",
   AI_ESCALATED_TO_HUMAN: "AI_ESCALATED_TO_HUMAN",
+  // WAVE 5 — Multi-Operation Business Architecture v2 (spec section 41:
+  // PASSENGER_TRANSPORT_REQUEST_CREATED). Named OPERATION_REQUEST_EXTRACTED
+  // rather than "_CREATED": nothing is persisted as a Trip/service-request
+  // record here — this is the structured-extraction step only, always
+  // subject to human confirmation before anything downstream happens.
+  OPERATION_REQUEST_EXTRACTED: "OPERATION_REQUEST_EXTRACTED",
+  TRIP_TRACKING_LINK_CREATED: "TRIP_TRACKING_LINK_CREATED",
+  TRIP_TRACKING_LINK_REVOKED: "TRIP_TRACKING_LINK_REVOKED",
+  TRIP_TRACKING_LINK_ACCESSED: "TRIP_TRACKING_LINK_ACCESSED",
 } as const;

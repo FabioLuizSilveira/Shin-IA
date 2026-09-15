@@ -58,6 +58,8 @@ function makeCtx(tenantId: string): AgentContext {
     currentResource: null,
     aiBudget: { balance: 100, currency: "credits" },
     workspaceId: tenantId,
+    availableOperationIds: [],
+    currentOperationId: null,
   };
 }
 

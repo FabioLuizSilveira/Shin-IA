@@ -55,6 +55,8 @@ function makeCtx(permissions: string[]): AgentContext {
     currentResource: null,
     aiBudget: { balance: 100, currency: "credits" },
     workspaceId: "tenant-B",
+    availableOperationIds: [],
+    currentOperationId: null,
   };
 }
 

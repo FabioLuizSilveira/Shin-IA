@@ -59,6 +59,8 @@ function makeCtx(overrides: Partial<AgentContext> = {}): AgentContext {
     currentResource: null,
     aiBudget: { balance: 100, currency: "credits" },
     workspaceId: "tenant-1",
+    availableOperationIds: [],
+    currentOperationId: null,
     ...overrides,
   };
 }
