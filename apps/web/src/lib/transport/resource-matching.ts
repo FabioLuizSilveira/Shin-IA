@@ -11,7 +11,13 @@
 export interface AssetForMatching {
   id: string;
   status: string;
-  metadata: { seatCapacity?: number; fleetType?: string } & Record<string, unknown>;
+  metadata: {
+    seatCapacity?: number;
+    fleetType?: string;
+    capacityLiters?: number;
+    capacityCubicMeters?: number;
+    capacityTons?: number;
+  } & Record<string, unknown>;
 }
 
 export interface ResourceForMatching {
@@ -30,6 +36,27 @@ export function matchVehiclesForCapacity(
     if (a.status !== "available") return false;
     const capacity = a.metadata.seatCapacity;
     return typeof capacity === "number" && capacity >= passengerCount;
+  });
+}
+
+/**
+ * Vehicles with enough load capacity for a bulk cargo request (water-tank
+ * trucks in liters, sand/gravel trucks in cubic meters or tons) — same
+ * shape as matchVehiclesForCapacity, generalized to whichever metadata
+ * field the operation type uses instead of hardcoding "seatCapacity".
+ * Reused across water_tank_service (field: "capacityLiters") and
+ * bulk_material_transport (field: "capacityCubicMeters" | "capacityTons")
+ * rather than duplicating the same filter per operation type.
+ */
+export function matchVehiclesByCapacityField(
+  assets: AssetForMatching[],
+  field: "capacityLiters" | "capacityCubicMeters" | "capacityTons",
+  minCapacity: number,
+): AssetForMatching[] {
+  return assets.filter((a) => {
+    if (a.status !== "available") return false;
+    const capacity = a.metadata[field];
+    return typeof capacity === "number" && capacity >= minCapacity;
   });
 }
 

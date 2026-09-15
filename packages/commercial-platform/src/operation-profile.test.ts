@@ -279,4 +279,69 @@ describe("characteristics discriminated schemas", () => {
       expect(profile.characteristics.serviceModel).toBe("mixed");
     }
   });
+
+  // water_tank_service / bulk_material_transport reuse towing's exact
+  // service-dispatch kernel (same four DispatchServiceModel values).
+  it("defaults water_tank_service characteristics to serviceModel mixed, capacityUnit liters", async () => {
+    const db = makeDb();
+    const profile = await createOperationProfile(db, {
+      tenantId: "t1",
+      type: "water_tank_service",
+    });
+    expect(profile.characteristics.kind).toBe("water_tank_service");
+    if (profile.characteristics.kind === "water_tank_service") {
+      expect(profile.characteristics.serviceModel).toBe("mixed");
+      expect(profile.characteristics.capacityUnit).toBe("liters");
+    }
+  });
+
+  it("defaults bulk_material_transport characteristics to serviceModel mixed, no material types yet", async () => {
+    const db = makeDb();
+    const profile = await createOperationProfile(db, {
+      tenantId: "t1",
+      type: "bulk_material_transport",
+    });
+    expect(profile.characteristics.kind).toBe("bulk_material_transport");
+    if (profile.characteristics.kind === "bulk_material_transport") {
+      expect(profile.characteristics.serviceModel).toBe("mixed");
+      expect(profile.characteristics.materialTypes).toEqual([]);
+      expect(profile.characteristics.capacityUnit).toBe("cubic_meters");
+    }
+  });
+
+  it("accepts an explicit bulk_material_transport payload with real material types", async () => {
+    const db = makeDb();
+    const profile = await createOperationProfile(db, {
+      tenantId: "t1",
+      type: "bulk_material_transport",
+      characteristics: {
+        kind: "bulk_material_transport",
+        version: 1,
+        serviceModel: "commercial_towing_service",
+        materialTypes: ["sand", "gravel"],
+        capacityUnit: "tons",
+      },
+    });
+    if (profile.characteristics.kind === "bulk_material_transport") {
+      expect(profile.characteristics.materialTypes).toEqual(["sand", "gravel"]);
+      expect(profile.characteristics.capacityUnit).toBe("tons");
+    }
+  });
+
+  it("rejects a water_tank_service profile given bulk_material_transport characteristics", async () => {
+    const db = makeDb();
+    await expect(
+      createOperationProfile(db, {
+        tenantId: "t1",
+        type: "water_tank_service",
+        characteristics: {
+          kind: "bulk_material_transport",
+          version: 1,
+          serviceModel: "mixed",
+          materialTypes: [],
+          capacityUnit: "tons",
+        },
+      }),
+    ).rejects.toThrow(/does not match operation type/);
+  });
 });

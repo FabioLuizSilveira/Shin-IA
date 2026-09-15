@@ -17,6 +17,8 @@ export type BusinessOperationType =
   | "vehicle_rental"
   | "motorcycle_rental"
   | "towing_service"
+  | "water_tank_service"
+  | "bulk_material_transport"
   | "passenger_transport"
   | "equipment_rental"
   | "forklift_operation"
@@ -59,6 +61,30 @@ export interface TowingCharacteristics {
   serviceModel: TowingServiceModel;
 }
 
+// Water-tank-truck (caminhão pipa) and bulk-material transport (areia,
+// pedra, brita) share towing's exact service-dispatch kernel (spec
+// sections 8-9's "reused kernel" principle) — same four service models
+// (own fleet / on-demand customer / commercial / mixed), reused verbatim
+// rather than re-declared under a new name.
+export type DispatchServiceModel = TowingServiceModel;
+
+export interface WaterTankCharacteristics {
+  kind: "water_tank_service";
+  version: 1;
+  serviceModel: DispatchServiceModel;
+  capacityUnit: "liters";
+}
+
+export type BulkMaterialType = "sand" | "gravel" | "crushed_stone" | "soil" | "other";
+
+export interface BulkMaterialTransportCharacteristics {
+  kind: "bulk_material_transport";
+  version: 1;
+  serviceModel: DispatchServiceModel;
+  materialTypes: BulkMaterialType[];
+  capacityUnit: "cubic_meters" | "tons";
+}
+
 export interface GenericCharacteristics {
   kind: "generic";
   version: 1;
@@ -68,6 +94,8 @@ export interface GenericCharacteristics {
 export type OperationProfileCharacteristics =
   | PassengerTransportCharacteristics
   | TowingCharacteristics
+  | WaterTankCharacteristics
+  | BulkMaterialTransportCharacteristics
   | GenericCharacteristics;
 
 function defaultCharacteristics(type: BusinessOperationType): OperationProfileCharacteristics {
@@ -86,20 +114,41 @@ function defaultCharacteristics(type: BusinessOperationType): OperationProfileCh
   if (type === "towing_service") {
     return { kind: "towing_service", version: 1, serviceModel: "mixed" };
   }
+  if (type === "water_tank_service") {
+    return {
+      kind: "water_tank_service",
+      version: 1,
+      serviceModel: "mixed",
+      capacityUnit: "liters",
+    };
+  }
+  if (type === "bulk_material_transport") {
+    return {
+      kind: "bulk_material_transport",
+      version: 1,
+      serviceModel: "mixed",
+      materialTypes: [],
+      capacityUnit: "cubic_meters",
+    };
+  }
   return { kind: "generic", version: 1 };
 }
 
 /** Rejects a characteristics payload whose `kind` doesn't match the operation `type` — the one place this is enforced, since the DB stores it as plain jsonb. */
+const DISCRIMINATED_TYPES: Partial<
+  Record<BusinessOperationType, OperationProfileCharacteristics["kind"]>
+> = {
+  passenger_transport: "passenger_transport",
+  towing_service: "towing_service",
+  water_tank_service: "water_tank_service",
+  bulk_material_transport: "bulk_material_transport",
+};
+
 function validateCharacteristics(
   type: BusinessOperationType,
   characteristics: OperationProfileCharacteristics,
 ): void {
-  const expectedKind =
-    type === "passenger_transport"
-      ? "passenger_transport"
-      : type === "towing_service"
-        ? "towing_service"
-        : null;
+  const expectedKind = DISCRIMINATED_TYPES[type] ?? null;
   if (expectedKind && characteristics.kind !== expectedKind) {
     throw new Error(
       `characteristics.kind "${characteristics.kind}" does not match operation type "${type}" (expected "${expectedKind}")`,

@@ -143,5 +143,9 @@ export {
   type TransportPurpose,
   type TowingCharacteristics,
   type TowingServiceModel,
+  type DispatchServiceModel,
+  type WaterTankCharacteristics,
+  type BulkMaterialTransportCharacteristics,
+  type BulkMaterialType,
   type GenericCharacteristics,
 } from "./operation-profile.js";

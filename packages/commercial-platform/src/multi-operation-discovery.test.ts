@@ -153,9 +153,26 @@ describe("WAVE 2 GATE — Rental + Towing + Passenger Transport resolves correct
   it("mapVerticalToOperationType covers every catalog vertical and falls back to 'other' for unknowns", () => {
     expect(mapVerticalToOperationType("rental-cars")).toBe("vehicle_rental");
     expect(mapVerticalToOperationType("guincho")).toBe("towing_service");
+    expect(mapVerticalToOperationType("water-tank-truck")).toBe("water_tank_service");
+    expect(mapVerticalToOperationType("sand-gravel-transport")).toBe("bulk_material_transport");
     expect(mapVerticalToOperationType("passenger-transport")).toBe("passenger_transport");
     expect(mapVerticalToOperationType("munk")).toBe("munk_operation");
     expect(mapVerticalToOperationType("something-not-in-the-catalog")).toBe("other");
+  });
+
+  // Same dispatch kernel as guincho (spec sections 8-9 reused kernel;
+  // confirmed with the user this generalizes to water-tank-truck and
+  // sand-gravel-transport the same way).
+  it("resolves rental + water-tank-truck + sand-gravel-transport to 3 distinct operation types", () => {
+    const resolved = resolveOperationProfilesForProfile({
+      primaryVertical: "rental-cars",
+      additionalVerticals: ["water-tank-truck", "sand-gravel-transport"],
+    });
+    expect(resolved).toEqual([
+      { vertical: "rental-cars", type: "vehicle_rental", role: "primary" },
+      { vertical: "water-tank-truck", type: "water_tank_service", role: "secondary" },
+      { vertical: "sand-gravel-transport", type: "bulk_material_transport", role: "secondary" },
+    ]);
   });
 
   it("collapses two verticals mapping to the same operation type into one profile", () => {

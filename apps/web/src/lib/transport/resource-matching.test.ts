@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   matchVehiclesForCapacity,
+  matchVehiclesByCapacityField,
   matchDriversForFleetType,
   type AssetForMatching,
   type ResourceForMatching,
@@ -27,6 +28,46 @@ describe("matchVehiclesForCapacity", () => {
   it("never matches a vehicle with no recorded capacity — never guesses", () => {
     const matched = matchVehiclesForCapacity(assets, 1);
     expect(matched.map((a) => a.id)).not.toContain("a4");
+  });
+});
+
+// water_tank_service / bulk_material_transport reuse the same matching
+// kernel via a generic capacity field instead of a hardcoded one.
+describe("matchVehiclesByCapacityField", () => {
+  const waterTrucks: AssetForMatching[] = [
+    { id: "w1", status: "available", metadata: { capacityLiters: 10000 } },
+    { id: "w2", status: "available", metadata: { capacityLiters: 5000 } },
+    { id: "w3", status: "maintenance", metadata: { capacityLiters: 12000 } },
+    { id: "w4", status: "available", metadata: {} },
+  ];
+
+  it("matches available water tank trucks with enough liters", () => {
+    const matched = matchVehiclesByCapacityField(waterTrucks, "capacityLiters", 8000);
+    expect(matched.map((a) => a.id)).toEqual(["w1"]);
+  });
+
+  it("never matches a truck under maintenance even if capacity fits", () => {
+    const matched = matchVehiclesByCapacityField(waterTrucks, "capacityLiters", 8000);
+    expect(matched.map((a) => a.id)).not.toContain("w3");
+  });
+
+  it("never matches a truck with no recorded capacity — never guesses", () => {
+    const matched = matchVehiclesByCapacityField(waterTrucks, "capacityLiters", 1);
+    expect(matched.map((a) => a.id)).not.toContain("w4");
+  });
+
+  it("works identically for bulk material trucks via capacityCubicMeters/capacityTons", () => {
+    const bulkTrucks: AssetForMatching[] = [
+      { id: "b1", status: "available", metadata: { capacityCubicMeters: 12 } },
+      { id: "b2", status: "available", metadata: { capacityCubicMeters: 6 } },
+      { id: "b3", status: "available", metadata: { capacityTons: 20 } },
+    ];
+    expect(
+      matchVehiclesByCapacityField(bulkTrucks, "capacityCubicMeters", 10).map((a) => a.id),
+    ).toEqual(["b1"]);
+    expect(matchVehiclesByCapacityField(bulkTrucks, "capacityTons", 15).map((a) => a.id)).toEqual([
+      "b3",
+    ]);
   });
 });
 
