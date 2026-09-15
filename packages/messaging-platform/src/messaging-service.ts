@@ -11,6 +11,7 @@ import {
   resolvedContactParticipantType,
   type ResolvedContact,
 } from "./contact-resolver.js";
+import { decryptToken, encryptToken } from "./token-encryption.js";
 
 // Gateway-agnostic DB-writing core — mirrors @shina/signature-platform's
 // signature-service.ts shape exactly. Reads only a CanonicalMessagingEvent,
@@ -120,10 +121,11 @@ export async function markChannelConnected(
     .single();
   if (error || !data) throw error ?? new Error("failed to mark channel connected");
 
+  const accessTokenEnc = await encryptToken(db, accessToken);
   await db.from("messaging_channel_credentials").upsert(
     {
       messaging_channel_id: channelId,
-      access_token: accessToken,
+      access_token_enc: accessTokenEnc,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "messaging_channel_id" },
@@ -138,14 +140,14 @@ export async function getAccessTokenForChannel(
 ): Promise<string> {
   const { data, error } = await db
     .from("messaging_channel_credentials")
-    .select("access_token")
+    .select("access_token_enc")
     .eq("messaging_channel_id", messagingChannelId)
     .maybeSingle();
   if (error) throw error;
-  if (!data?.access_token) {
+  if (!data?.access_token_enc) {
     throw new Error(`no access token stored for messaging channel ${messagingChannelId}`);
   }
-  return data.access_token as string;
+  return decryptToken(db, data.access_token_enc as string);
 }
 
 async function resolveChannelByExternalPhone(

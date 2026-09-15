@@ -4,11 +4,14 @@ import { FakeMessagingProvider } from "./providers/fake.js";
 import {
   applyMessagingEvent,
   createMessagingChannel,
+  getAccessTokenForChannel,
   markChannelConnected,
 } from "./messaging-service.js";
 import { evaluateSendPolicy } from "./policy-engine.js";
 import { sendOutboundText } from "./outbound.js";
 import type { CanonicalMessagingEvent, MessagingChannel } from "./types.js";
+
+process.env.MESSAGING_TOKEN_ENCRYPTION_KEY = "test-key-wave1";
 
 // ── FakeDb — same shape as packages/commercial-platform's own test doubles ─
 interface Row {
@@ -147,6 +150,22 @@ class FakeDb {
   from(t: string) {
     return new FakeQuery(this, t);
   }
+  // Fake, reversible stand-in for the real pgcrypto RPC wrappers — proves
+  // messaging-service.ts round-trips through encryptToken/decryptToken
+  // without needing a real Postgres connection in unit tests.
+  rpc(fn: string, args: Record<string, unknown>) {
+    if (fn === "encrypt_messaging_token") {
+      return Promise.resolve({ data: `enc:${args.key}:${args.token}`, error: null });
+    }
+    if (fn === "decrypt_messaging_token") {
+      const raw = args.ciphertext as string;
+      const prefix = `enc:${args.key}:`;
+      if (!raw.startsWith(prefix))
+        return Promise.resolve({ data: null, error: { message: "bad key" } });
+      return Promise.resolve({ data: raw.slice(prefix.length), error: null });
+    }
+    return Promise.resolve({ data: null, error: { message: `unknown rpc ${fn}` } });
+  }
 }
 const asClient = (db: FakeDb) => db as unknown as SupabaseClient;
 
@@ -170,9 +189,13 @@ describe("WAVE 1 FOUNDATION — MessagingChannel lifecycle", () => {
     );
     expect(connected.status).toBe("connected");
     expect(connected.externalPhoneNumberId).toBe("phone-1");
-    // credential row exists but is never part of the returned domain object
-    expect(db.tables.messaging_channel_credentials[0].access_token).toBe("secret-token");
+    // credential row exists but is never part of the returned domain object,
+    // and is stored encrypted, never in plain text
+    const stored = db.tables.messaging_channel_credentials[0].access_token_enc;
+    expect(stored).not.toBe("secret-token");
     expect((connected as unknown as Record<string, unknown>).accessToken).toBeUndefined();
+    // round-trips back to the original token through the decrypt RPC
+    expect(await getAccessTokenForChannel(asClient(db), channel.id)).toBe("secret-token");
   });
 
   it("supports multiple channels per tenant (multiple numbers)", async () => {

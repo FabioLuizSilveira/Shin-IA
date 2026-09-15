@@ -23,6 +23,8 @@ import {
 import { getUsageSummary } from "./usage-service.js";
 import type { CanonicalMessagingEvent } from "./types.js";
 
+process.env.MESSAGING_TOKEN_ENCRYPTION_KEY = "test-key-wave2";
+
 // ── FakeDb (same shape as messaging-platform.test.ts) ───────────────────
 interface Row {
   [k: string]: unknown;
@@ -155,6 +157,22 @@ class FakeDb {
   tables: Record<string, Row[]> = {};
   from(t: string) {
     return new FakeQuery(this, t);
+  }
+  // Fake, reversible stand-in for the real pgcrypto RPC wrappers — proves
+  // messaging-service.ts round-trips through encryptToken/decryptToken
+  // without needing a real Postgres connection in unit tests.
+  rpc(fn: string, args: Record<string, unknown>) {
+    if (fn === "encrypt_messaging_token") {
+      return Promise.resolve({ data: `enc:${args.key}:${args.token}`, error: null });
+    }
+    if (fn === "decrypt_messaging_token") {
+      const raw = args.ciphertext as string;
+      const prefix = `enc:${args.key}:`;
+      if (!raw.startsWith(prefix))
+        return Promise.resolve({ data: null, error: { message: "bad key" } });
+      return Promise.resolve({ data: raw.slice(prefix.length), error: null });
+    }
+    return Promise.resolve({ data: null, error: { message: `unknown rpc ${fn}` } });
   }
 }
 const asClient = (db: FakeDb) => db as unknown as SupabaseClient;
