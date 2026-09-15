@@ -135,6 +135,26 @@ describe("WAVE 5 — extractOperationRequest", () => {
     expect(result.towingFields?.location).toBe("Av. Paulista");
   });
 
+  it("extracts a confident water_tank_request", async () => {
+    mockRunAiGateway.mockResolvedValueOnce({
+      text: JSON.stringify({
+        intent: "water_tank_request",
+        waterTankFields: { deliveryLocation: "Sítio Boa Vista", litersRequested: 8000 },
+        ambiguousFields: [],
+      }),
+      creditsConsumed: 2,
+    });
+    const db = seed();
+    const result = await extractOperationRequest(asClient(db), {
+      tenantId: "t1",
+      conversationId: "conv1",
+    });
+    expect(result.extracted).toBe(true);
+    expect(result.intent).toBe("water_tank_request");
+    expect(result.waterTankFields?.litersRequested).toBe(8000);
+    expect(result.needsConfirmation).toBe(false);
+  });
+
   it("needsConfirmation is true whenever ambiguousFields is non-empty — never assumed silently", async () => {
     mockRunAiGateway.mockResolvedValueOnce({
       text: JSON.stringify({

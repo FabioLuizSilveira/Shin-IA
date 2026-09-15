@@ -7,7 +7,9 @@ import { ensureDefaultAgentWorkspace } from "@/lib/ai/workspace";
 import { getConversation, listMessages } from "@shina/messaging-platform";
 
 // WAVE 5 — Multi-Operation Business Architecture v2: "WhatsApp transport
-// request" / "Towing request" (spec sections 24 and 8-9's shared kernel).
+// request" / "Towing request" (spec sections 24 and 8-9's shared kernel) —
+// extended to water_tank_request once water-tank-truck got its own
+// dispatch runtime (same shared kernel, same on-demand shape as towing).
 // Structured, JSON-only extraction from a conversation's inbound messages —
 // deliberately NOT a tool-calling agent loop: it never books a Trip, never
 // creates a service request, never sends anything. It only classifies
@@ -29,19 +31,20 @@ const EXTRACTION_SYSTEM_PROMPT = `Você é a Shinã, extraindo dados estruturado
 
 REGRAS OBRIGATÓRIAS:
 - Responda APENAS com um objeto JSON válido, sem markdown, sem comentários, sem texto antes ou depois.
-- Classifique "intent" como exatamente um destes valores: "passenger_transport_request", "towing_request", "unclear".
+- Classifique "intent" como exatamente um destes valores: "passenger_transport_request", "towing_request", "water_tank_request", "unclear".
 - NUNCA invente um valor que não esteja explícito na conversa. Se um campo não estiver claro, OMITA-o do objeto de campos e liste sua chave em "ambiguousFields".
 - Se a conversa não tiver contexto suficiente para determinar a intenção, use intent="unclear" e explique em "ambiguousFields".
 - Nunca assuma data, cidade, horário ou quantidade que não tenha sido dita explicitamente.
 
 Formato de saída exato:
 {
-  "intent": "passenger_transport_request" | "towing_request" | "unclear",
+  "intent": "passenger_transport_request" | "towing_request" | "water_tank_request" | "unclear",
   "transportFields": { "origin"?: string, "destination"?: string, "date"?: string, "departureTime"?: string, "returnTime"?: string, "passengerCount"?: number },
   "towingFields": { "customerHint"?: string, "vehicleDescription"?: string, "location"?: string },
+  "waterTankFields": { "deliveryLocation"?: string, "litersRequested"?: number, "customerHint"?: string },
   "ambiguousFields": string[]
 }
-Omita "transportFields" se intent não for passenger_transport_request; omita "towingFields" se intent não for towing_request.`;
+Omita "transportFields" se intent não for passenger_transport_request; omita "towingFields" se intent não for towing_request; omita "waterTankFields" se intent não for water_tank_request.`;
 
 const MAX_HISTORY_MESSAGES = 12;
 
@@ -60,7 +63,17 @@ export interface TowingRequestFields {
   location?: string;
 }
 
-export type ExtractedOperationIntent = "passenger_transport_request" | "towing_request" | "unclear";
+export interface WaterTankRequestFields {
+  deliveryLocation?: string;
+  litersRequested?: number;
+  customerHint?: string;
+}
+
+export type ExtractedOperationIntent =
+  | "passenger_transport_request"
+  | "towing_request"
+  | "water_tank_request"
+  | "unclear";
 
 export interface OperationRequestExtraction {
   extracted: boolean;
@@ -68,6 +81,7 @@ export interface OperationRequestExtraction {
   intent?: ExtractedOperationIntent;
   transportFields?: TransportRequestFields;
   towingFields?: TowingRequestFields;
+  waterTankFields?: WaterTankRequestFields;
   ambiguousFields: string[];
   needsConfirmation: boolean;
   creditsConsumed?: number;
@@ -77,6 +91,7 @@ interface RawExtraction {
   intent?: unknown;
   transportFields?: unknown;
   towingFields?: unknown;
+  waterTankFields?: unknown;
   ambiguousFields?: unknown;
 }
 
@@ -98,6 +113,7 @@ function parseModelOutput(text: string): OperationRequestExtraction | null {
   const validIntents: ExtractedOperationIntent[] = [
     "passenger_transport_request",
     "towing_request",
+    "water_tank_request",
     "unclear",
   ];
   const intent = validIntents.includes(raw.intent as ExtractedOperationIntent)
@@ -119,6 +135,9 @@ function parseModelOutput(text: string): OperationRequestExtraction | null {
   }
   if (intent === "towing_request" && typeof raw.towingFields === "object") {
     result.towingFields = raw.towingFields as TowingRequestFields;
+  }
+  if (intent === "water_tank_request" && typeof raw.waterTankFields === "object") {
+    result.waterTankFields = raw.waterTankFields as WaterTankRequestFields;
   }
   return result;
 }

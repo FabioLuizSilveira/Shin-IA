@@ -1,0 +1,12 @@
+-- Multi-Operation Business Architecture v2 — water-tank-truck's own
+-- dispatch runtime (same "wave 2" treatment just given to towing, per the
+-- user: "segue com a wave 2 pro caminhão-pipa").
+--
+-- Pure REUSE, identical shape to towing_service_request
+-- (20260929000000): a water tank service request IS an operations row,
+-- not a new aggregate. Unlike towing (matched by fleet-type tag only),
+-- water-tank matching cares about CAPACITY (liters delivered) — reuses
+-- matchVehiclesByCapacityField (already built for the water/bulk
+-- taxonomy) against the capacityLiters metadata field, same as passenger
+-- transport's seat-capacity matching.
+alter type operation_type add value if not exists 'water_tank_service_request';

@@ -7,6 +7,7 @@ import { extractOperationRequest } from "@/lib/ai/operation-request-extraction";
 import {
   matchVehiclesForCapacity,
   matchAvailableVehiclesByFleetType,
+  matchVehiclesByCapacityField,
   type AssetForMatching,
 } from "@/lib/transport/resource-matching";
 import { newCorrelationId } from "@/lib/audit-event";
@@ -108,7 +109,37 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       }));
     }
 
-    return NextResponse.json({ data: { ...result, compatibleVehicles, compatibleTowTrucks } });
+    let compatibleWaterTankTrucks: Array<{
+      id: string;
+      name: string;
+      capacityLiters: number | null;
+    }> = [];
+    const litersRequested = result.waterTankFields?.litersRequested;
+    if (
+      result.intent === "water_tank_request" &&
+      typeof litersRequested === "number" &&
+      litersRequested > 0
+    ) {
+      const { data: assets } = await scope.db
+        .from("assets")
+        .select("id, name, status, metadata")
+        .eq("tenant_id", scope.tenantId)
+        .eq("category", "vehicle");
+      const matched = matchVehiclesByCapacityField(
+        (assets ?? []) as AssetForMatching[],
+        "capacityLiters",
+        litersRequested,
+      );
+      compatibleWaterTankTrucks = matched.map((a) => ({
+        id: a.id,
+        name: (a as unknown as { name: string }).name,
+        capacityLiters: a.metadata.capacityLiters ?? null,
+      }));
+    }
+
+    return NextResponse.json({
+      data: { ...result, compatibleVehicles, compatibleTowTrucks, compatibleWaterTankTrucks },
+    });
   } catch (err) {
     return internalError(err);
   }
