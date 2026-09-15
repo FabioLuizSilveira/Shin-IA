@@ -19,9 +19,19 @@ export interface OpenAiToolCall {
   arguments: Record<string, unknown>;
 }
 
+// A user message's content can be plain text or, for vision-capable models
+// (gpt-4o-mini included), a mix of text + inline image parts — added for
+// the Shinã Agent's document/image attachment support. `image_url.url`
+// accepts a base64 data: URL directly (no hosting needed), same posture as
+// the voice transcription route: the image bytes are never persisted
+// anywhere, only passed through this one request.
+export type OpenAiContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export interface OpenAiMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content?: string | null;
+  content?: string | OpenAiContentPart[] | null;
   tool_calls?: { id: string; type: "function"; function: { name: string; arguments: string } }[];
   tool_call_id?: string;
 }

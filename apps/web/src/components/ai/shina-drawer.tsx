@@ -9,7 +9,7 @@
 // feedback goes through it as normal.
 
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Sparkles } from "lucide-react";
+import { X, Send, Sparkles, Paperclip, Mic, Square, Loader2, FileText } from "lucide-react";
 import { useToast } from "@shina/design-system";
 
 interface ActionPlan {
@@ -36,6 +36,40 @@ interface AgentApiResponse {
   code?: string;
 }
 
+interface PendingAttachment {
+  name: string;
+  mimeType: string;
+  dataBase64: string;
+  isImage: boolean;
+}
+
+const MAX_ATTACHMENTS = 3;
+const ACCEPTED_ATTACHMENT_TYPES =
+  "image/png,image/jpeg,image/webp,application/pdf,.docx,text/plain";
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1] ?? "");
+    };
+    reader.onerror = () => reject(new Error("failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Whisper infers the audio container from the upload's filename extension
+// (see api/ai/agent/transcribe/route.ts) — map the browser's actual
+// MediaRecorder mimeType to a matching extension instead of guessing.
+function extensionForMimeType(mimeType: string): string {
+  const base = mimeType.split(";")[0]?.trim();
+  if (base === "audio/webm") return "webm";
+  if (base === "audio/ogg") return "ogg";
+  if (base === "audio/mp4") return "mp4";
+  return "webm";
+}
+
 interface ShinaDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -53,7 +87,13 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
   const [sending, setSending] = useState(false);
   const [resolvingPlanId, setResolvingPlanId] = useState<string | null>(null);
   const [resolvedPlanIds, setResolvedPlanIds] = useState<Set<string>>(new Set());
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
@@ -61,18 +101,127 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
 
   if (!open) return null;
 
+  async function onFilesSelected(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList);
+    if (attachments.length + files.length > MAX_ATTACHMENTS) {
+      show({ message: `Máximo de ${MAX_ATTACHMENTS} anexos por mensagem.`, variant: "warning" });
+      return;
+    }
+    try {
+      const encoded = await Promise.all(
+        files.map(async (file) => ({
+          name: file.name,
+          mimeType: file.type,
+          dataBase64: await fileToBase64(file),
+          isImage: file.type.startsWith("image/"),
+        })),
+      );
+      setAttachments((prev) => [...prev, ...encoded]);
+    } catch {
+      show({ message: "Não foi possível ler um dos arquivos selecionados.", variant: "danger" });
+    }
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const mimeType = recorder.mimeType || "audio/webm";
+        void transcribe(new Blob(audioChunksRef.current, { type: mimeType }), mimeType);
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setRecording(true);
+    } catch {
+      show({
+        message: "Não foi possível acessar o microfone. Verifique as permissões do navegador.",
+        variant: "danger",
+      });
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  }
+
+  async function transcribe(blob: Blob, mimeType: string) {
+    setTranscribing(true);
+    try {
+      const form = new FormData();
+      form.append("audio", blob, `recording.${extensionForMimeType(mimeType)}`);
+      const res = await fetch("/api/ai/agent/transcribe", { method: "POST", body: form });
+      const json = (await res.json().catch(() => ({}))) as {
+        data?: { transcript: string };
+        error?: string;
+      };
+      if (!res.ok || json.error) {
+        show({
+          message:
+            res.status === 403
+              ? "Voz ainda não está habilitada para este workspace."
+              : (json.error ?? "Não foi possível transcrever o áudio."),
+          variant: res.status === 403 ? "info" : "danger",
+        });
+        return;
+      }
+      const transcript = json.data?.transcript.trim() ?? "";
+      if (!transcript) {
+        show({ message: "Não entendi o áudio, tenta de novo.", variant: "warning" });
+        return;
+      }
+      setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    } catch {
+      show({ message: "Não foi possível transcrever o áudio.", variant: "danger" });
+    } finally {
+      setTranscribing(false);
+    }
+  }
+
   async function send() {
     const query = input.trim();
-    if (!query || sending) return;
+    if ((!query && attachments.length === 0) || sending) return;
+    const pendingAttachments = attachments;
     setInput("");
-    setMessages((m) => [...m, { role: "user", text: query }]);
+    setAttachments([]);
+    setMessages((m) => [
+      ...m,
+      {
+        role: "user",
+        text: pendingAttachments.length
+          ? `${query}${query ? "\n" : ""}📎 ${pendingAttachments.map((a) => a.name).join(", ")}`
+          : query,
+      },
+    ]);
     setSending(true);
 
     try {
       const res = await fetch("/api/ai/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, currentModule, currentResource }),
+        body: JSON.stringify({
+          query: query || "Veja o(s) anexo(s) enviado(s).",
+          currentModule,
+          currentResource,
+          attachments: pendingAttachments.length
+            ? pendingAttachments.map(({ name, mimeType, dataBase64 }) => ({
+                name,
+                mimeType,
+                dataBase64,
+              }))
+            : undefined,
+        }),
       });
       const json = (await res.json().catch(() => ({}))) as AgentApiResponse;
 
@@ -214,28 +363,91 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
           )}
         </div>
 
-        <div className="border-t border-slate-100 dark:border-slate-700 p-4 flex items-end gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send();
-              }
-            }}
-            placeholder="Pergunte à Shinã…"
-            rows={2}
-            className="flex-1 text-sm px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
-          />
-          <button
-            type="button"
-            onClick={() => void send()}
-            disabled={sending || !input.trim()}
-            className="p-2.5 rounded-lg bg-shina-blue hover:bg-blue-600 text-white disabled:opacity-60 cursor-pointer border-0 shrink-0"
-          >
-            <Send className="w-4 h-4" />
-          </button>
+        <div className="border-t border-slate-100 dark:border-slate-700 p-4 flex flex-col gap-2.5">
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {attachments.map((att, i) => (
+                <div
+                  key={`${att.name}-${i}`}
+                  className="flex items-center gap-1.5 max-w-[200px] px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-300"
+                >
+                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{att.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(i)}
+                    className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border-0 bg-transparent cursor-pointer shrink-0"
+                    aria-label={`Remover ${att.name}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-end gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_ATTACHMENT_TYPES}
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void onFilesSelected(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending || attachments.length >= MAX_ATTACHMENTS}
+              title="Anexar documento ou imagem"
+              className="p-2.5 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer border-0 bg-transparent shrink-0"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => (recording ? stopRecording() : void startRecording())}
+              disabled={sending || transcribing}
+              title={recording ? "Parar gravação" : "Gravar mensagem de voz"}
+              className={`p-2.5 rounded-lg border-0 cursor-pointer shrink-0 disabled:opacity-40 ${
+                recording
+                  ? "text-white bg-red-500 hover:bg-red-600"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 bg-transparent"
+              }`}
+            >
+              {transcribing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : recording ? (
+                <Square className="w-4 h-4" />
+              ) : (
+                <Mic className="w-4 h-4" />
+              )}
+            </button>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              placeholder={recording ? "Gravando…" : "Pergunte à Shinã…"}
+              rows={2}
+              className="flex-1 text-sm px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
+            />
+            <button
+              type="button"
+              onClick={() => void send()}
+              disabled={sending || (!input.trim() && attachments.length === 0)}
+              className="p-2.5 rounded-lg bg-shina-blue hover:bg-blue-600 text-white disabled:opacity-60 cursor-pointer border-0 shrink-0"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </>

@@ -12,6 +12,9 @@ export const AI_AGENT_EVENTS = {
   // metadata, only duration/size; the transcript is logged once, for
   // real, as AI_AGENT_REQUEST when it's actually submitted to the agent).
   VOICE_TRANSCRIBED: "AI_VOICE_TRANSCRIBED",
+  // Attachments (image/document) — never the extracted text/image bytes in
+  // metadata, only count/type/size, same posture as VOICE_TRANSCRIBED.
+  ATTACHMENT_PROCESSED: "AI_AGENT_ATTACHMENT_PROCESSED",
 } as const;
 
 // Wave 6 — Guided Actions. PROPOSED fires from the tool loop (never a

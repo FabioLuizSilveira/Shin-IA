@@ -52,8 +52,25 @@ export async function POST(req: NextRequest) {
   }
 
   const started = Date.now();
+  // Mobile (expo-audio) always sends audio/m4a; the web drawer's
+  // MediaRecorder sends whatever the browser picks (webm/opus on
+  // Chrome/Firefox, mp4/aac on Safari) — Whisper infers the container from
+  // the filename extension, so a hardcoded ".m4a" name would silently
+  // mislabel a webm upload. Derive the extension from the actual MIME type
+  // instead, falling back to m4a only when it's absent/unrecognized.
+  const EXTENSION_BY_MIME: Record<string, string> = {
+    "audio/webm": "webm",
+    "audio/ogg": "ogg",
+    "audio/mp4": "mp4",
+    "audio/mpeg": "mp3",
+    "audio/wav": "wav",
+    "audio/m4a": "m4a",
+    "audio/x-m4a": "m4a",
+  };
+  const baseType = audio.type.split(";")[0]?.trim() ?? "";
+  const extension = EXTENSION_BY_MIME[baseType] ?? "m4a";
   const upstreamForm = new FormData();
-  upstreamForm.append("file", audio, "recording.m4a");
+  upstreamForm.append("file", audio, `recording.${extension}`);
   upstreamForm.append("model", "whisper-1");
 
   let transcript: string;

@@ -8,12 +8,18 @@ import { buildMutationToolRegistry } from "@/lib/ai/actions/tools";
 import type { ProposedPlan } from "@/lib/ai/actions/mutation-registry";
 import { AI_AGENT_EVENTS, AI_ACTION_EVENTS } from "@/lib/ai/audit-events";
 import {
+  AttachmentError,
+  processAttachments,
+  type AgentAttachmentInput,
+} from "@/lib/ai/attachments";
+import {
   runAiGateway,
   AiPolicyError,
   InsufficientCreditsError,
   DuplicateRequestError,
   OpenAIProviderError,
   type OpenAiMessage,
+  type OpenAiContentPart,
 } from "@shina/ai-gateway";
 
 export const dynamic = "force-dynamic";
@@ -53,9 +59,40 @@ export async function POST(req: NextRequest) {
     query?: string;
     currentModule?: string;
     currentResource?: { type: string; id: string };
+    attachments?: AgentAttachmentInput[];
   };
   if (!body.query?.trim()) {
     return NextResponse.json({ error: "query is required" }, { status: 400 });
+  }
+
+  if (body.attachments?.length && !(await isFeatureEnabled(scope, "agent.attachments.enabled"))) {
+    return NextResponse.json(
+      { error: "Anexos ainda não estão habilitados para este tenant." },
+      { status: 403 },
+    );
+  }
+
+  let imageParts: OpenAiContentPart[] = [];
+  let documentText: string | null = null;
+  if (body.attachments?.length) {
+    try {
+      const processed = await processAttachments(body.attachments);
+      imageParts = processed.imageParts;
+      documentText = processed.documentText;
+      void logActivity(scope.db, {
+        tenantId: scope.tenantId,
+        actorId: scope.userId,
+        entityType: "ai_agent",
+        entityId: crypto.randomUUID(),
+        action: AI_AGENT_EVENTS.ATTACHMENT_PROCESSED,
+        metadata: processed.meta,
+      });
+    } catch (e) {
+      if (e instanceof AttachmentError) {
+        return NextResponse.json({ error: e.message }, { status: 400 });
+      }
+      throw e;
+    }
   }
 
   const ctx = await buildAgentContext(scope, {
@@ -83,7 +120,11 @@ export async function POST(req: NextRequest) {
   ];
   const mutationToolNames = new Set(availableMutationTools.map((t) => t.name));
 
-  const messages: OpenAiMessage[] = [{ role: "user", content: body.query.trim() }];
+  const queryText = documentText ? `${body.query.trim()}\n\n${documentText}` : body.query.trim();
+  const userContent: OpenAiMessage["content"] = imageParts.length
+    ? [{ type: "text", text: queryText }, ...imageParts]
+    : queryText;
+  const messages: OpenAiMessage[] = [{ role: "user", content: userContent }];
   const toolsUsed: string[] = [];
   const pendingActionPlans: ProposedPlan[] = [];
   let totalCreditsConsumed = 0;
