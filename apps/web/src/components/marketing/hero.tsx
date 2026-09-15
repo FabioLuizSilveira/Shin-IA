@@ -1,101 +1,102 @@
 "use client";
 
-// Hero do site institucional — headline serifada itálica (tagline oficial),
-// dois CTAs e barra de setores-alvo, sobre fundo preto com aurora sutil.
+// Hero do site institucional — réplica do blueprint real da Autoloc
+// (Hero.jsx): badge, headline em Unbounded com trecho em gradiente,
+// card de status "ao vivo" e dois CTAs, sobre o fundo slate + grid + dois
+// plasma blobs (não mais a aurora WebGL "wisp" preto/indigo do rebrand
+// anterior).
 
 import { motion } from "framer-motion";
-import { WispBackground } from "./wisp-background";
 import { useDemoLead } from "./demo-lead-context";
-
-const SECTORS = [
-  "Locação de Ativos",
-  "Construção Civil",
-  "Agronegócio",
-  "Logística",
-  "Indústria",
-  "Energia",
-];
 
 export function Hero() {
   const { open: openDemoLead } = useDemoLead();
   return (
-    <section className="relative pt-40 pb-24 px-4 overflow-hidden">
-      {/* Fundo WebGL "wisp" (template Nexus, recolorido indigo/violeta) +
-          overlay preto 40% + fade inferior alto para fundir com o preto. */}
-      <div className="absolute inset-0 z-0">
-        <WispBackground />
-      </div>
-      <div aria-hidden className="absolute inset-0 bg-black/40 z-0 pointer-events-none" />
+    <section className="relative overflow-hidden pt-36 pb-16 px-4">
+      <div className="grid-bg" />
       <div
         aria-hidden
-        className="absolute bottom-0 left-0 w-full h-[300px] bg-gradient-to-b from-transparent to-black z-0 pointer-events-none"
+        className="plasma left-[-8%] top-[10%] h-[420px] w-[420px] bg-[#0066ff] animate-pulse-glow"
+      />
+      <div
+        aria-hidden
+        className="plasma right-[-6%] top-[18%] h-[480px] w-[480px] bg-[#7000ff] animate-pulse-glow"
       />
 
-      <div className="relative z-10 max-w-4xl mx-auto text-center">
+      <div className="relative z-10 max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full liquid-glass text-xs font-body font-medium text-white/70 mb-8"
+          className="glass inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full text-xs font-body font-medium text-white/70 mb-8"
         >
-          O Sistema Operacional da Economia de Ativos
+          <span className="h-2 w-2 rounded-full bg-[#00E5FF] shadow-[0_0_10px_#00E5FF]" />
+          Gestão inteligente de ativos + operações
         </motion.div>
 
         <motion.h1
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1 }}
-          className="font-heading italic text-5xl sm:text-6xl lg:text-7xl text-white leading-[1.05] mb-6"
+          className="font-heading text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[0.98] text-white [text-wrap:balance]"
         >
-          Operações Inteligentes em Movimento.
+          Sua operação
+          <br />
+          <span className="text-white/60">no piloto</span>{" "}
+          <span className="text-gradient text-glow">automático.</span>
         </motion.h1>
 
-        <motion.p
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
-          className="font-body text-lg text-white/85 [text-shadow:0_1px_16px_rgba(0,0,0,0.85)] max-w-2xl mx-auto mb-10 leading-relaxed"
-        >
-          A Shinã IA conecta, automatiza e escala a operação de ativos físicos e digitais em um
-          único ecossistema inteligente — do agronegócio à construção civil, da logística à
-          indústria.
-        </motion.p>
+        <div className="mt-11 flex flex-col lg:flex-row lg:items-end justify-between gap-10">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="font-body text-base sm:text-lg text-white/70 leading-relaxed max-w-lg"
+          >
+            A Shinã IA conecta, automatiza e escala a operação de ativos físicos e digitais em um
+            único ecossistema inteligente — contratos, ativos, financeiro e decisões, em um só
+            lugar.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.3 }}
+            className="glass rounded-2xl px-6 py-5 min-w-[260px] shrink-0"
+          >
+            {["Ativos monitorados · ao vivo", "6 setores conectados", "IA operando 24/7"].map(
+              (row) => (
+                <div
+                  key={row}
+                  className="flex items-center gap-2.5 text-sm text-white/70 mb-3.5 last:mb-0"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF] shrink-0" />
+                  {row}
+                </div>
+              ),
+            )}
+          </motion.div>
+        </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.3 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
+          transition={{ duration: 0.7, delay: 0.4 }}
+          className="mt-10 flex flex-wrap items-center gap-4"
         >
           <button
             type="button"
             onClick={() => openDemoLead("hero")}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-black font-body font-semibold rounded-full transition-transform hover:scale-[1.02] border-0 cursor-pointer"
+            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full font-body font-semibold text-sm text-[#04040a] bg-gradient-to-r from-[#00E5FF] to-[#7000FF] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,229,255,0.35)] border-0 cursor-pointer"
           >
-            Agendar Demonstração
+            Conheça a plataforma →
           </button>
           <a
             href="#plataforma"
-            className="inline-flex items-center gap-2 px-8 py-4 liquid-glass text-white font-body font-semibold rounded-full transition-colors hover:bg-white/5 no-underline"
+            className="glass inline-flex items-center gap-2 px-7 py-3.5 rounded-full font-body font-semibold text-sm text-white no-underline"
           >
-            Conhecer a Plataforma
+            ▷ Ver como funciona
           </a>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-          className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3"
-        >
-          {SECTORS.map((sector) => (
-            <span
-              key={sector}
-              className="text-xs font-body uppercase tracking-widest text-white/65"
-            >
-              {sector}
-            </span>
-          ))}
         </motion.div>
       </div>
     </section>

@@ -25,7 +25,7 @@ export function Navbar() {
 
   return (
     <>
-      <header className="fixed top-0 inset-x-0 z-50 liquid-glass border-b border-white/5">
+      <header className="fixed top-0 inset-x-0 z-50 glass-strong border-b-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-2.5 no-underline group">
@@ -67,7 +67,7 @@ export function Navbar() {
                 type="button"
                 id="nav-cta"
                 onClick={() => openDemoLead("nav")}
-                className="inline-flex items-center gap-1.5 px-4 py-2 liquid-glass-strong text-white text-sm font-body font-semibold rounded-full transition-colors border-0 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 glass-strong text-white text-sm font-body font-semibold rounded-full transition-colors border-0 cursor-pointer"
               >
                 Agendar Demo
               </button>
@@ -86,7 +86,7 @@ export function Navbar() {
         </div>
 
         {open && (
-          <div className="md:hidden border-t border-white/5 liquid-glass">
+          <div className="md:hidden border-t border-white/5 glass">
             <div className="px-4 py-4 space-y-2">
               {NAV_LINKS.map((link) => (
                 <Link
@@ -115,7 +115,7 @@ export function Navbar() {
                     setOpen(false);
                     openDemoLead("nav-mobile");
                   }}
-                  className="block w-full px-3 py-2.5 liquid-glass-strong text-white text-sm font-body font-semibold rounded-xl text-center border-0 cursor-pointer"
+                  className="block w-full px-3 py-2.5 glass-strong text-white text-sm font-body font-semibold rounded-xl text-center border-0 cursor-pointer"
                 >
                   Agendar Demo
                 </button>
@@ -126,7 +126,7 @@ export function Navbar() {
       </header>
 
       {/* Rendered as a sibling of <header>, not a descendant — <header> has
-        the liquid-glass class, whose backdrop-filter establishes a new
+        the glass class, whose backdrop-filter establishes a new
         containing block for descendant `position: fixed` elements, which
         was collapsing this modal into the header's own 64px-tall box
         instead of centering it in the viewport. */}

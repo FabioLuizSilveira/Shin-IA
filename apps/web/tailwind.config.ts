@@ -18,8 +18,9 @@ export default {
       // Tipografia exclusiva do site institucional (public)/ — ver public.css.
       // Não substitui sans/display do preset compartilhado, só adiciona.
       fontFamily: {
-        heading: ["var(--font-heading)", "serif"],
+        heading: ["var(--font-heading)", "sans-serif"],
         body: ["var(--font-body)", "sans-serif"],
+        data: ["var(--font-data)", "monospace"],
       },
     },
   },

@@ -1,244 +1,167 @@
 /* Estilos exclusivos do site institucional público (grupo de rotas
-   (public)). Visual "liquid glass" preto/serif — deliberadamente à parte
-   do Shinã Flow Design System (globals.css, tokens indigo/violeta) usado
-   no restante da plataforma. Ver plano de rebrand para o motivo.
+   (public)). Visual replicado do blueprint de design real da LP Autoloc
+   (autoloc.shinaia.com.br) — ver frontend/src/index.css e os componentes
+   em frontend/src/components/landing/ no repo vendorado
+   autoloc.shinaia.com.br-main/. Deliberadamente à parte do Shinã Flow
+   Design System (globals.css, tokens indigo/violeta) usado no restante da
+   plataforma.
 
-   .liquid-glass / .liquid-glass-strong replicam a receita exata do
-   template de referência (fundo quase transparente + luminosity blend +
-   anel de borda em gradiente via mask-composite) — conferida diretamente
-   no editor da Aura.build, não uma aproximação. */
+   Correção importante: a primeira versão deste rebrand (baseada só no
+   design_guidelines.json do projeto) usava um fundo quase preto
+   (#050508). O código-fonte real da Autoloc usa um slate azul-acinzentado
+   (#3A3A4F, ver --background: 240 15% 27% em index.css) — é esse tom que
+   este arquivo replica, não preto. */
 
-.liquid-glass {
-  position: relative;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.01);
-  background-blend-mode: luminosity;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: none;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+:root {
+  --bg-body: #3a3a4f;
+  --bg-elevated: #43435b;
+  --blue: #0066ff;
+  --plasma: #7000ff;
+  --cyan: #00e5ff;
+  --purple: #8a2be2;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-glow: rgba(0, 229, 255, 0.35);
+  --glass: rgba(255, 255, 255, 0.04);
+  --glass-strong: rgba(255, 255, 255, 0.08);
 }
 
-.liquid-glass::before {
+.bg-body {
+  background-color: var(--bg-body);
+}
+
+::selection {
+  background: var(--plasma);
+  color: white;
+}
+
+/* ── glass primitives (real Autoloc .glass recipe) ──────────────────── */
+
+.glass {
+  position: relative;
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-subtle);
+  transition:
+    border-color 0.3s ease,
+    background-color 0.3s ease,
+    transform 0.3s ease;
+}
+
+.glass:hover {
+  border-color: rgba(0, 229, 255, 0.28);
+  background: var(--glass-strong);
+}
+
+.glass-strong {
+  background: var(--glass-strong);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid var(--border-subtle);
+}
+
+/* card that lifts + gains a cyan/purple wash on hover (real .group +
+   group-hover recipe from Benefits.jsx) */
+.hover-lift {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.35s ease, border-color 0.3s ease;
+}
+.hover-lift::before {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: -1;
   border-radius: inherit;
-  padding: 1.4px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.45) 0%,
-    rgba(255, 255, 255, 0.15) 20%,
-    rgba(255, 255, 255, 0) 40%,
-    rgba(255, 255, 255, 0) 60%,
-    rgba(255, 255, 255, 0.15) 80%,
-    rgba(255, 255, 255, 0.45) 100%
-  );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(112, 0, 255, 0.12));
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-6px);
+  border-color: rgba(0, 229, 255, 0.25);
+}
+.hover-lift:hover::before {
+  opacity: 1;
+}
+
+/* ── gradient text (real .text-gradient recipe) ──────────────────────── */
+
+.text-gradient {
+  background: linear-gradient(120deg, #4df2ff 0%, #7ba9ff 52%, #c39bff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.text-glow {
+  text-shadow:
+    0 0 32px rgba(0, 229, 255, 0.4),
+    0 2px 24px rgba(4, 6, 16, 0.55);
+}
+
+/* ── plasma glow blobs (real .plasma recipe) ─────────────────────────── */
+
+.plasma {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(110px);
+  opacity: 0.4;
   pointer-events: none;
+  z-index: 0;
 }
 
-.liquid-glass-strong {
-  position: relative;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.01);
-  background-blend-mode: luminosity;
-  backdrop-filter: blur(50px);
-  -webkit-backdrop-filter: blur(50px);
-  border: none;
-  box-shadow:
-    4px 4px 4px rgba(0, 0, 0, 0.05),
-    inset 0 1px 1px rgba(255, 255, 255, 0.15);
-}
+/* ── grid backdrop (real .grid-bg recipe) ────────────────────────────── */
 
-.liquid-glass-strong::before {
-  content: "";
+.grid-bg {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
-  padding: 1.4px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.5) 0%,
-    rgba(255, 255, 255, 0.2) 20%,
-    rgba(255, 255, 255, 0) 40%,
-    rgba(255, 255, 255, 0) 60%,
-    rgba(255, 255, 255, 0.2) 80%,
-    rgba(255, 255, 255, 0.5) 100%
-  );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 40%, transparent 100%);
 }
 
-/* AMBIENT BACKGROUND — fundo padrão é o shader WebGL "wisp" (ver
-   ambient-background.tsx / wisp-background.tsx). */
+/* ── marquee (real react-fast-marquee visual, CSS-only here) ─────────── */
 
-/* COSMIC BACKGROUND — nebulosa + estrelas + semente neural (ver
-   cosmic-background.tsx). Recriação em código do efeito "gênese" do
-   template de referência. */
-
-.cosmic-nebula {
-  position: absolute;
-  inset: -10%;
-  background:
-    radial-gradient(45% 40% at 25% 30%, rgba(88, 60, 160, 0.4), transparent 70%),
-    radial-gradient(50% 45% at 75% 20%, rgba(49, 46, 129, 0.45), transparent 70%),
-    radial-gradient(40% 35% at 60% 75%, rgba(120, 60, 150, 0.3), transparent 70%),
-    radial-gradient(30% 25% at 15% 80%, rgba(170, 120, 60, 0.16), transparent 70%),
-    radial-gradient(35% 30% at 88% 70%, rgba(160, 100, 50, 0.14), transparent 70%),
-    #05060e;
-  filter: blur(6px);
-  animation: cosmic-drift 60s ease-in-out infinite;
+.marquee-track {
+  display: flex;
+  white-space: nowrap;
+  animation: marquee-scroll 28s linear infinite;
 }
 
-.cosmic-twinkle {
-  animation: cosmic-twinkle 3.5s ease-in-out infinite;
-}
-
-/* Estado inicial: semente minúscula, ramos não desenhados, nós apagados.
-   Quando a seção entra na tela (.cosmic-grow), tudo cresce em sequência:
-   núcleo (0s) → semente escala (0–2.2s) → troncos (0.6s) → bifurcações
-   (1.7s) → nós acendem (2.6s) → respiração contínua (3s+). */
-
-.cosmic-seed {
-  transform-origin: 500px 380px;
-  transform: scale(0.12);
-  opacity: 0;
-}
-
-/* cosmic-spin (continuous 55s rotation) was removed — this group contains
-   feGaussianBlur-filtered paths (SVG filters aren't GPU-composited the way
-   CSS filters are), so rotating it forced a full filter re-rasterization on
-   every frame, forever, for as long as the tab stayed open. That was the
-   dominant cost behind this page's Lighthouse TBT/main-thread-work numbers,
-   not just a one-time animation cost. The one-shot grow-in stays. */
-.cosmic-grow .cosmic-seed {
-  animation: cosmic-seed-grow 2.2s cubic-bezier(0.22, 0.9, 0.3, 1) forwards;
-}
-
-.cosmic-core {
-  transform-origin: 500px 380px;
-  transform: scale(0.2);
-  opacity: 0;
-}
-
-.cosmic-grow .cosmic-core {
-  animation: cosmic-core-in 1s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s forwards;
-}
-
-/* Was a stroke-dashoffset "draw the line" animation over 62 paths (two
-   layers — glow + sharp — of the 31 BRANCHES entries). stroke-dashoffset
-   isn't a compositor-only property, so animating it forces a paint pass on
-   every one of those 62 elements on every frame — the single biggest
-   contributor to this page's "non-composited animations" Lighthouse flag.
-   A plain opacity fade-in keeps the same per-branch stagger (still driven
-   by the inline animationDelay in cosmic-background.tsx) at a fraction of
-   the cost, since opacity animates on the compositor thread. */
-.cosmic-branch {
-  opacity: 0;
-}
-
-.cosmic-grow .cosmic-branch {
-  animation: cosmic-branch-in 0.6s ease-out forwards;
-  /* delay por ramo definido inline (troncos antes das bifurcações) */
-}
-
-.cosmic-node {
-  opacity: 0;
-}
-
-.cosmic-grow .cosmic-node {
-  animation:
-    cosmic-node-in 0.5s ease-out forwards,
-    cosmic-node-pulse 3s ease-in-out infinite;
-  /* delays por nó definidos inline */
-}
-
-@keyframes cosmic-seed-grow {
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes cosmic-core-in {
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes cosmic-branch-in {
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes cosmic-node-in {
+@keyframes marquee-scroll {
   from {
-    opacity: 0;
+    transform: translateX(0);
   }
   to {
-    opacity: 0.45;
+    transform: translateX(-50%);
   }
 }
 
-@keyframes cosmic-drift {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(2%, 1.5%);
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
   }
 }
 
-@keyframes cosmic-twinkle {
+@keyframes pulse-glow {
   0%,
   100% {
-    opacity: 0.15;
+    opacity: 0.5;
   }
   50% {
     opacity: 0.9;
   }
 }
-
-@keyframes cosmic-node-pulse {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 1;
-  }
+.animate-pulse-glow {
+  animation: pulse-glow 5s ease-in-out infinite;
 }
-
 @media (prefers-reduced-motion: reduce) {
-  .cosmic-nebula,
-  .cosmic-twinkle {
-    animation: none !important;
-  }
-  /* sem motion: mostra o estado final direto */
-  .cosmic-seed,
-  .cosmic-core {
-    transform: none !important;
-    opacity: 1 !important;
-    animation: none !important;
-  }
-  .cosmic-branch {
-    opacity: 1 !important;
-    animation: none !important;
-  }
-  .cosmic-node {
-    opacity: 0.7 !important;
-    animation: none !important;
+  .animate-pulse-glow {
+    animation: none;
   }
 }
