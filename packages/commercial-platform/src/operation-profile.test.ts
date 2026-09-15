@@ -344,4 +344,27 @@ describe("characteristics discriminated schemas", () => {
       }),
     ).rejects.toThrow(/does not match operation type/);
   });
+
+  it("defaults concrete_mixer_service characteristics to serviceModel mixed", async () => {
+    const db = makeDb();
+    const profile = await createOperationProfile(db, {
+      tenantId: "t1",
+      type: "concrete_mixer_service",
+    });
+    expect(profile.characteristics.kind).toBe("concrete_mixer_service");
+    if (profile.characteristics.kind === "concrete_mixer_service") {
+      expect(profile.characteristics.serviceModel).toBe("mixed");
+    }
+  });
+
+  it("rejects a concrete_mixer_service profile given towing characteristics", async () => {
+    const db = makeDb();
+    await expect(
+      createOperationProfile(db, {
+        tenantId: "t1",
+        type: "concrete_mixer_service",
+        characteristics: { kind: "towing_service", version: 1, serviceModel: "mixed" },
+      }),
+    ).rejects.toThrow(/does not match operation type/);
+  });
 });

@@ -172,6 +172,34 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       }));
     }
 
+    let compatibleConcreteMixerTrucks: Array<{
+      id: string;
+      name: string;
+      capacityCubicMeters: number | null;
+    }> = [];
+    const cubicMetersRequested = result.concreteMixerFields?.cubicMetersRequested;
+    if (
+      result.intent === "concrete_mixer_request" &&
+      typeof cubicMetersRequested === "number" &&
+      cubicMetersRequested > 0
+    ) {
+      const { data: assets } = await scope.db
+        .from("assets")
+        .select("id, name, status, metadata")
+        .eq("tenant_id", scope.tenantId)
+        .eq("category", "vehicle");
+      const matched = matchVehiclesByCapacityField(
+        (assets ?? []) as AssetForMatching[],
+        "capacityCubicMeters",
+        cubicMetersRequested,
+      );
+      compatibleConcreteMixerTrucks = matched.map((a) => ({
+        id: a.id,
+        name: (a as unknown as { name: string }).name,
+        capacityCubicMeters: a.metadata.capacityCubicMeters ?? null,
+      }));
+    }
+
     return NextResponse.json({
       data: {
         ...result,
@@ -179,6 +207,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         compatibleTowTrucks,
         compatibleWaterTankTrucks,
         compatibleBulkMaterialTrucks,
+        compatibleConcreteMixerTrucks,
       },
     });
   } catch (err) {

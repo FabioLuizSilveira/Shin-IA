@@ -19,6 +19,7 @@ export type BusinessOperationType =
   | "towing_service"
   | "water_tank_service"
   | "bulk_material_transport"
+  | "concrete_mixer_service"
   | "passenger_transport"
   | "equipment_rental"
   | "forklift_operation"
@@ -85,6 +86,15 @@ export interface BulkMaterialTransportCharacteristics {
   capacityUnit: "cubic_meters" | "tons";
 }
 
+// Concrete-mixer trucks (betoneira) reuse the exact same dispatch kernel
+// too — concrete is always measured in cubic meters (unlike bulk material,
+// which can be m³ or tons), so this doesn't need a capacityUnit field.
+export interface ConcreteMixerCharacteristics {
+  kind: "concrete_mixer_service";
+  version: 1;
+  serviceModel: DispatchServiceModel;
+}
+
 export interface GenericCharacteristics {
   kind: "generic";
   version: 1;
@@ -96,6 +106,7 @@ export type OperationProfileCharacteristics =
   | TowingCharacteristics
   | WaterTankCharacteristics
   | BulkMaterialTransportCharacteristics
+  | ConcreteMixerCharacteristics
   | GenericCharacteristics;
 
 function defaultCharacteristics(type: BusinessOperationType): OperationProfileCharacteristics {
@@ -131,6 +142,9 @@ function defaultCharacteristics(type: BusinessOperationType): OperationProfileCh
       capacityUnit: "cubic_meters",
     };
   }
+  if (type === "concrete_mixer_service") {
+    return { kind: "concrete_mixer_service", version: 1, serviceModel: "mixed" };
+  }
   return { kind: "generic", version: 1 };
 }
 
@@ -142,6 +156,7 @@ const DISCRIMINATED_TYPES: Partial<
   towing_service: "towing_service",
   water_tank_service: "water_tank_service",
   bulk_material_transport: "bulk_material_transport",
+  concrete_mixer_service: "concrete_mixer_service",
 };
 
 function validateCharacteristics(

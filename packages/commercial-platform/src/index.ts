@@ -147,5 +147,6 @@ export {
   type WaterTankCharacteristics,
   type BulkMaterialTransportCharacteristics,
   type BulkMaterialType,
+  type ConcreteMixerCharacteristics,
   type GenericCharacteristics,
 } from "./operation-profile.js";

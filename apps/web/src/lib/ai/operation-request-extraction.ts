@@ -31,21 +31,22 @@ const EXTRACTION_SYSTEM_PROMPT = `Você é a Shinã, extraindo dados estruturado
 
 REGRAS OBRIGATÓRIAS:
 - Responda APENAS com um objeto JSON válido, sem markdown, sem comentários, sem texto antes ou depois.
-- Classifique "intent" como exatamente um destes valores: "passenger_transport_request", "towing_request", "water_tank_request", "bulk_material_request", "unclear".
+- Classifique "intent" como exatamente um destes valores: "passenger_transport_request", "towing_request", "water_tank_request", "bulk_material_request", "concrete_mixer_request", "unclear".
 - NUNCA invente um valor que não esteja explícito na conversa. Se um campo não estiver claro, OMITA-o do objeto de campos e liste sua chave em "ambiguousFields".
 - Se a conversa não tiver contexto suficiente para determinar a intenção, use intent="unclear" e explique em "ambiguousFields".
 - Nunca assuma data, cidade, horário ou quantidade que não tenha sido dita explicitamente.
 
 Formato de saída exato:
 {
-  "intent": "passenger_transport_request" | "towing_request" | "water_tank_request" | "bulk_material_request" | "unclear",
+  "intent": "passenger_transport_request" | "towing_request" | "water_tank_request" | "bulk_material_request" | "concrete_mixer_request" | "unclear",
   "transportFields": { "origin"?: string, "destination"?: string, "date"?: string, "departureTime"?: string, "returnTime"?: string, "passengerCount"?: number },
   "towingFields": { "customerHint"?: string, "vehicleDescription"?: string, "location"?: string },
   "waterTankFields": { "deliveryLocation"?: string, "litersRequested"?: number, "customerHint"?: string },
   "bulkMaterialFields": { "deliveryLocation"?: string, "materialType"?: "sand" | "gravel" | "crushed_stone" | "soil" | "other", "quantity"?: number, "quantityUnit"?: "cubic_meters" | "tons", "customerHint"?: string },
+  "concreteMixerFields": { "deliveryLocation"?: string, "cubicMetersRequested"?: number, "customerHint"?: string },
   "ambiguousFields": string[]
 }
-Omita "transportFields" se intent não for passenger_transport_request; omita "towingFields" se intent não for towing_request; omita "waterTankFields" se intent não for water_tank_request; omita "bulkMaterialFields" se intent não for bulk_material_request.`;
+Omita "transportFields" se intent não for passenger_transport_request; omita "towingFields" se intent não for towing_request; omita "waterTankFields" se intent não for water_tank_request; omita "bulkMaterialFields" se intent não for bulk_material_request; omita "concreteMixerFields" se intent não for concrete_mixer_request.`;
 
 const MAX_HISTORY_MESSAGES = 12;
 
@@ -80,11 +81,18 @@ export interface BulkMaterialRequestFields {
   customerHint?: string;
 }
 
+export interface ConcreteMixerRequestFields {
+  deliveryLocation?: string;
+  cubicMetersRequested?: number;
+  customerHint?: string;
+}
+
 export type ExtractedOperationIntent =
   | "passenger_transport_request"
   | "towing_request"
   | "water_tank_request"
   | "bulk_material_request"
+  | "concrete_mixer_request"
   | "unclear";
 
 export interface OperationRequestExtraction {
@@ -95,6 +103,7 @@ export interface OperationRequestExtraction {
   towingFields?: TowingRequestFields;
   waterTankFields?: WaterTankRequestFields;
   bulkMaterialFields?: BulkMaterialRequestFields;
+  concreteMixerFields?: ConcreteMixerRequestFields;
   ambiguousFields: string[];
   needsConfirmation: boolean;
   creditsConsumed?: number;
@@ -106,6 +115,7 @@ interface RawExtraction {
   towingFields?: unknown;
   waterTankFields?: unknown;
   bulkMaterialFields?: unknown;
+  concreteMixerFields?: unknown;
   ambiguousFields?: unknown;
 }
 
@@ -129,6 +139,7 @@ function parseModelOutput(text: string): OperationRequestExtraction | null {
     "towing_request",
     "water_tank_request",
     "bulk_material_request",
+    "concrete_mixer_request",
     "unclear",
   ];
   const intent = validIntents.includes(raw.intent as ExtractedOperationIntent)
@@ -156,6 +167,9 @@ function parseModelOutput(text: string): OperationRequestExtraction | null {
   }
   if (intent === "bulk_material_request" && typeof raw.bulkMaterialFields === "object") {
     result.bulkMaterialFields = raw.bulkMaterialFields as BulkMaterialRequestFields;
+  }
+  if (intent === "concrete_mixer_request" && typeof raw.concreteMixerFields === "object") {
+    result.concreteMixerFields = raw.concreteMixerFields as ConcreteMixerRequestFields;
   }
   return result;
 }
