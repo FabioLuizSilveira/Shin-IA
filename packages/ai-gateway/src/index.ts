@@ -29,6 +29,7 @@ export {
   type OpenAiToolCall,
   type OpenAiMessage,
   type OpenAiContentPart,
+  type OpenAiToolChoice,
   type OpenAiResult,
   type OpenAiEmbeddingResult,
 } from "./openai.js";

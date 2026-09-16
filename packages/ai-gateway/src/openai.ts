@@ -54,6 +54,15 @@ export class OpenAIProviderError extends Error {
   }
 }
 
+// Agent Runtime Architecture v2, Wave 2 (spec section 12, "Forced Tool
+// Policy") — passed straight through as OpenAI's own `tool_choice` field.
+// `{ name }` forces that exact function (only sound when the Capability
+// Router narrowed candidates to exactly one unambiguous tool — the model
+// still extracts the arguments, it just can't pick a different tool);
+// "required" forces some tool call without picking which; "auto" (or
+// omitted) is today's unchanged default.
+export type OpenAiToolChoice = "auto" | "required" | { name: string };
+
 export async function generateWithMessagesOpenAI(options: {
   system: string;
   messages: OpenAiMessage[];
@@ -61,6 +70,7 @@ export async function generateWithMessagesOpenAI(options: {
   model?: string;
   apiKey?: string;
   tools?: OpenAiToolDefinition[];
+  toolChoice?: OpenAiToolChoice;
 }): Promise<OpenAiResult> {
   const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -82,6 +92,14 @@ export async function generateWithMessagesOpenAI(options: {
       max_completion_tokens: options.maxTokens ?? 2048,
       messages: [{ role: "system", content: options.system }, ...options.messages],
       ...(options.tools?.length ? { tools: options.tools } : {}),
+      ...(options.toolChoice && options.tools?.length
+        ? {
+            tool_choice:
+              typeof options.toolChoice === "string"
+                ? options.toolChoice
+                : { type: "function", function: { name: options.toolChoice.name } },
+          }
+        : {}),
     }),
   });
 

@@ -15,6 +15,12 @@ export const AI_AGENT_EVENTS = {
   // Attachments (image/document) — never the extracted text/image bytes in
   // metadata, only count/type/size, same posture as VOICE_TRANSCRIBED.
   ATTACHMENT_PROCESSED: "AI_AGENT_ATTACHMENT_PROCESSED",
+  // Agent Runtime Architecture v2, Wave 2 (spec section 51) — only fired
+  // when AGENT_DYNAMIC_TOOL_ROUTING is on for the tenant. Metadata is the
+  // classification result (domain/intent/confidence/method) and the
+  // before/after tool counts — never the raw query text.
+  INTENT_CLASSIFIED: "AI_AGENT_INTENT_CLASSIFIED",
+  TOOLS_FILTERED: "AI_AGENT_TOOLS_FILTERED",
 } as const;
 
 // Wave 6 — Guided Actions. PROPOSED fires from the tool loop (never a

@@ -6,7 +6,7 @@ import { consumeCredits, getCreditBalance, InsufficientCreditsError } from "./cr
 import { getModelProviderRegistry } from "./registry.js";
 import { analyzeImage, AIProviderError } from "./anthropic.js";
 import { generateWithMessagesOpenAI } from "./openai.js";
-import type { OpenAiMessage, OpenAiToolDefinition } from "./openai.js";
+import type { OpenAiMessage, OpenAiToolDefinition, OpenAiToolChoice } from "./openai.js";
 import {
   AiPolicyError,
   SHINA_ONLY_POLICY,
@@ -65,6 +65,10 @@ interface GatewayInput {
    * exclusive with `prompt`. */
   messages?: OpenAiMessage[];
   tools?: OpenAiToolDefinition[];
+  /** Agent Runtime v2 Wave 2 (spec section 12) — forces a specific tool
+   * (or any tool via "required") instead of the default "auto". Only
+   * meaningful together with `tools`; ignored otherwise. */
+  toolChoice?: OpenAiToolChoice;
   /** Required when capability === "vision". */
   imageUrl?: string;
   /**
@@ -282,6 +286,7 @@ export async function runAiGateway(input: GatewayInput): Promise<GatewayResult> 
       model,
       apiKey,
       tools: input.tools,
+      toolChoice: input.toolChoice,
     });
     text = result.text;
     tokensIn = result.tokensIn;

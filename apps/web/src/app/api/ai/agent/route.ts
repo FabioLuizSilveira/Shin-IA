@@ -12,6 +12,8 @@ import {
   processAttachments,
   type AgentAttachmentInput,
 } from "@/lib/ai/attachments";
+import { classifyIntent } from "@/lib/ai/intent-router";
+import { filterToolsByIntent } from "@/lib/ai/capability-router";
 import {
   runAiGateway,
   AiPolicyError,
@@ -20,6 +22,7 @@ import {
   OpenAIProviderError,
   type OpenAiMessage,
   type OpenAiContentPart,
+  type OpenAiToolDefinition,
 } from "@shina/ai-gateway";
 
 export const dynamic = "force-dynamic";
@@ -133,7 +136,69 @@ export async function POST(req: NextRequest) {
   const availableTools = await registry.listAvailable(scope, ctx);
   const mutationRegistry = buildMutationToolRegistry();
   const availableMutationTools = await mutationRegistry.listAvailable(scope, ctx);
-  const allToolDefinitions = [
+  const mutationToolNames = new Set(availableMutationTools.map((t) => t.name));
+
+  const queryText = documentText ? `${body.query.trim()}\n\n${documentText}` : body.query.trim();
+
+  // Agent Runtime Architecture v2, Wave 2 — Intent Router + Capability
+  // Router + Dynamic Tool Filter (spec sections 8-11), behind a feature
+  // flag (spec section 52's AGENT_DYNAMIC_TOOL_ROUTING) so this never
+  // changes behavior for a tenant that hasn't opted in. When on, the tool
+  // catalog sent to the model is narrowed BEFORE turn 1 based on the
+  // classified {domain, intent} — this never replaces the IAM filter
+  // above (spec section 13), it only runs after it.
+  const dynamicRoutingEnabled = await isFeatureEnabled(scope, "agent.dynamic_tool_routing");
+  let forcedToolName: string | null = null;
+  let routedToolDefinitions: OpenAiToolDefinition[] | null = null;
+  // Declared here (not with the other per-turn accumulators below) so the
+  // Intent Router's own cheap classification call — a real, metered AI
+  // Gateway call in its own right (spec section 41) — is folded into the
+  // same total the response reports, never a separate untracked cost.
+  let totalCreditsConsumed = 0;
+  if (dynamicRoutingEnabled) {
+    const classification = await classifyIntent(
+      scope.db,
+      { workspaceId: ctx.workspaceId, tenantId: ctx.tenantId, userId: ctx.userId },
+      queryText,
+    );
+    totalCreditsConsumed += classification.creditsConsumed ?? 0;
+    void logActivity(scope.db, {
+      tenantId: scope.tenantId,
+      actorId: scope.userId,
+      entityType: "ai_agent",
+      entityId: requestId,
+      action: AI_AGENT_EVENTS.INTENT_CLASSIFIED,
+      metadata: {
+        domain: classification.domain,
+        intent: classification.intent,
+        confidence: classification.confidence,
+        method: classification.method,
+      },
+    });
+
+    const combined = [
+      ...availableTools.map((t) => ({ ...t, def: registry.toDefinitions([t])[0] })),
+      ...availableMutationTools.map((t) => ({ ...t, def: mutationRegistry.toDefinitions([t])[0] })),
+    ];
+    const filterResult = filterToolsByIntent(combined, classification, DISCOVERY_TOOL_NAMES);
+    void logActivity(scope.db, {
+      tenantId: scope.tenantId,
+      actorId: scope.userId,
+      entityType: "ai_agent",
+      entityId: requestId,
+      action: AI_AGENT_EVENTS.TOOLS_FILTERED,
+      metadata: {
+        candidatesBeforeFilter: filterResult.candidatesBeforeFilter,
+        candidatesAfterFilter: filterResult.candidatesAfterFilter,
+        forced: filterResult.forced,
+      },
+    });
+
+    routedToolDefinitions = filterResult.candidates.map((c) => c.def);
+    if (filterResult.forced) forcedToolName = filterResult.forcedToolName;
+  }
+
+  const allToolDefinitions = routedToolDefinitions ?? [
     ...registry.toDefinitions(availableTools),
     ...mutationRegistry.toDefinitions(availableMutationTools),
   ];
@@ -146,16 +211,13 @@ export async function POST(req: NextRequest) {
   const nonDiscoveryToolDefinitions = allToolDefinitions.filter(
     (t) => !DISCOVERY_TOOL_NAMES.has(t.function.name),
   );
-  const mutationToolNames = new Set(availableMutationTools.map((t) => t.name));
 
-  const queryText = documentText ? `${body.query.trim()}\n\n${documentText}` : body.query.trim();
   const userContent: OpenAiMessage["content"] = imageParts.length
     ? [{ type: "text", text: queryText }, ...imageParts]
     : queryText;
   const messages: OpenAiMessage[] = [{ role: "user", content: userContent }];
   const toolsUsed: string[] = [];
   const pendingActionPlans: ProposedPlan[] = [];
-  let totalCreditsConsumed = 0;
   let discoveryCallCount = 0;
   // Backstop against a model latching onto one tool and calling it with the
   // IDENTICAL name+args repeatedly (live-verified with gpt-4o-mini: get_deep_link
@@ -181,11 +243,23 @@ export async function POST(req: NextRequest) {
         system: SYSTEM_PROMPT,
         messages,
         tools: turnToolDefinitions.length ? turnToolDefinitions : undefined,
+        // Forced tool_choice (spec section 12) only on the very first turn —
+        // once that call either executes or gets denied, later turns go
+        // back to "auto" so the model can still respond in text or chain a
+        // different tool (e.g. a follow-up search) without being stuck.
+        toolChoice: turn === 0 && forcedToolName ? { name: forcedToolName } : undefined,
         credentialMode: "shina_only",
       });
       totalCreditsConsumed += result.creditsConsumed ?? 0;
 
-      if (result.stopReason !== "tool_calls" || result.toolUses.length === 0) {
+      // The presence of toolUses is the authoritative signal, not the
+      // stopReason string — live-verified (Wave 2, forced tool_choice):
+      // OpenAI returns finish_reason "stop", not "tool_calls", when
+      // tool_choice forces a specific function, even though the tool call
+      // itself is populated. Checking stopReason first silently discarded
+      // a real, forced create_organization call and returned an empty
+      // response instead.
+      if (result.toolUses.length === 0) {
         void logActivity(scope.db, {
           tenantId: scope.tenantId,
           actorId: scope.userId,
