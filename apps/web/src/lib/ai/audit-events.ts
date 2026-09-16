@@ -21,6 +21,11 @@ export const AI_AGENT_EVENTS = {
   // before/after tool counts — never the raw query text.
   INTENT_CLASSIFIED: "AI_AGENT_INTENT_CLASSIFIED",
   TOOLS_FILTERED: "AI_AGENT_TOOLS_FILTERED",
+  // Wave 4 (spec sections 14-15, 40) — only fired when
+  // agent.dynamic_tool_routing is on. Metadata is the resolved tier and
+  // model name, so the pilot's real tier distribution can be audited
+  // without re-deriving it from ai_gateway_usage rows.
+  MODEL_ROUTED: "AI_AGENT_MODEL_ROUTED",
 } as const;
 
 // Wave 6 — Guided Actions. PROPOSED fires from the tool loop (never a

@@ -81,6 +81,7 @@ describe("Wave 2 — filterToolsByIntent (Capability Router / Dynamic Tool Filte
       ["create_organization", "list_available_tools"].sort(),
     );
     expect(result.candidatesAfterFilter).toBeLessThan(result.candidatesBeforeFilter);
+    expect(result.isFallback).toBe(false);
   });
 
   it("LOW confidence never narrows below what an unmigrated domain already gets — un-annotated tools stay visible, never silently dropped (spec section 9: 'LOW ≠ send all 100 tools', but also never LOW = send nothing)", () => {
@@ -100,6 +101,7 @@ describe("Wave 2 — filterToolsByIntent (Capability Router / Dynamic Tool Filte
     const names = result.candidates.map((c) => c.name);
     expect(names).toContain("list_assets"); // unannotated tool preserved
     expect(names).not.toContain("create_organization"); // ORGANIZATION-domain tool correctly excluded
+    expect(result.isFallback).toBe(true);
   });
 
   it("a domain that resolves but has zero annotated tools yet falls back to the unannotated set, not an empty catalog", () => {
@@ -113,6 +115,12 @@ describe("Wave 2 — filterToolsByIntent (Capability Router / Dynamic Tool Filte
     const result = filterToolsByIntent(tools, classification, always);
     expect(result.forced).toBe(false);
     expect(result.candidates.map((c) => c.name)).toContain("list_assets");
+    // Wave 4 — this is the exact shape a real live test exposed as a bug:
+    // this result narrows (candidatesAfterFilter < candidatesBeforeFilter
+    // isn't even true here, but in the real registry it can be, purely
+    // from excluding OTHER domains' annotated tools) while still being a
+    // fallback, not a real ASSET match — isFallback must say so.
+    expect(result.isFallback).toBe(true);
   });
 
   it("MEDIUM confidence narrows to the domain but does not force a single tool", () => {
@@ -129,6 +137,7 @@ describe("Wave 2 — filterToolsByIntent (Capability Router / Dynamic Tool Filte
     };
     const result = filterToolsByIntent(tools, classification, always);
     expect(result.forced).toBe(false);
+    expect(result.isFallback).toBe(false);
     const names = result.candidates.map((c) => c.name);
     expect(names).toEqual(
       expect.arrayContaining(["list_available_tools", "create_organization", "search_customers"]),

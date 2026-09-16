@@ -34,6 +34,17 @@ export interface ToolFilterResult<T> {
   forcedToolName: string | null;
   candidatesBeforeFilter: number;
   candidatesAfterFilter: number;
+  /** Wave 4 — true whenever this result came from the fallback() branch
+   * (no domain, LOW confidence, or a domain with zero annotated tools
+   * yet), false whenever a real domain match narrowed the set. NOT the
+   * same thing as "candidatesAfterFilter < candidatesBeforeFilter" — a
+   * fallback still excludes the OTHER domains' annotated tools (e.g. the
+   * 3 ORGANIZATION tools get excluded from an ASSET-classified fallback,
+   * a real live test caught this: that exclusion alone shrinks the
+   * count even though nothing was actually narrowed toward ASSET).
+   * Model Router (model-router.ts) uses this, not the raw counts, to
+   * decide whether the model still faces a wide, ambiguous catalog. */
+  isFallback: boolean;
 }
 
 function dedupe<T extends { name: string }>(items: T[]): T[] {
@@ -63,6 +74,7 @@ export function filterToolsByIntent<T extends DomainTaggedTool>(
       forcedToolName: null,
       candidatesBeforeFilter,
       candidatesAfterFilter: candidates.length,
+      isFallback: true,
     };
   };
 
@@ -84,5 +96,6 @@ export function filterToolsByIntent<T extends DomainTaggedTool>(
     forcedToolName: forced ? matched[0].name : null,
     candidatesBeforeFilter,
     candidatesAfterFilter: candidates.length,
+    isFallback: false,
   };
 }

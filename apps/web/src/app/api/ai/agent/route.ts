@@ -14,6 +14,7 @@ import {
 } from "@/lib/ai/attachments";
 import { classifyIntent } from "@/lib/ai/intent-router";
 import { filterToolsByIntent } from "@/lib/ai/capability-router";
+import { resolveAgentModelTier, resolveModelForTier } from "@/lib/ai/model-router";
 import {
   runAiGateway,
   AiPolicyError,
@@ -151,6 +152,10 @@ export async function POST(req: NextRequest) {
   const dynamicRoutingEnabled = await isFeatureEnabled(scope, "agent.dynamic_tool_routing");
   let forcedToolName: string | null = null;
   let routedToolDefinitions: OpenAiToolDefinition[] | null = null;
+  // Wave 4 -- Model Router. Stays undefined (gateway's bare default,
+  // unchanged behavior) unless dynamic routing is on AND actually
+  // computes a tier below from the real filter outcome.
+  let agentModel: string | undefined;
   // Declared here (not with the other per-turn accumulators below) so the
   // Intent Router's own cheap classification call — a real, metered AI
   // Gateway call in its own right (spec section 41) — is folded into the
@@ -197,6 +202,17 @@ export async function POST(req: NextRequest) {
 
     routedToolDefinitions = filterResult.candidates.map((c) => c.def);
     if (filterResult.forced) forcedToolName = filterResult.forcedToolName;
+
+    const agentTier = resolveAgentModelTier(filterResult);
+    agentModel = resolveModelForTier(agentTier);
+    void logActivity(scope.db, {
+      tenantId: scope.tenantId,
+      actorId: scope.userId,
+      entityType: "ai_agent",
+      entityId: requestId,
+      action: AI_AGENT_EVENTS.MODEL_ROUTED,
+      metadata: { tier: agentTier, model: agentModel },
+    });
   }
 
   const allToolDefinitions = routedToolDefinitions ?? [
@@ -249,6 +265,7 @@ export async function POST(req: NextRequest) {
         // back to "auto" so the model can still respond in text or chain a
         // different tool (e.g. a follow-up search) without being stuck.
         toolChoice: turn === 0 && forcedToolName ? { name: forcedToolName } : undefined,
+        model: agentModel,
         credentialMode: "shina_only",
       });
       totalCreditsConsumed += result.creditsConsumed ?? 0;
