@@ -42,6 +42,18 @@ export interface AgentMutationTool<TArgs = Record<string, unknown>> {
   /** Human-readable (pt-BR) description of what this action will do,
    * shown to the user for confirmation before anything happens. */
   summarize(args: TArgs, ctx: AgentContext, scope: TenantScope): Promise<string>;
+  /** Wave 3 -- optional structured field-by-field breakdown of the
+   * proposed payload (pt-BR labels), shown alongside summarize()'s
+   * sentence in the confirmation UI (master prompt section 25: a
+   * one-line summary alone isn't enough to confirm a real mutation).
+   * Tools that don't implement this fall back to a generic key/value
+   * rendering of args in mutation-registry.ts's propose() -- additive,
+   * no tool is required to have this. */
+  describeFields?(
+    args: TArgs,
+    ctx: AgentContext,
+    scope: TenantScope,
+  ): Promise<{ label: string; value: string }[]>;
   /** The real mutation. Only ever invoked by the confirm endpoint. */
   execute(args: TArgs, ctx: AgentContext, scope: TenantScope): Promise<ToolResult>;
 }

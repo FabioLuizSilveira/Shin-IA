@@ -67,6 +67,25 @@ export const createOrganizationTool: AgentMutationTool<Args> = {
     };
     return `Cadastrar ${TYPE_LABEL[args.type!] ?? args.type} "${args.name}" (documento: ${args.document}, ${args.address_city}/${args.address_state}).`;
   },
+  async describeFields(args) {
+    const TYPE_LABEL: Record<string, string> = {
+      customer: "Cliente",
+      supplier: "Fornecedor",
+      partner: "Parceiro",
+      internal: "Interna",
+    };
+    const fields: { label: string; value: string }[] = [
+      { label: "Razão social", value: args.name ?? "" },
+      { label: "Documento", value: args.document ?? "" },
+      { label: "Tipo", value: TYPE_LABEL[args.type ?? ""] ?? args.type ?? "" },
+      { label: "Cidade", value: args.address_city ?? "" },
+      { label: "Estado", value: args.address_state ?? "" },
+    ];
+    if (args.trade_name?.trim()) fields.push({ label: "Nome fantasia", value: args.trade_name });
+    if (args.email?.trim()) fields.push({ label: "E-mail", value: args.email });
+    if (args.phone?.trim()) fields.push({ label: "Telefone", value: args.phone });
+    return fields;
+  },
   async execute(args, _ctx, scope) {
     const { data: created, error: insertError } = await scope.db
       .from("organizations")

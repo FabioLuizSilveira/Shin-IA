@@ -12,11 +12,18 @@ import { useState, useRef, useEffect } from "react";
 import { X, Send, Sparkles, Paperclip, Mic, Square, Loader2, FileText, Image } from "lucide-react";
 import { useToast } from "@shina/design-system";
 
+interface ActionPlanField {
+  label: string;
+  value: string;
+}
+
 interface ActionPlan {
   id: string;
   toolName: string;
   riskLevel: string;
   summary: string;
+  fields?: ActionPlanField[];
+  isDuplicate?: boolean;
 }
 
 interface ShinaMessage {
@@ -30,7 +37,7 @@ interface AgentApiResponse {
     text: string;
     toolsUsed: string[];
     creditsConsumed: number;
-    pendingActionPlans?: { id: string; toolName: string; riskLevel: string; summary: string }[];
+    pendingActionPlans?: ActionPlan[];
   };
   error?: string;
   code?: string;
@@ -357,6 +364,25 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
                     className="max-w-[85%] w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 px-4 py-3 text-sm"
                   >
                     <p className="text-slate-700 dark:text-slate-200">{plan.summary}</p>
+                    {plan.isDuplicate && !resolved && (
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        Já havia um plano igual pendente — reaproveitado.
+                      </p>
+                    )}
+                    {plan.fields && plan.fields.length > 0 && (
+                      <dl className="mt-2.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-lg bg-slate-50 dark:bg-slate-900/40 px-3 py-2">
+                        {plan.fields.map((field) => (
+                          <div key={field.label} className="contents">
+                            <dt className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                              {field.label}
+                            </dt>
+                            <dd className="text-xs text-slate-700 dark:text-slate-200 break-words">
+                              {field.value}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
                     {resolved ? (
                       <p className="mt-2 text-xs text-slate-400">Concluído.</p>
                     ) : (

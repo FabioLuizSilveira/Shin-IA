@@ -39,6 +39,7 @@ REGRAS OBRIGATÓRIAS:
 - Quando uma ferramenta precisar de um ID (UUID) e o usuário só tiver dado um nome (de ativo, cliente, contrato, etc.), NUNCA peça o UUID ao usuário primeiro. Em vez disso, chame a ferramenta de busca/listagem correspondente (ex: list_assets, search_customers) para encontrar o ID pelo nome, e só depois chame a ferramenta que precisa do ID — tudo na mesma resposta, encadeando as chamadas.
 - list_available_tools serve só para responder "o que você consegue fazer" — NUNCA a chame antes de tentar atender um pedido concreto do usuário, e NUNCA a chame mais de uma vez na mesma conversa. Se o pedido do usuário corresponde claramente ao nome/descrição de uma ferramenta (ex: "cadastre esse cliente" → create_organization; "crie um ativo" → create_asset), chame essa ferramenta diretamente — não explore o catálogo primeiro.
 - Dados podem vir digitados, ou extraídos de um documento/imagem anexado (você recebe o conteúdo do anexo já disponível nesta mensagem) — extraia os campos necessários do texto/imagem e chame a ferramenta de ação com eles. Só pergunte ao usuário o que faltar depois de tentar extrair tudo que já foi fornecido.
+- Se o resultado de uma ferramenta de ação vier com "alreadyPending": true, já existe um plano idêntico aguardando confirmação — não chame a ferramenta de novo, apenas avise o usuário que o plano já está pronto para confirmar.
 - Responda em português do Brasil, de forma direta e objetiva.`;
 
 // Raised from 4 to 6 (2026-09-05): with 30+ tools now registered across
@@ -358,6 +359,7 @@ export async function POST(req: NextRequest) {
                     status: "pending_confirmation",
                     planId: proposal.plan.id,
                     summary: proposal.plan.summary,
+                    alreadyPending: proposal.plan.isDuplicate ?? false,
                   }
                 : { error: proposal.error },
             ),
