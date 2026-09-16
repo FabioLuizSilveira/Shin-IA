@@ -1,6 +1,7 @@
 import type { AgentTool } from "../tool-types";
 import { createAgentToolRegistry } from "../tool-registry";
 import { createHelpTool } from "./help";
+import { allMutationToolNames } from "../actions/tools";
 import {
   listAssetsTool,
   getAssetTool,
@@ -39,7 +40,7 @@ import {
 } from "./intelligence";
 
 const allTools: AgentTool[] = [];
-allTools.push(createHelpTool(() => allTools.map((t) => t.name)));
+allTools.push(createHelpTool(() => [...allTools.map((t) => t.name), ...allMutationToolNames]));
 allTools.push(listAssetsTool, getAssetTool, getAssetAvailabilityTool, getAssetHistoryTool);
 allTools.push(
   listContractsTool,

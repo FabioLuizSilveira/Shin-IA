@@ -34,6 +34,8 @@ REGRAS OBRIGATÓRIAS:
 - Você nunca executa uma ação real diretamente — mas CHAMAR a ferramenta de ação é sempre seguro: ela nunca executa nada sozinha, apenas cria um plano pendente. Por isso, quando o usuário pedir uma ação (marcar notificações como lidas, criar um ativo, etc.) e existir uma ferramenta para isso, CHAME A FERRAMENTA IMEDIATAMENTE nesta mesma resposta — nunca pergunte em texto "posso fazer isso?" antes de chamar a ferramenta; a confirmação de verdade acontece depois, na interface (botões Confirmar/Cancelar), nunca na conversa. Depois de chamar a ferramenta, diga que o plano está pronto para confirmação — nunca diga que a ação "foi feita".
 - Você só sabe o que este usuário pode saber e só faz o que este usuário pode fazer — nunca mencione ou tente acessar dados de outro tenant.
 - Quando uma ferramenta precisar de um ID (UUID) e o usuário só tiver dado um nome (de ativo, cliente, contrato, etc.), NUNCA peça o UUID ao usuário primeiro. Em vez disso, chame a ferramenta de busca/listagem correspondente (ex: list_assets, search_customers) para encontrar o ID pelo nome, e só depois chame a ferramenta que precisa do ID — tudo na mesma resposta, encadeando as chamadas.
+- list_available_tools serve só para responder "o que você consegue fazer" — NUNCA a chame antes de tentar atender um pedido concreto do usuário, e NUNCA a chame mais de uma vez na mesma conversa. Se o pedido do usuário corresponde claramente ao nome/descrição de uma ferramenta (ex: "cadastre esse cliente" → create_organization; "crie um ativo" → create_asset), chame essa ferramenta diretamente — não explore o catálogo primeiro.
+- Dados podem vir digitados, ou extraídos de um documento/imagem anexado (você recebe o conteúdo do anexo já disponível nesta mensagem) — extraia os campos necessários do texto/imagem e chame a ferramenta de ação com eles. Só pergunte ao usuário o que faltar depois de tentar extrair tudo que já foi fornecido.
 - Responda em português do Brasil, de forma direta e objetiva.`;
 
 // Raised from 4 to 6 (2026-09-05): with 30+ tools now registered across
@@ -43,6 +45,23 @@ REGRAS OBRIGATÓRIAS:
 // limitation, not something this constant alone fixes, but it buys enough
 // room for the common 2-3 step case to converge instead of hard-failing.
 const MAX_TURNS = 6;
+
+// gpt-4o-mini, given a big tool catalog plus an attachment, sometimes
+// "explores" instead of acting: calling list_available_tools (occasionally
+// more than once) and then get_product_help for a handful of unrelated
+// topics — burning the whole MAX_TURNS budget before ever trying the tool
+// that actually matches the request. A stronger system-prompt instruction
+// alone didn't stop this (live-verified: identical behavior before/after).
+// This caps those specific discovery/help tools at one real call per
+// request — every call past that gets a corrective tool result instead of
+// running again, pushing the model back toward picking a real tool.
+const DISCOVERY_TOOL_NAMES = new Set([
+  "list_available_tools",
+  "get_product_help",
+  "get_screen_help",
+  "get_feature_explanation",
+]);
+const MAX_DISCOVERY_CALLS = 1;
 
 export async function POST(req: NextRequest) {
   const scope = await requireTenantScope();
@@ -114,10 +133,19 @@ export async function POST(req: NextRequest) {
   const availableTools = await registry.listAvailable(scope, ctx);
   const mutationRegistry = buildMutationToolRegistry();
   const availableMutationTools = await mutationRegistry.listAvailable(scope, ctx);
-  const toolDefinitions = [
+  const allToolDefinitions = [
     ...registry.toDefinitions(availableTools),
     ...mutationRegistry.toDefinitions(availableMutationTools),
   ];
+  // Recomputed per turn below, dropping DISCOVERY_TOOL_NAMES once their
+  // budget is spent — a live-verified stronger guarantee than telling the
+  // model "stop calling this" via a tool result: gpt-4o-mini kept calling
+  // list_available_tools again anyway after that correction (up to 5x in a
+  // row, live-verified), but it can't call a function that isn't in the
+  // schema it was given for that turn.
+  const nonDiscoveryToolDefinitions = allToolDefinitions.filter(
+    (t) => !DISCOVERY_TOOL_NAMES.has(t.function.name),
+  );
   const mutationToolNames = new Set(availableMutationTools.map((t) => t.name));
 
   const queryText = documentText ? `${body.query.trim()}\n\n${documentText}` : body.query.trim();
@@ -128,9 +156,21 @@ export async function POST(req: NextRequest) {
   const toolsUsed: string[] = [];
   const pendingActionPlans: ProposedPlan[] = [];
   let totalCreditsConsumed = 0;
+  let discoveryCallCount = 0;
+  // Backstop against a model latching onto one tool and calling it with the
+  // IDENTICAL name+args repeatedly (live-verified with gpt-4o-mini: get_deep_link
+  // with the same args 5x in a row after list_available_tools's own budget
+  // ran out) — a repeat can't produce new information, so there's no reason
+  // to let the turn budget keep burning on it.
+  const seenCalls = new Set<string>();
+  let hitDuplicateCall = false;
 
   try {
-    for (let turn = 0; turn < MAX_TURNS; turn++) {
+    for (let turn = 0; turn < MAX_TURNS && !hitDuplicateCall; turn++) {
+      const turnToolDefinitions =
+        discoveryCallCount >= MAX_DISCOVERY_CALLS
+          ? nonDiscoveryToolDefinitions
+          : allToolDefinitions;
       const result = await runAiGateway({
         db: scope.db,
         adminDb: scope.db,
@@ -140,7 +180,7 @@ export async function POST(req: NextRequest) {
         entityType: "ai_agent",
         system: SYSTEM_PROMPT,
         messages,
-        tools: toolDefinitions.length ? toolDefinitions : undefined,
+        tools: turnToolDefinitions.length ? turnToolDefinitions : undefined,
         credentialMode: "shina_only",
       });
       totalCreditsConsumed += result.creditsConsumed ?? 0;
@@ -183,6 +223,37 @@ export async function POST(req: NextRequest) {
           action: AI_AGENT_EVENTS.TOOL_REQUESTED,
           metadata: { tool: toolUse.name, input: toolUse.input },
         });
+
+        const callKey = `${toolUse.name}::${JSON.stringify(toolUse.input)}`;
+        if (seenCalls.has(callKey)) {
+          hitDuplicateCall = true;
+          toolsUsed.push(toolUse.name);
+          messages.push({
+            role: "tool",
+            tool_call_id: toolUse.id,
+            content: JSON.stringify({
+              error: "Chamada idêntica já feita nesta conversa — repetir não muda o resultado.",
+            }),
+          });
+          continue;
+        }
+        seenCalls.add(callKey);
+
+        if (DISCOVERY_TOOL_NAMES.has(toolUse.name)) {
+          discoveryCallCount += 1;
+          if (discoveryCallCount > MAX_DISCOVERY_CALLS) {
+            toolsUsed.push(toolUse.name);
+            messages.push({
+              role: "tool",
+              tool_call_id: toolUse.id,
+              content: JSON.stringify({
+                error:
+                  "Chamada de exploração/ajuda já usada nesta conversa. Pare de explorar: chame agora, pelo nome exato, a ferramenta de dados ou ação que atende ao pedido do usuário — ou, se realmente não existir nenhuma aplicável, responda em texto explicando isso.",
+              }),
+            });
+            continue;
+          }
+        }
 
         if (mutationToolNames.has(toolUse.name)) {
           const proposal = await mutationRegistry.propose(
@@ -246,10 +317,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      { error: "Shinã excedeu o número máximo de turnos de ferramentas" },
-      { status: 502 },
-    );
+    // Graceful degradation, not a raw error: the model got stuck (ran out of
+    // turns, or latched onto one tool call repeatedly) before ever reaching
+    // a real answer or action. A 200 with an honest text response renders as
+    // a normal assistant message in the drawer, not an error toast — and it
+    // tells the user exactly what to do next instead of a technical message.
+    void logActivity(scope.db, {
+      tenantId: scope.tenantId,
+      actorId: scope.userId,
+      entityType: "ai_agent",
+      entityId: requestId,
+      action: AI_AGENT_EVENTS.RESPONSE,
+      metadata: { toolsUsed, creditsConsumed: totalCreditsConsumed, degraded: true },
+    });
+    return NextResponse.json({
+      data: {
+        text: "Não consegui concluir isso automaticamente. Pode me dizer diretamente os dados (nome, documento, cidade, estado e o que mais for pedido) em texto, em vez de só no anexo?",
+        toolsUsed,
+        creditsConsumed: totalCreditsConsumed,
+      },
+    });
   } catch (e) {
     void logActivity(scope.db, {
       tenantId: scope.tenantId,
