@@ -63,6 +63,41 @@ const DETERMINISTIC_RULES: DeterministicRule[] = [
     pattern:
       /\b(dados|detalhe\w*|informa[cç][ãa]o\w*|mostr\w*)\b[^.\n]{0,60}\b(d[eo]\s+)?(cliente|organiza[cç][aã]o|empresa)\b/i,
   },
+  // Wave 5 (spec sections 52/9 — progressive domain migration) — the
+  // exact reliability gap Waves 2/4 found and live-verified: "quantos
+  // ativos eu tenho?" reached the LLM classifier tier every time (extra
+  // latency/cost) and even THAT wasn't the bug — it correctly resolved
+  // ASSET/LIST, but with zero ASSET tools annotated the Capability
+  // Router still fell back to the wide, unnarrowed catalog. Annotating
+  // ASSET tools (tools/assets.ts) fixes the narrowing; this deterministic
+  // rule additionally makes the COMMON phrasing free and instant instead
+  // of depending on the LLM tier's classification every single time.
+  //
+  // Tight adjacency (\s*, not the wide [^.\n]{0,N} gap the ORGANIZATION
+  // rules above use) is deliberate here: "ativo(s)" in pt-BR is BOTH the
+  // noun "asset" and the adjective "active" ("contratos ativos" =
+  // "active contracts", nothing to do with the ASSET domain) — a wide
+  // gap would let another domain's noun sit between the verb and
+  // "ativo" and misclassify e.g. "quantos contratos ativos eu tenho"
+  // as ASSET. Requiring "ativo(s)" immediately after the verb (with only
+  // small filler words) keeps this rule to the cases that really mean
+  // the noun.
+  {
+    domain: "ASSET",
+    intent: "LIST",
+    pattern:
+      /\b(quant\w*|lista\w*|list(a|e|ar)?|mostr\w*)\b\s*(de\s+|os\s+|as\s+|meus\s+|minhas\s+)?ativos?\b/i,
+  },
+  {
+    domain: "ASSET",
+    intent: "SEARCH",
+    pattern: /\b(busc\w*|procur\w*|encontr\w*)\b\s*(o\s+|os\s+|um\s+)?ativo\b/i,
+  },
+  {
+    domain: "ASSET",
+    intent: "GET",
+    pattern: /\b(dados|detalhe\w*|informa[cç][ãa]o\w*)\b\s*(d[eo]\s+)?ativo\b/i,
+  },
 ];
 
 /** Tier 1 — free, deterministic. Returns null (not "LOW confidence") when

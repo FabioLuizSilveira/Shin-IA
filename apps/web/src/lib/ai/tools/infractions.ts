@@ -24,6 +24,8 @@ export const getInfractionsTool: AgentTool<{ status?: string; assetId?: string }
   },
   requiredPermission: "tenant.infractions.view",
   requiredFeature: "agent.tools.infractions",
+  domain: "INFRACTION",
+  intents: ["LIST"],
   async execute(args, _ctx, scope) {
     let q = scope.db.from("infraction_cases").select(SELECT).eq("tenant_id", scope.tenantId);
     if (args.status) q = q.eq("status", args.status);

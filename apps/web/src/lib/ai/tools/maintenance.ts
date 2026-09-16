@@ -39,6 +39,8 @@ export const getMaintenanceDueTool: AgentTool<{ assetId?: string }> = {
   },
   requiredPermission: "tenant.maintenance.view",
   requiredFeature: "agent.tools.maintenance",
+  domain: "MAINTENANCE",
+  intents: ["LIST"],
   async execute(args, _ctx, scope) {
     let q = scope.db
       .from("maintenance_plans")
@@ -75,6 +77,8 @@ export const getMaintenanceOrderTool: AgentTool<{ orderId: string }> = {
   },
   requiredPermission: "tenant.maintenance.view",
   requiredFeature: "agent.tools.maintenance",
+  domain: "MAINTENANCE",
+  intents: ["GET"],
   async execute(args, _ctx, scope) {
     const { data: order, error } = await scope.db
       .from("maintenance_orders")
@@ -131,6 +135,8 @@ export const getMaintenanceHistoryTool: AgentTool<{
   },
   requiredPermission: "tenant.maintenance.view",
   requiredFeature: "agent.tools.maintenance",
+  domain: "MAINTENANCE",
+  intents: ["LIST"],
   async execute(args, _ctx, scope) {
     let q = scope.db
       .from("maintenance_orders")
@@ -176,6 +182,8 @@ export const getMaintenanceCostTool: AgentTool<{
   // the analytics-specific permission, not the general maintenance.view.
   requiredPermission: "tenant.maintenance.analytics_view",
   requiredFeature: "agent.tools.maintenance",
+  domain: "MAINTENANCE",
+  intents: ["ANALYZE"],
   async execute(args, _ctx, scope) {
     let q = scope.db
       .from("maintenance_orders")

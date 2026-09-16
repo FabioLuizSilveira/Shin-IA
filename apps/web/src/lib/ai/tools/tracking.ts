@@ -20,6 +20,8 @@ export const getResourceLocationTool: AgentTool<{ resourceId: string }> = {
   },
   requiredPermission: "tenant.tracking.view",
   requiredFeature: "agent.tools.tracking",
+  domain: "TRACKING",
+  intents: ["GET"],
   async execute(args, _ctx, scope) {
     const { data, error } = await scope.db
       .from("resource_locations")
@@ -53,6 +55,8 @@ export const getTrackingEventsTool: AgentTool<{
   },
   requiredPermission: "tenant.tracking.view",
   requiredFeature: "agent.tools.tracking",
+  domain: "TRACKING",
+  intents: ["LIST"],
   async execute(args, _ctx, scope) {
     let q = scope.db
       .from("resource_locations")

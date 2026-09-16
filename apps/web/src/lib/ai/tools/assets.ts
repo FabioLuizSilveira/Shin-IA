@@ -23,6 +23,8 @@ export const listAssetsTool: AgentTool<{ query?: string; category?: string }> = 
   },
   requiredPermission: "tenant.assets.view",
   requiredFeature: "agent.tools.assets",
+  domain: "ASSET",
+  intents: ["LIST", "SEARCH"],
   async execute(args, _ctx, scope) {
     let q = scope.db
       .from("assets")
@@ -54,6 +56,8 @@ export const getAssetTool: AgentTool<{ assetId: string }> = {
   },
   requiredPermission: "tenant.assets.view",
   requiredFeature: "agent.tools.assets",
+  domain: "ASSET",
+  intents: ["GET"],
   async execute(args, _ctx, scope) {
     const { data, error } = await scope.db
       .from("assets")
@@ -91,6 +95,8 @@ export const getAssetAvailabilityTool: AgentTool<{
   },
   requiredPermission: "tenant.assets.view",
   requiredFeature: "agent.tools.assets",
+  domain: "ASSET",
+  intents: ["GET"],
   async execute(args, _ctx, scope) {
     const { data: asset } = await scope.db
       .from("assets")
@@ -130,6 +136,8 @@ export const getAssetHistoryTool: AgentTool<{ assetId: string }> = {
   },
   requiredPermission: "tenant.maintenance.view",
   requiredFeature: "agent.tools.assets",
+  domain: "ASSET",
+  intents: ["GET"],
   async execute(args, _ctx, scope) {
     const { data: asset } = await scope.db
       .from("assets")

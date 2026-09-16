@@ -35,6 +35,8 @@ export const createAssetTool: AgentMutationTool<Args> = {
   riskLevel: "LOW_RISK_WRITE",
   requiredPermission: "tenant.assets.create",
   requiredFeature: "agent.actions.assets",
+  domain: "ASSET",
+  intents: ["CREATE"],
   async validate(args, _ctx, scope) {
     if (!args.name?.trim() || !args.category || !VALID_CATEGORIES.includes(args.category)) {
       return { ok: false, error: "name and a valid category are required" };

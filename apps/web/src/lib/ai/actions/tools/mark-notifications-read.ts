@@ -28,6 +28,8 @@ export const markNotificationsReadTool: AgentMutationTool<Args> = {
   riskLevel: "LOW_RISK",
   requiredPermission: "tenant.notifications.manage",
   requiredFeature: "agent.actions.notifications",
+  domain: "NOTIFICATION",
+  intents: ["MANAGE"],
   async validate(args) {
     if (!args.all && (!args.ids || args.ids.length === 0)) {
       return { ok: false, error: "ids or all is required" };

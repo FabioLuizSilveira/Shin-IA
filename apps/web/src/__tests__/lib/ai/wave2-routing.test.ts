@@ -18,6 +18,15 @@ describe("Wave 2 — classifyIntentDeterministic", () => {
     ["registre o fornecedor ABC Ltda", "ORGANIZATION", "CREATE"],
     ["busca o cliente João", "ORGANIZATION", "SEARCH"],
     ["procura a organização XYZ", "ORGANIZATION", "SEARCH"],
+    // Wave 5 — the exact case a real live test (Wave 2/4) found reaching
+    // the LLM classifier tier every time, with the LLM correctly
+    // resolving it but the tool catalog never actually narrowing (zero
+    // ASSET-annotated tools). Now free and instant, tier 1.
+    ["quantos ativos eu tenho cadastrados?", "ASSET", "LIST"],
+    ["lista os ativos", "ASSET", "LIST"],
+    ["mostra meus ativos", "ASSET", "LIST"],
+    ["busca o ativo com placa ABC1234", "ASSET", "SEARCH"],
+    ["detalhes do ativo", "ASSET", "GET"],
   ];
 
   for (const [text, domain, intent] of cases) {
@@ -30,8 +39,12 @@ describe("Wave 2 — classifyIntentDeterministic", () => {
   }
 
   it("does not match unrelated text — returns null so the caller falls through to the LLM tier, not a false HIGH-confidence result", () => {
-    expect(classifyIntentDeterministic("quantos ativos eu tenho?")).toBeNull();
     expect(classifyIntentDeterministic("qual o clima hoje?")).toBeNull();
+  });
+
+  it("Wave 5 regression guard: 'ativos' as the pt-BR ADJECTIVE ('active'), not the ASSET noun, does not misfire the ASSET rule — the wide-gap style used by the ORGANIZATION rules above would have matched this (another domain's noun sitting between the verb and 'ativos')", () => {
+    const result = classifyIntentDeterministic("quantos contratos ativos eu tenho?");
+    expect(result?.domain).not.toBe("ASSET");
   });
 
   it("treats text extracted from an attached image the same as typed text (spec section 21: image is DATA) — a query embedding OCR'd content still matches on its own merits, not because it came from an image", () => {

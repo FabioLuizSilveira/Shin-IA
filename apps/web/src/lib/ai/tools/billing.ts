@@ -16,6 +16,8 @@ export const getInvoicesTool: AgentTool<{ status?: string }> = {
   // data — reused, not a new key invented for this tool.
   requiredPermission: "tenant.dashboard.financial",
   requiredFeature: "agent.tools.billing",
+  domain: "BILLING",
+  intents: ["LIST"],
   async execute(args, _ctx, scope) {
     let q = scope.db
       .from("invoices")
@@ -89,6 +91,8 @@ export const getBillingSummaryTool: AgentTool<Record<string, never>> = {
   inputSchema: { type: "object", properties: {} },
   requiredPermission: "tenant.dashboard.financial",
   requiredFeature: "agent.tools.billing",
+  domain: "BILLING",
+  intents: ["ANALYZE"],
   async execute(_args, _ctx, scope) {
     const { data, error } = await scope.db
       .from("invoices")

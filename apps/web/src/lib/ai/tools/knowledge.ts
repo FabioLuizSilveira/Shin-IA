@@ -33,6 +33,8 @@ export const searchTenantKnowledgeTool: AgentTool<{ query: string }> = {
   },
   requiredPermission: "tenant.knowledge.view",
   requiredFeature: "agent.tools.knowledge",
+  domain: "KNOWLEDGE",
+  intents: ["SEARCH"],
   async execute(args, ctx, scope) {
     if (!args.query?.trim()) return { ok: false, error: "query is required" };
 

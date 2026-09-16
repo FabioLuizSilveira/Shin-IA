@@ -20,6 +20,8 @@ export const getInspectionTool: AgentTool<{ inspectionId: string }> = {
   },
   requiredPermission: "tenant.inspections.view",
   requiredFeature: "agent.tools.inspections",
+  domain: "INSPECTION",
+  intents: ["GET"],
   async execute(args, _ctx, scope) {
     const { data: inspection, error } = await scope.db
       .from("inspections")
@@ -79,6 +81,8 @@ export const getInspectionFindingsTool: AgentTool<{ inspectionId: string }> = {
   },
   requiredPermission: "tenant.inspections.view",
   requiredFeature: "agent.tools.inspections",
+  domain: "INSPECTION",
+  intents: ["GET"],
   async execute(args, _ctx, scope) {
     // Confirm the inspection belongs to this tenant BEFORE reading its
     // findings — inspection_findings itself has no tenant_id column, so

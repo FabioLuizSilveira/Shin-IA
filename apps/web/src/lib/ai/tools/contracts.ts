@@ -16,6 +16,8 @@ export const listContractsTool: AgentTool<{ status?: string }> = {
   },
   requiredPermission: "tenant.contracts.view",
   requiredFeature: "agent.tools.contracts",
+  domain: "CONTRACT",
+  intents: ["LIST"],
   async execute(args, _ctx, scope) {
     let q = scope.db
       .from("contracts")
@@ -41,6 +43,8 @@ export const getContractSignatureStatusTool: AgentTool<{ contractId: string }> =
   },
   requiredPermission: "tenant.contracts.view",
   requiredFeature: "agent.tools.contracts",
+  domain: "CONTRACT",
+  intents: ["GET"],
   async execute(args, _ctx, scope) {
     // Re-scoped internally: confirm the contract belongs to this tenant
     // BEFORE looking up its signature status — a contractId from another
@@ -72,6 +76,8 @@ export const getContractTool: AgentTool<{ contractId: string }> = {
   },
   requiredPermission: "tenant.contracts.view",
   requiredFeature: "agent.tools.contracts",
+  domain: "CONTRACT",
+  intents: ["GET"],
   async execute(args, _ctx, scope) {
     const { data, error } = await scope.db
       .from("contracts")
@@ -99,6 +105,8 @@ export const getContractsExpiringTool: AgentTool<{ withinDays?: number }> = {
   },
   requiredPermission: "tenant.contracts.view",
   requiredFeature: "agent.tools.contracts",
+  domain: "CONTRACT",
+  intents: ["LIST"],
   async execute(args, _ctx, scope) {
     const days = args.withinDays && args.withinDays > 0 ? Math.min(args.withinDays, 365) : 30;
     const now = new Date();
@@ -130,6 +138,8 @@ export const getCustomerContractsTool: AgentTool<{ organizationId: string }> = {
   },
   requiredPermission: "tenant.contracts.view",
   requiredFeature: "agent.tools.contracts",
+  domain: "CONTRACT",
+  intents: ["LIST"],
   async execute(args, _ctx, scope) {
     // Scoped by this tenant's own contracts regardless of whether
     // organizationId is real or belongs to another tenant — an id from

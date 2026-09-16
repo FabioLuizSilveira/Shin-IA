@@ -33,6 +33,8 @@ export const generateBasicReportTool: AgentTool<{ period?: string }> = {
   },
   requiredPermission: "tenant.reports.view",
   requiredFeature: "agent.tools.reporting",
+  domain: "REPORTING",
+  intents: ["ANALYZE"],
   async execute(args, _ctx, scope) {
     const tenantId = scope.tenantId;
     const [opsRes, assetsRes, contractsRes, invoicesRes] = await Promise.all([

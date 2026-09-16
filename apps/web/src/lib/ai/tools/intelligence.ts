@@ -98,6 +98,8 @@ export const getAssetHealthScoreTool: AgentTool<{ assetId: string }> = {
   },
   requiredPermission: "tenant.maintenance.view",
   requiredFeature: "agent.tools.intelligence",
+  domain: "INTELLIGENCE",
+  intents: ["ANALYZE"],
   async execute(args, _ctx, scope) {
     const loaded = await loadAssetAndOrders(scope, args.assetId);
     if (!loaded) return { ok: false, error: "asset not found" };
@@ -133,6 +135,8 @@ export const getAssetPredictiveRiskTool: AgentTool<{ assetId: string }> = {
   },
   requiredPermission: "tenant.maintenance.ai_use",
   requiredFeature: "agent.tools.intelligence",
+  domain: "INTELLIGENCE",
+  intents: ["ANALYZE"],
   async execute(args, _ctx, scope) {
     const loaded = await loadAssetAndOrders(scope, args.assetId);
     if (!loaded) return { ok: false, error: "asset not found" };
@@ -187,6 +191,8 @@ export const getAssetEconomicsTool: AgentTool<{ assetId: string }> = {
   },
   requiredPermission: "tenant.maintenance.analytics_view",
   requiredFeature: "agent.tools.intelligence",
+  domain: "INTELLIGENCE",
+  intents: ["ANALYZE"],
   async execute(args, _ctx, scope) {
     const { data: asset } = await scope.db
       .from("assets")
@@ -232,6 +238,8 @@ export const getAssetAnomaliesTool: AgentTool<{ assetId: string }> = {
   },
   requiredPermission: "tenant.maintenance.view",
   requiredFeature: "agent.tools.intelligence",
+  domain: "INTELLIGENCE",
+  intents: ["ANALYZE"],
   async execute(args, _ctx, scope) {
     const { data: asset } = await scope.db
       .from("assets")
@@ -284,6 +292,8 @@ export const getMaintenanceInsightsTool: AgentTool<{ status?: string }> = {
   },
   requiredPermission: "tenant.maintenance.view",
   requiredFeature: "agent.tools.intelligence",
+  domain: "INTELLIGENCE",
+  intents: ["LIST"],
   async execute(args, _ctx, scope) {
     const status = args.status ?? "open";
     let q = scope.db.from("maintenance_insights").select("*").eq("tenant_id", scope.tenantId);
@@ -309,6 +319,8 @@ export const getAttentionSummaryTool: AgentTool<Record<string, never>> = {
     "Resumo do que precisa de atenção hoje: insights de manutenção abertos, contratos vencendo em breve, e assinaturas de contrato pendentes há muito tempo. Cada item tem origem, motivo, severidade e ação recomendada.",
   inputSchema: { type: "object", properties: {} },
   requiredFeature: "agent.tools.intelligence",
+  domain: "INTELLIGENCE",
+  intents: ["ANALYZE"],
   async execute(_args, _ctx, scope) {
     const items = await computeAttentionSummary(scope.db, scope.tenantId);
     return { ok: true, data: items };
