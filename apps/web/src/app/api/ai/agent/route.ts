@@ -197,6 +197,11 @@ export async function POST(req: NextRequest) {
         candidatesBeforeFilter: filterResult.candidatesBeforeFilter,
         candidatesAfterFilter: filterResult.candidatesAfterFilter,
         forced: filterResult.forced,
+        // Wave 6 — the real narrowing/fallback signal (Wave 4 found the
+        // raw candidate counts alone are NOT a reliable proxy for this),
+        // needed so observability.ts can report a true fallback rate
+        // instead of re-deriving (and re-risking) the same bug.
+        isFallback: filterResult.isFallback,
       },
     });
 

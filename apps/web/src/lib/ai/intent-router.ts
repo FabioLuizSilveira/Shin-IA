@@ -40,8 +40,11 @@ const DETERMINISTIC_RULES: DeterministicRule[] = [
   {
     domain: "ORGANIZATION",
     intent: "CREATE",
+    // Wave 6 eval suite caught this: "cri(e|ar)" missed "cria" (a very
+    // common imperative/present form, "cria uma organização nova") —
+    // widened to "cri(a|e|ar)".
     pattern:
-      /\b(cadastr\w*|registr\w*|cri(e|ar)|inclu\w*|adicion\w*)\b[^.\n]{0,60}\b(cliente|organiza[cç][aã]o|empresa|fornecedor|parceiro)\b/i,
+      /\b(cadastr\w*|registr\w*|cri(a|e|ar)|inclu\w*|adicion\w*)\b[^.\n]{0,60}\b(cliente|organiza[cç][aã]o|empresa|fornecedor|parceiro)\b/i,
   },
   {
     // Separate rule for "coloca X no sistema" — the object sits BETWEEN
@@ -54,14 +57,25 @@ const DETERMINISTIC_RULES: DeterministicRule[] = [
   {
     domain: "ORGANIZATION",
     intent: "SEARCH",
+    // Wave 6 eval suite caught this: the trailing \b right after
+    // "onde\s+est[aá]" never matched when the alternative picked the
+    // accented "á" — accented letters aren't \w in a plain JS regex, so
+    // \b between "á" and the following space (two non-word characters)
+    // can never satisfy a boundary. Dropped the \b there; it added
+    // nothing real since [^.\n]{0,60} already doesn't need one.
     pattern:
-      /\b(busc\w*|procur\w*|encontr\w*|localiz\w*|onde\s+est[aá])\b[^.\n]{0,60}\b(cliente|organiza[cç][aã]o|empresa)\b/i,
+      /\b(busc\w*|procur\w*|encontr\w*|localiz\w*|onde\s+est[aá])[^.\n]{0,60}\b(cliente|organiza[cç][aã]o|empresa)\b/i,
   },
   {
     domain: "ORGANIZATION",
     intent: "GET",
+    // Wave 6 eval suite caught this: "informa[cç][ãa]o\w*" matched the
+    // singular "informação" but not the plural "informações" — plural
+    // pt-BR nasalizes onto "õ" (ç-Ã-o -> ç-Õ-es), a different vowel
+    // than the singular's "ã". Widened to make the ã optional and
+    // accept either o or õ.
     pattern:
-      /\b(dados|detalhe\w*|informa[cç][ãa]o\w*|mostr\w*)\b[^.\n]{0,60}\b(d[eo]\s+)?(cliente|organiza[cç][aã]o|empresa)\b/i,
+      /\b(dados|detalhe\w*|informa[cç][aã]?[oõ]\w*|mostr\w*)\b[^.\n]{0,60}\b(d[eo]\s+)?(cliente|organiza[cç][aã]o|empresa)\b/i,
   },
   // Wave 5 (spec sections 52/9 — progressive domain migration) — the
   // exact reliability gap Waves 2/4 found and live-verified: "quantos
@@ -96,7 +110,8 @@ const DETERMINISTIC_RULES: DeterministicRule[] = [
   {
     domain: "ASSET",
     intent: "GET",
-    pattern: /\b(dados|detalhe\w*|informa[cç][ãa]o\w*)\b\s*(d[eo]\s+)?ativo\b/i,
+    // Same plural fix as the ORGANIZATION GET rule above.
+    pattern: /\b(dados|detalhe\w*|informa[cç][aã]?[oõ]\w*)\b\s*(d[eo]\s+)?ativo\b/i,
   },
 ];
 
@@ -138,7 +153,10 @@ interface RawClassification {
   confidence?: unknown;
 }
 
-function parseClassifierOutput(
+// Exported for Wave 6's security tests (adversarial/malformed JSON
+// handling) — otherwise only ever called internally by
+// classifyIntentWithModel().
+export function parseClassifierOutput(
   text: string,
 ): Omit<IntentClassification, "method" | "creditsConsumed"> | null {
   let raw: RawClassification;
@@ -147,7 +165,16 @@ function parseClassifierOutput(
       .trim()
       .replace(/^```(?:json)?\s*/i, "")
       .replace(/```\s*$/i, "");
-    raw = JSON.parse(cleaned) as RawClassification;
+    const parsed: unknown = JSON.parse(cleaned);
+    // Wave 6 security test caught this: JSON.parse("null") and
+    // JSON.parse("42") both succeed (valid JSON, just not an object) —
+    // the outer try/catch here only guards a parse FAILURE, not a
+    // parse success that isn't shaped like an object. Reading
+    // `.domain` off a bare `null` throws; a number/string/array
+    // wouldn't throw but would silently be misread as {} via casting.
+    // Explicitly requiring a non-null object closes both paths.
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
+    raw = parsed as RawClassification;
   } catch {
     return null;
   }
