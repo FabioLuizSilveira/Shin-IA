@@ -1,5 +1,6 @@
 import type { AgentContext } from "./agent-context";
 import type { TenantScope } from "@/lib/tenant-context";
+import type { ToolDomain, ToolIntent } from "./tool-taxonomy";
 
 export interface ToolResult {
   ok: boolean;
@@ -30,6 +31,13 @@ export interface AgentTool<TArgs = Record<string, unknown>> {
   /** Feature-flag key required to see/use this tool — checked via
    * isFeatureEnabled(). Omit for tools always available once registered. */
   requiredFeature?: string;
+  /** Agent Runtime Architecture v2, Wave 1 (Tool Registry v2, spec section
+   * 4) — optional and additive on purpose: a tool without domain/intents
+   * still registers and executes exactly as before, it's just not yet a
+   * candidate for the domain-based Dynamic Tool Filter a later wave adds.
+   * Migrated progressively per spec section 52, not all 41 tools at once. */
+  domain?: ToolDomain;
+  intents?: ToolIntent[];
   execute(args: TArgs, ctx: AgentContext, scope: TenantScope): Promise<ToolResult>;
 }
 

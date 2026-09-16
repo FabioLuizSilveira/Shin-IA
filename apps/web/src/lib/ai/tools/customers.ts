@@ -19,6 +19,8 @@ export const searchCustomersTool: AgentTool<{ query?: string }> = {
   },
   requiredPermission: "tenant.customers.view",
   requiredFeature: "agent.tools.customers",
+  domain: "ORGANIZATION",
+  intents: ["SEARCH"],
   async execute(args, _ctx, scope) {
     let q = scope.db
       .from("organizations")
@@ -46,6 +48,8 @@ export const getCustomerTool: AgentTool<{ customerId: string }> = {
   },
   requiredPermission: "tenant.customers.view",
   requiredFeature: "agent.tools.customers",
+  domain: "ORGANIZATION",
+  intents: ["GET"],
   async execute(args, _ctx, scope) {
     const { data, error } = await scope.db
       .from("organizations")

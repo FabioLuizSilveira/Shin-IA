@@ -1,6 +1,7 @@
 import type { AgentContext } from "../agent-context";
 import type { TenantScope } from "@/lib/tenant-context";
 import type { ToolResult } from "../tool-types";
+import type { ToolDomain, ToolIntent } from "../tool-taxonomy";
 
 export type ActionRiskLevel = "LOW_RISK" | "LOW_RISK_WRITE" | "MEDIUM_RISK" | "HIGH_RISK";
 
@@ -30,6 +31,10 @@ export interface AgentMutationTool<TArgs = Record<string, unknown>> {
    * valid step-up cookie (apps/web/src/lib/auth/require-step-up.ts,
    * already built, never wired to a route before this) before executing. */
   requiresAal2?: boolean;
+  /** Same Tool Registry v2 metadata as the read-only AgentTool (see
+   * tool-types.ts) — optional/additive, migrated progressively. */
+  domain?: ToolDomain;
+  intents?: ToolIntent[];
   /** Checks the args are well-formed and any referenced entity really
    * belongs to this tenant — WITHOUT mutating anything. A failure here
    * means no plan is ever created. */

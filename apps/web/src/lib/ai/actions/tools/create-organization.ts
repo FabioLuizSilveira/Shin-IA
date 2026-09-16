@@ -44,6 +44,8 @@ export const createOrganizationTool: AgentMutationTool<Args> = {
   riskLevel: "LOW_RISK_WRITE",
   requiredPermission: "tenant.customers.create",
   requiredFeature: "agent.actions.customers",
+  domain: "ORGANIZATION",
+  intents: ["CREATE"],
   async validate(args) {
     if (!args.name?.trim() || !args.document?.trim()) {
       return { ok: false, error: "name and document are required" };
