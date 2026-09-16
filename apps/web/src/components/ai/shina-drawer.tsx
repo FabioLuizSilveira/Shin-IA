@@ -9,7 +9,7 @@
 // feedback goes through it as normal.
 
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Sparkles, Paperclip, Mic, Square, Loader2, FileText } from "lucide-react";
+import { X, Send, Sparkles, Paperclip, Mic, Square, Loader2, FileText, Image } from "lucide-react";
 import { useToast } from "@shina/design-system";
 
 interface ActionPlan {
@@ -125,6 +125,40 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
 
   function removeAttachment(index: number) {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // Pasting a screenshot (Ctrl/Cmd+V) drops an image straight into the
+  // clipboard as a file, no filename attached — same encode path as a
+  // real file pick, just named generically and always treated as an image.
+  async function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const imageItems = Array.from(e.clipboardData?.items ?? []).filter(
+      (item) => item.kind === "file" && item.type.startsWith("image/"),
+    );
+    if (imageItems.length === 0) return;
+    e.preventDefault();
+
+    if (attachments.length + imageItems.length > MAX_ATTACHMENTS) {
+      show({ message: `Máximo de ${MAX_ATTACHMENTS} anexos por mensagem.`, variant: "warning" });
+      return;
+    }
+    try {
+      const encoded = await Promise.all(
+        imageItems.map(async (item, i) => {
+          const file = item.getAsFile();
+          if (!file) throw new Error("failed to read pasted image");
+          const ext = item.type.split("/")[1] ?? "png";
+          return {
+            name: `imagem-colada-${attachments.length + i + 1}.${ext}`,
+            mimeType: item.type,
+            dataBase64: await fileToBase64(file),
+            isImage: true,
+          };
+        }),
+      );
+      setAttachments((prev) => [...prev, ...encoded]);
+    } catch {
+      show({ message: "Não foi possível colar a imagem.", variant: "danger" });
+    }
   }
 
   async function startRecording() {
@@ -371,7 +405,11 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
                   key={`${att.name}-${i}`}
                   className="flex items-center gap-1.5 max-w-[200px] px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-300"
                 >
-                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                  {att.isImage ? (
+                    <Image className="w-3.5 h-3.5 shrink-0" />
+                  ) : (
+                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                  )}
                   <span className="truncate">{att.name}</span>
                   <button
                     type="button"
@@ -435,7 +473,8 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
                   void send();
                 }
               }}
-              placeholder={recording ? "Gravando…" : "Pergunte à Shinã…"}
+              onPaste={(e) => void onPaste(e)}
+              placeholder={recording ? "Gravando…" : "Pergunte à Shinã… (cole um print aqui)"}
               rows={2}
               className="flex-1 text-sm px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-shina-blue/30"
             />
