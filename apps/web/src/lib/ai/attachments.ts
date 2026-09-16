@@ -1,4 +1,14 @@
-import pdfParse from "pdf-parse";
+// Imports the internal module directly, NOT "pdf-parse" itself: that
+// package's index.js has a notorious "debug mode" footgun — when
+// `!module.parent` (true for how Next.js's webpack wraps server modules,
+// unlike a plain Node require), it synchronously reads a test PDF from
+// its own package directory at import time. That throw happens at module
+// load, before any request handler runs, and Next's dev server surfaces
+// it as a bare 404 on the route instead of a 500 with the real error —
+// which is exactly what made this look like an unrelated routing bug
+// while wiring this feature up. Importing the inner file skips that
+// wrapper entirely.
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import * as mammoth from "mammoth";
 import type { OpenAiContentPart } from "@shina/ai-gateway";
 
