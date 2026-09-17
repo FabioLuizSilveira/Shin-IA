@@ -462,6 +462,19 @@ export async function middleware(request: NextRequest) {
       !pathname.startsWith("/auth/mfa") &&
       !pathname.startsWith("/settings")
     ) {
+      // Found live: this block never excluded API routes like the
+      // unauthenticated-user and subscription gates above do (isApiRoute).
+      // A same-origin POST (e.g. the Shinã Agent's confirm button) got a
+      // 307 redirect to a GET-only page and came back 405 — the browser
+      // preserves the method across a 307/308, but /auth/mfa-setup has
+      // no POST handler. API callers get a JSON error instead, same
+      // convention as line ~371's isApiRoute branch.
+      if (isApiRoute) {
+        return NextResponse.json(
+          { error: "mfa_setup_required", code: "mfa_setup_required" },
+          { status: 401 },
+        );
+      }
       const url = request.nextUrl.clone();
       url.pathname = "/auth/mfa-setup";
       return NextResponse.redirect(url);
@@ -479,6 +492,17 @@ export async function middleware(request: NextRequest) {
       !pathname.startsWith("/settings");
 
     if (mfaChallengeRequired) {
+      // Same fix as mfa-setup above — this is the exact bug a real
+      // production screenshot surfaced: confirming a Shinã Agent action
+      // plan (POST /api/ai/agent/actions/[id]/confirm) with an expired/
+      // missing MFA cookie redirected to /auth/mfa-challenge, which 405'd
+      // on the preserved POST.
+      if (isApiRoute) {
+        return NextResponse.json(
+          { error: "mfa_challenge_required", code: "mfa_challenge_required" },
+          { status: 401 },
+        );
+      }
       const url = request.nextUrl.clone();
       url.pathname = "/auth/mfa-challenge";
       url.searchParams.set("next", pathname);

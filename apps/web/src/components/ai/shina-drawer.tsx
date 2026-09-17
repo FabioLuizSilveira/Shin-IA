@@ -301,9 +301,30 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
     setResolvingPlanId(planId);
     try {
       const res = await fetch(`/api/ai/agent/actions/${planId}/${action}`, { method: "POST" });
-      const json = (await res.json().catch(() => ({}))) as { data?: unknown; error?: string };
+      const json = (await res.json().catch(() => ({}))) as {
+        data?: unknown;
+        error?: string;
+        code?: string;
+      };
       if (!res.ok) {
-        show({ message: json.error ?? "Não foi possível concluir a ação.", variant: "danger" });
+        // A real production bug (fixed in middleware.ts): a POST here
+        // with an expired/missing MFA session used to 405 with no
+        // usable message at all. These two codes now come back as a
+        // proper JSON error from the middleware — give the user
+        // something actionable instead of the raw code string.
+        const FRIENDLY_ERROR: Record<string, string> = {
+          mfa_challenge_required:
+            "Sua verificação de segurança expirou. Atualize a página para confirmar novamente.",
+          mfa_setup_required: "Configure a verificação em duas etapas antes de confirmar ações.",
+          step_up_required: "Esta ação exige uma verificação de segurança adicional.",
+        };
+        show({
+          message:
+            (json.code && FRIENDLY_ERROR[json.code]) ??
+            json.error ??
+            "Não foi possível concluir a ação.",
+          variant: "danger",
+        });
         return;
       }
       setResolvedPlanIds((s) => new Set(s).add(planId));
