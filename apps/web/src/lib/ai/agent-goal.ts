@@ -135,6 +135,8 @@ const EXTRACTION_PROMPTS: Record<GoalType, string> = {
 Campos possíveis: "passengerCount" (número), "scheduledStartsAt" (ISO 8601, data/hora de partida), "scheduledEndsAt" (ISO 8601, data/hora de retorno/término).`,
   CREATE_TOWING_REQUEST: `Extraia dados de uma solicitação de guincho a partir da mensagem do usuário.
 Campos possíveis: "scheduledStartsAt" (ISO 8601, data/hora do atendimento), "scheduledEndsAt" (ISO 8601, data/hora estimada de término — se não disponível, estime 2 horas após o início), "origin" (string, local de origem), "destination" (string, destino).`,
+  CREATE_RENTAL: `Extraia o período de uma locação (aluguel) de veículo a partir da mensagem do usuário.
+Campos possíveis: "scheduledStartsAt" (ISO 8601, data/hora de retirada do veículo), "scheduledEndsAt" (ISO 8601, data/hora de devolução do veículo). Nunca invente um veículo ou cliente — isso não é extraído daqui.`,
 };
 
 // Extraction never invents a tenant-configurable timezone (no such

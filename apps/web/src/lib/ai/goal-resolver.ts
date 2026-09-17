@@ -3,12 +3,12 @@
 // there's a real multi-step process behind it, distinct from the
 // per-message Intent Router (v2's intent-router.ts classifies WHAT this
 // message means; this classifies WHAT the user is trying to accomplish
-// across the whole conversation). Deliberately starts with only the two
-// domains this wave validates the orchestrator against — per explicit
-// user decision, CREATE_RENTAL is Wave 2.5+ territory (the real Rental
-// domain doesn't exist yet, see project_agent_runtime_v3 memory).
+// across the whole conversation). Wave 2 started with only Towing/
+// Transport (real domain services already existed for those); Wave 3
+// adds CREATE_RENTAL now that Wave 2.5 built the real Rental domain
+// (rental-service.ts) it needs to wire to.
 
-export type GoalType = "CREATE_TOWING_REQUEST" | "CREATE_TRANSPORT_REQUEST";
+export type GoalType = "CREATE_TOWING_REQUEST" | "CREATE_TRANSPORT_REQUEST" | "CREATE_RENTAL";
 
 interface GoalRule {
   type: GoalType;
@@ -32,6 +32,10 @@ const GOAL_RULES: GoalRule[] = [
     type: "CREATE_TRANSPORT_REQUEST",
     pattern:
       /([oô]nibus|micro[- ]?[oô]nibus|\bvan\b|transporte\s+de\s+passageiros|\d+\s*passageiros)\b/i,
+  },
+  {
+    type: "CREATE_RENTAL",
+    pattern: /\b(alug\w*|loca[cç][aã]o|locar)\b/i,
   },
 ];
 
@@ -106,11 +110,38 @@ export const GOAL_REQUIREMENTS: Record<GoalType, GoalRequirementSpec[]> = {
     { key: "destination", required: false, label: "o destino" },
     { key: "customerOrganizationId", required: false, label: "o cliente" },
   ],
+  // Mirrors rental-service.ts's real CreateRentalInput (Wave 2.5) — a
+  // rental, unlike towing/transport, always needs a customer (it's a
+  // commercial agreement with someone), so customerOrganizationId is
+  // required here, not optional. Usually filled by Wave 1's entity
+  // resolver ("esse cliente") rather than asked directly.
+  CREATE_RENTAL: [
+    { key: "customerOrganizationId", required: true, label: "o cliente" },
+    {
+      key: "assetId",
+      required: true,
+      label: "o veículo",
+      hint: "chame list_assets (category: vehicle) para encontrar opções elegíveis e pergunte ao usuário qual prefere — nunca escolha sozinho se houver mais de uma opção",
+      searchTool: "list_assets",
+    },
+    { key: "scheduledStartsAt", required: true, label: "a data/hora de retirada" },
+    { key: "scheduledEndsAt", required: true, label: "a data/hora de devolução" },
+  ],
 };
 
 export const GOAL_MUTATION_TOOL: Record<GoalType, string> = {
   CREATE_TRANSPORT_REQUEST: "create_transport_request",
   CREATE_TOWING_REQUEST: "create_towing_request",
+  CREATE_RENTAL: "create_rental",
+};
+
+/** The `agent_goals.domain` value for each goal type — reuses the same
+ * ToolDomain values the mutation tools themselves carry (tool-taxonomy.ts),
+ * not a parallel mapping. */
+export const GOAL_DOMAIN: Record<GoalType, string> = {
+  CREATE_TRANSPORT_REQUEST: "PASSENGER_TRANSPORT",
+  CREATE_TOWING_REQUEST: "TOWING",
+  CREATE_RENTAL: "RENTAL",
 };
 
 export type NextBestAction =
@@ -143,4 +174,61 @@ export function computeNextBestAction(
     }
   }
   return { action: "EXECUTE", toolName: GOAL_MUTATION_TOOL[goalType] };
+}
+
+// ── Offered-option selection (spec sections 10, 18, 39) ─────────────────
+// The canonical flow's "O Mobi" step: turn N forces a search tool
+// (list_assets) and shows the user real candidates; turn N+1's message
+// names one of them. Route.ts captures the search tool's real result
+// into agent_goals.state right after it runs (never invented here) —
+// this is the pure resolution logic over that captured list, same
+// name-match-only-when-unambiguous discipline as entity-context.ts's
+// resolveReferentialExpression (spec section 10: never choose silently).
+
+export interface OfferedOption {
+  id: string;
+  name: string;
+}
+
+export type OfferedSelectionResult =
+  | { status: "RESOLVED"; id: string }
+  | { status: "AMBIGUOUS"; candidates: OfferedOption[] }
+  | { status: "NONE" };
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Live-verified real bug (Wave 3): matching required the FULL offered
+// name as a substring of the user's message ("Chevrolet Onix" inside
+// "o Chevrolet Onix mesmo") -- but the master prompt's own canonical
+// step is "O Mobi", a partial name, and real users never repeat the
+// full catalog name back. Matches instead on any single "significant"
+// word (>= 3 letters, so "Fiat"/"Mobi"/"Onix" count but "de"/"o" don't)
+// shared between the offered name and the message -- still never
+// guesses: two offered options sharing a significant word (e.g.
+// "Chevrolet Onix" / "Chevrolet Onix Plus" both containing "onix")
+// still resolve as AMBIGUOUS rather than picking one.
+function significantWords(name: string): string[] {
+  return name
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length >= 3);
+}
+
+export function resolveOfferedSelection(
+  text: string,
+  offered: OfferedOption[],
+): OfferedSelectionResult {
+  if (offered.length === 0) return { status: "NONE" };
+  const lower = text.toLowerCase();
+  const matches = offered.filter((o) => {
+    if (!o.name) return false;
+    return significantWords(o.name).some((word) =>
+      new RegExp(`\\b${escapeRegExp(word)}\\b`, "i").test(lower),
+    );
+  });
+  if (matches.length === 1) return { status: "RESOLVED", id: matches[0].id };
+  if (matches.length > 1) return { status: "AMBIGUOUS", candidates: matches };
+  return { status: "NONE" };
 }

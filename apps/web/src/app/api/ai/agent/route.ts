@@ -21,7 +21,14 @@ import {
   resolveReferentialExpression,
   buildEntityContextNote,
 } from "@/lib/ai/entity-context";
-import { resolveGoalType, computeNextBestAction, GOAL_MUTATION_TOOL } from "@/lib/ai/goal-resolver";
+import {
+  resolveGoalType,
+  computeNextBestAction,
+  resolveOfferedSelection,
+  GOAL_MUTATION_TOOL,
+  GOAL_DOMAIN,
+  type OfferedOption,
+} from "@/lib/ai/goal-resolver";
 import {
   getActiveGoal,
   createGoal,
@@ -182,6 +189,12 @@ export async function POST(req: NextRequest) {
   // Intent/Capability Router's forcing — see the guard where that block
   // sets this further down, it only applies if still null).
   let forcedToolName: string | null = null;
+  // Agent Runtime v3, Wave 3 — the goal-state key a forced search tool's
+  // results should be captured under this turn (e.g. "assetId" for
+  // CREATE_RENTAL's list_assets search), read by the capture hook in the
+  // turn loop below. Only set when this turn is actually forcing a
+  // searchTool for a still-missing field (see the ASK_USER branch).
+  let pendingOfferedField: string | null = null;
   // Declared here (not with the other per-turn accumulators further
   // down) so both the Wave 2 goal-slot extraction call below and the
   // Wave 2 v2 Intent Router's own classification call — real, metered AI
@@ -260,7 +273,7 @@ export async function POST(req: NextRequest) {
     } else {
       const goalType = resolveGoalType(queryText);
       if (goalType) {
-        const domain = goalType === "CREATE_TOWING_REQUEST" ? "TOWING" : "PASSENGER_TRANSPORT";
+        const domain = GOAL_DOMAIN[goalType];
         activeGoal = await createGoal(
           scope.db,
           scope.tenantId,
@@ -281,6 +294,43 @@ export async function POST(req: NextRequest) {
     }
 
     if (activeGoal) {
+      // Agent Runtime v3, Wave 3 — the canonical flow's "O Mobi" step:
+      // a PRIOR turn forced a search tool (list_assets) and offered real
+      // candidates, captured into activeGoal.state (see the capture hook
+      // in the turn loop below). This turn's message may be selecting
+      // one of them by name — resolved BEFORE the general slot
+      // extraction, same "never guess, only an unambiguous name match"
+      // discipline as entity-context.ts.
+      const patch: Record<string, unknown> = {};
+      const offeredAssets = activeGoal.state.__offeredAssets as OfferedOption[] | undefined;
+      const offeredField = activeGoal.state.__offeredAssetsField as string | undefined;
+      if (offeredAssets && offeredField && !activeGoal.state[offeredField]) {
+        const selection = resolveOfferedSelection(queryText, offeredAssets);
+        if (selection.status === "AMBIGUOUS") {
+          const names = selection.candidates.map((c) => `"${c.name}"`).join(", ");
+          return NextResponse.json({
+            data: {
+              text: `Encontrei mais de uma opção que pode ser essa: ${names}. Qual delas você quer dizer?`,
+              toolsUsed: [],
+              creditsConsumed: totalCreditsConsumed,
+            },
+          });
+        }
+        if (selection.status === "RESOLVED") {
+          patch[offeredField] = selection.id;
+          // updateGoalState's merge skips null/undefined values (by
+          // design, so a turn's extraction never erases an already-known
+          // field) — that means putting __offeredAssets/Field in `patch`
+          // as null would silently NOT clear them. Clear them on the
+          // local copy directly instead, so the offer never leaks into a
+          // later, unrelated turn once it's been consumed.
+          const clearedState = { ...activeGoal.state };
+          delete clearedState.__offeredAssets;
+          delete clearedState.__offeredAssetsField;
+          activeGoal = { ...activeGoal, state: clearedState };
+        }
+      }
+
       const extraction = await extractGoalSlots(
         scope.db,
         { workspaceId: ctx.workspaceId, tenantId: ctx.tenantId, userId: ctx.userId },
@@ -289,7 +339,7 @@ export async function POST(req: NextRequest) {
         activeGoal.state,
       );
       totalCreditsConsumed += extraction.creditsConsumed ?? 0;
-      const patch = { ...extraction.slots };
+      Object.assign(patch, extraction.slots);
       if (resolvedCustomerOrgId && !activeGoal.state.customerOrganizationId) {
         patch.customerOrganizationId = resolvedCustomerOrgId;
       }
@@ -350,7 +400,10 @@ export async function POST(req: NextRequest) {
         // impossible to call, not just discouraged.
         availableMutationTools = availableMutationTools.filter((t) => t.name !== goalToolName);
         mutationToolNames.delete(goalToolName);
-        if (nextAction.searchTool) forcedToolName = nextAction.searchTool;
+        if (nextAction.searchTool) {
+          forcedToolName = nextAction.searchTool;
+          pendingOfferedField = nextAction.missingKey;
+        }
       } else if (nextAction.action === "EXECUTE") {
         queryText += `\n\n[Contexto do objetivo em andamento (${activeGoal.type}): todos os dados obrigatórios já estão disponíveis (${knownSummary}). Chame agora a ferramenta "${nextAction.toolName}" com esses dados — não pergunte de novo, não peça confirmação em texto.]`;
         // Same structural approach in the other direction: force the
@@ -645,6 +698,35 @@ export async function POST(req: NextRequest) {
           action: toolResult.ok ? AI_AGENT_EVENTS.TOOL_EXECUTED : AI_AGENT_EVENTS.TOOL_DENIED,
           metadata: { tool: toolUse.name },
         });
+
+        // Agent Runtime v3, Wave 3 — the OTHER half of the offered-option
+        // selection mechanism (see the resolution hook earlier in this
+        // file): this turn forced exactly this search tool for a goal's
+        // still-missing field, so its real results become next turn's
+        // candidate list, never invented. Only real {id, name} rows are
+        // kept — a malformed/empty result just means no offer is stored,
+        // which is safe (the next turn's resolver treats that as NONE).
+        if (
+          activeGoal &&
+          pendingOfferedField &&
+          toolUse.name === forcedToolName &&
+          toolResult.ok &&
+          Array.isArray(toolResult.data)
+        ) {
+          const offered: OfferedOption[] = (toolResult.data as { id?: unknown; name?: unknown }[])
+            .filter((row) => typeof row.id === "string" && typeof row.name === "string")
+            .map((row) => ({ id: row.id as string, name: row.name as string }));
+          if (offered.length > 0) {
+            const mergedState = await updateGoalState(
+              scope.db,
+              scope.tenantId,
+              activeGoal.id,
+              activeGoal.state,
+              { __offeredAssets: offered, __offeredAssetsField: pendingOfferedField },
+            );
+            activeGoal = { ...activeGoal, state: mergedState };
+          }
+        }
 
         messages.push({
           role: "tool",

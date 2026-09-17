@@ -37,7 +37,13 @@ export type ToolDomain =
   // scheduled task. Kept as their own domains for clarity, matching how
   // the master prompt itself treats them as distinct goal domains.
   | "TOWING"
-  | "PASSENGER_TRANSPORT";
+  | "PASSENGER_TRANSPORT"
+  // Agent Runtime v3, Wave 3 — Rental now has a real domain (Wave 2.5:
+  // rental-service.ts, operations type="vehicle_rental") to wire the
+  // agent to. Distinct from CONTRACT (a rental produces a Contract as
+  // one of its outputs, but the goal/tool itself is about the rental
+  // operation, matching the TOWING/PASSENGER_TRANSPORT precedent).
+  | "RENTAL";
 
 export type ToolIntent =
   | "SEARCH"
@@ -68,6 +74,7 @@ export const TOOL_DOMAINS: readonly ToolDomain[] = [
   "NOTIFICATION",
   "TOWING",
   "PASSENGER_TRANSPORT",
+  "RENTAL",
 ];
 
 export const TOOL_INTENTS: readonly ToolIntent[] = [
