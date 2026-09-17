@@ -166,13 +166,20 @@ export interface EntityResolution {
 }
 
 // Referential expressions this wave resolves (spec sections 8, 10) --
-// deliberately scoped to the ORGANIZATION/CURRENT_CUSTOMER case the
-// reported bug and Wave 1's own gate are about. Other relations
-// (CURRENT_ASSET, CURRENT_TRIP, ...) reuse the exact same mechanism once
-// a tool exists that produces them (Wave 2+ domains) -- nothing here is
-// ORGANIZATION-specific in a way that would need rework.
+// started scoped to the ORGANIZATION/CURRENT_CUSTOMER case the reported
+// bug and Wave 1's own gate are about. Agent Runtime v3, Wave 4 adds the
+// ASSET/CURRENT_ASSET case -- the master prompt's own Maintenance
+// example ("esse ônibus está fazendo um barulho estranho") is exactly
+// this pattern, live-tested and found missing: create_asset only grew
+// resultEntity() in Wave 4 (see create-asset.ts), but resolution never
+// matched "esse ativo"/"esse veículo" at all since only the customer
+// pattern existed. CURRENT_TRIP/CURRENT_SERVICE_REQUEST still reuse the
+// same mechanism once a real "esse guincho"/"essa viagem" use case shows
+// up -- nothing here is domain-specific in a way that needs rework.
 const CUSTOMER_REFERENCE_PATTERN =
   /\b(esse|essa|esta|este|o|a)\s+(cliente|organiza[cç][aã]o|empresa)\b|cliente\s+que\s+acabamos?\s+de\s+cadastrar/i;
+const ASSET_REFERENCE_PATTERN =
+  /\b(esse|essa|esta|este)\s+(ativo|ve[ií]culo|carro|caminh[aã]o|[oô]nibus|equipamento)\b|(ativo|ve[ií]culo)\s+que\s+acabamos?\s+de\s+cadastrar/i;
 const BARE_PRONOUN_PATTERN = /\b(ele|ela)\b/i;
 
 /** Pure resolution logic (no db access) -- given the message text and
@@ -207,6 +214,14 @@ export function resolveReferentialExpression(
     return { status: "NONE" };
   }
 
+  // 2b. "esse ativo" / "esse veículo" / "esse ônibus" -- resolves to the
+  // most recent CURRENT_ASSET (Wave 4).
+  if (ASSET_REFERENCE_PATTERN.test(text)) {
+    const asset = recentEntities.find((e) => e.relation === "CURRENT_ASSET");
+    if (asset) return { status: "RESOLVED", entity: asset };
+    return { status: "NONE" };
+  }
+
   // 3. Bare pronoun ("ele"/"ela") -- only safe to resolve when there is
   // EXACTLY ONE recent entity overall; with more than one, which
   // relation "ele" refers to is genuinely ambiguous across different
@@ -220,42 +235,60 @@ export function resolveReferentialExpression(
 }
 
 const ORGANIZATION_SELECT = "id, name, type, document, email, phone, address_city, address_state";
+const ASSET_SELECT = "id, name, category, status, serial_number";
 
 /** Re-reads the resolved entity fresh from its real domain table (spec
  * section 43 -- stale entity protection: a name/relation remembered a
  * few messages ago must never be trusted as current data, only as a
  * pointer to re-resolve) and formats it as a system-note the LLM can use
  * without asking the user again. Returns null when the domain has no
- * fresh-read support yet (only ORGANIZATION today — Wave 2 adds more as
- * their tools grow resultEntity() support) or the entity no longer
- * exists/belongs to this tenant (never fabricate stale data instead).
- * ALWAYS tenant-scoped (spec section 44) — an entityId that used to
- * belong to this tenant but was moved/deleted resolves to nothing, never
- * another tenant's row. */
+ * fresh-read support yet (ORGANIZATION and, since Wave 4, ASSET) or the
+ * entity no longer exists/belongs to this tenant (never fabricate stale
+ * data instead). ALWAYS tenant-scoped (spec section 44) — an entityId
+ * that used to belong to this tenant but was moved/deleted resolves to
+ * nothing, never another tenant's row. */
 export async function buildEntityContextNote(
   db: SupabaseClient,
   tenantId: string,
   entity: ConversationEntityReference,
 ): Promise<string | null> {
-  if (entity.entityType !== "ORGANIZATION") return null;
+  if (entity.entityType === "ORGANIZATION") {
+    const { data } = await db
+      .from("organizations")
+      .select(ORGANIZATION_SELECT)
+      .eq("id", entity.entityId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    if (!data) return null;
 
-  const { data } = await db
-    .from("organizations")
-    .select(ORGANIZATION_SELECT)
-    .eq("id", entity.entityId)
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
-  if (!data) return null;
+    const parts = [
+      `nome: ${data.name}`,
+      `documento: ${data.document}`,
+      `tipo: ${data.type}`,
+      `cidade: ${data.address_city}`,
+      `estado: ${data.address_state}`,
+    ];
+    if (data.email) parts.push(`e-mail: ${data.email}`);
+    if (data.phone) parts.push(`telefone: ${data.phone}`);
 
-  const parts = [
-    `nome: ${data.name}`,
-    `documento: ${data.document}`,
-    `tipo: ${data.type}`,
-    `cidade: ${data.address_city}`,
-    `estado: ${data.address_state}`,
-  ];
-  if (data.email) parts.push(`e-mail: ${data.email}`);
-  if (data.phone) parts.push(`telefone: ${data.phone}`);
+    return `[Contexto da conversa — cliente atual já identificado, NÃO peça esses dados de novo ao usuário: ${parts.join(", ")}. ID interno: ${data.id}.]`;
+  }
 
-  return `[Contexto da conversa — cliente atual já identificado, NÃO peça esses dados de novo ao usuário: ${parts.join(", ")}. ID interno: ${data.id}.]`;
+  if (entity.entityType === "ASSET") {
+    const { data } = await db
+      .from("assets")
+      .select(ASSET_SELECT)
+      .eq("id", entity.entityId)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!data) return null;
+
+    const parts = [`nome: ${data.name}`, `categoria: ${data.category}`, `status: ${data.status}`];
+    if (data.serial_number) parts.push(`número de série: ${data.serial_number}`);
+
+    return `[Contexto da conversa — ativo/veículo atual já identificado, NÃO peça esses dados de novo ao usuário: ${parts.join(", ")}. ID interno: ${data.id}.]`;
+  }
+
+  return null;
 }

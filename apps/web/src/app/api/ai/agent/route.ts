@@ -231,9 +231,19 @@ export async function POST(req: NextRequest) {
     }
 
     let resolvedCustomerOrgId: string | null = null;
+    // Agent Runtime v3, Wave 4 — the master prompt's own Maintenance
+    // example: "esse ônibus está fazendo um barulho estranho, abre uma
+    // manutenção" must resolve "esse ônibus" from the recent/current
+    // Asset and never re-ask for plate/model. Generalized (not
+    // maintenance-specific) since Inspection and Rental's assetId slot
+    // benefit from the exact same auto-fill.
+    let resolvedAssetId: string | null = null;
     if (resolution.status === "RESOLVED" && resolution.entity) {
       if (resolution.entity.relation === "CURRENT_CUSTOMER") {
         resolvedCustomerOrgId = resolution.entity.entityId;
+      }
+      if (resolution.entity.relation === "CURRENT_ASSET") {
+        resolvedAssetId = resolution.entity.entityId;
       }
       const note = await buildEntityContextNote(scope.db, scope.tenantId, resolution.entity);
       if (note) {
@@ -342,6 +352,9 @@ export async function POST(req: NextRequest) {
       Object.assign(patch, extraction.slots);
       if (resolvedCustomerOrgId && !activeGoal.state.customerOrganizationId) {
         patch.customerOrganizationId = resolvedCustomerOrgId;
+      }
+      if (resolvedAssetId && !activeGoal.state.assetId) {
+        patch.assetId = resolvedAssetId;
       }
       // Defensive second layer, never trust extraction alone: a new
       // scheduledEndsAt that would land at/before the already-known (or

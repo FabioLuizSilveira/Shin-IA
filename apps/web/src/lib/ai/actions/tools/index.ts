@@ -6,6 +6,8 @@ import { createOrganizationTool } from "./create-organization";
 import { createTransportRequestTool } from "./create-transport-request";
 import { createTowingRequestTool } from "./create-towing-request";
 import { createRentalTool } from "./create-rental";
+import { createMaintenanceRequestTool } from "./create-maintenance-request";
+import { createInspectionTool } from "./create-inspection";
 
 // MEDIUM_RISK (createMaintenance, generateReport, createContractDraft) and
 // HIGH_RISK (sendExternalNotification, requestSignature) are explicitly
@@ -24,6 +26,8 @@ const allMutationTools: AgentMutationTool[] = [
   createTransportRequestTool,
   createTowingRequestTool,
   createRentalTool,
+  createMaintenanceRequestTool,
+  createInspectionTool,
 ];
 
 export function buildMutationToolRegistry() {

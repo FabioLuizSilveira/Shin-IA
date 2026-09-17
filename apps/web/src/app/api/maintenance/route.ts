@@ -3,6 +3,7 @@ import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, hasTenantPermission } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
 import type { MaintenanceOrderType } from "@shina/maintenance-engine";
+import { createMaintenanceOrder, AssetNotFoundError } from "@/lib/maintenance/maintenance-service";
 
 export const dynamic = "force-dynamic";
 
@@ -97,49 +98,44 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data: asset, error: assetError } = await scope.db
-    .from("assets")
-    .select("id")
-    .eq("id", body.assetId)
-    .eq("tenant_id", scope.tenantId)
-    .maybeSingle();
-  if (assetError) return internalError(assetError);
-  if (!asset) return NextResponse.json({ error: "Asset not found" }, { status: 404 });
-
-  const orderId = crypto.randomUUID();
-  const { error: insertError } = await scope.db.from("maintenance_orders").insert({
-    id: orderId,
-    tenant_id: scope.tenantId,
-    asset_id: body.assetId,
-    contract_id: body.contractId ?? null,
-    customer_id: body.customerId ?? null,
-    operator_id: body.operatorId ?? null,
-    supplier_id: body.supplierId ?? null,
-    branch_id: body.branchId ?? null,
-    type: body.type,
-    status: body.initialStatus ?? "scheduled",
-    scheduled_at: body.scheduledAt ?? null,
-    started_at: body.initialStatus === "in_progress" ? new Date().toISOString() : null,
-    odometer: body.odometer ?? null,
-    hour_meter: body.hourMeter ?? null,
-    description: body.description,
-    labor_cost_cents: body.laborCostCents ?? 0,
-    parts_cost_cents: body.partsCostCents ?? 0,
-    other_cost_cents: body.otherCostCents ?? 0,
-    source_type: body.sourceType ?? null,
-    source_id: body.sourceId ?? null,
-    created_by: scope.userId,
-  });
-  if (insertError) return internalError(insertError);
+  let order;
+  try {
+    order = await createMaintenanceOrder(scope.db, {
+      tenantId: scope.tenantId,
+      createdBy: scope.userId,
+      assetId: body.assetId,
+      type: body.type,
+      description: body.description,
+      contractId: body.contractId,
+      customerId: body.customerId,
+      operatorId: body.operatorId,
+      supplierId: body.supplierId,
+      branchId: body.branchId,
+      scheduledAt: body.scheduledAt,
+      odometer: body.odometer,
+      hourMeter: body.hourMeter,
+      laborCostCents: body.laborCostCents,
+      partsCostCents: body.partsCostCents,
+      otherCostCents: body.otherCostCents,
+      sourceType: body.sourceType,
+      sourceId: body.sourceId,
+      initialStatus: body.initialStatus,
+    });
+  } catch (e) {
+    if (e instanceof AssetNotFoundError) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+    return internalError(e);
+  }
 
   void logActivity(scope.db, {
     tenantId: scope.tenantId,
     actorId: scope.userId,
     entityType: "maintenance_order",
-    entityId: orderId,
+    entityId: order.id,
     action: "created",
     metadata: { assetId: body.assetId, type: body.type },
   });
 
-  return NextResponse.json({ data: { id: orderId } }, { status: 201 });
+  return NextResponse.json({ data: { id: order.id } }, { status: 201 });
 }

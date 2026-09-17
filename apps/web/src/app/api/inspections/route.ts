@@ -2,13 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { internalError } from "@/lib/api-error";
 import { requireTenantScope, isReadOnlyScope, hasTenantPermission } from "@/lib/tenant-context";
 import { logActivity } from "@/lib/activity-log";
-import { createInspectionTemplateRepository } from "@/lib/inspection-repository";
+import type { InspectionPurpose, InspectionType } from "@shina/inspection-engine";
 import {
-  resolveInspectionTemplate,
+  createInspection,
+  AssetNotFoundError,
+  NoBlueprintError,
   InspectionTemplateResolutionError,
-  type InspectionPurpose,
-  type InspectionType,
-} from "@shina/inspection-engine";
+} from "@/lib/inspections/inspection-service";
 
 export const dynamic = "force-dynamic";
 
@@ -58,47 +58,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "assetId, type and purpose are required" }, { status: 400 });
   }
 
-  const { data: asset, error: assetError } = await scope.db
-    .from("assets")
-    .select("id, branch_id, asset_type_id")
-    .eq("id", body.assetId)
-    .eq("tenant_id", scope.tenantId)
-    .maybeSingle();
-  if (assetError) return internalError(assetError);
-  if (!asset) return NextResponse.json({ error: "Asset not found" }, { status: 404 });
-
-  // blueprintId comes from the request only as an override — the normal
-  // path resolves it from the asset's own asset_type, same source
-  // apply-blueprint-to-asset-types.ts writes to
-  // (asset_types.metadata.blueprintId). Never guessed from asset.category
-  // or any other heuristic — an asset_type not created from a blueprint
-  // has no blueprintId, and that's a 422, not a silent generic template.
-  let blueprintId = body.blueprintId ?? null;
-  if (!blueprintId && asset.asset_type_id) {
-    const { data: assetType, error: assetTypeError } = await scope.db
-      .from("asset_types")
-      .select("metadata")
-      .eq("id", asset.asset_type_id)
-      .maybeSingle();
-    if (assetTypeError) return internalError(assetTypeError);
-    const metadata = assetType?.metadata as { blueprintId?: string } | null;
-    blueprintId = metadata?.blueprintId ?? null;
-  }
-  if (!blueprintId) {
-    return NextResponse.json(
-      {
-        error: "asset_has_no_blueprint",
-        message: "Ativo não tem blueprint associado — informe blueprintId.",
-      },
-      { status: 422 },
-    );
-  }
-
-  const repo = createInspectionTemplateRepository(scope.db);
-  let template;
+  let inspection;
   try {
-    template = await resolveInspectionTemplate(repo, blueprintId, body.purpose);
+    inspection = await createInspection(scope.db, {
+      tenantId: scope.tenantId,
+      responsibleUserId: scope.userId,
+      assetId: body.assetId,
+      type: body.type,
+      purpose: body.purpose,
+      contractId: body.contractId,
+      operationId: body.operationId,
+      customerId: body.customerId,
+      operatorId: body.operatorId,
+      blueprintId: body.blueprintId,
+      linkedInspectionId: body.linkedInspectionId,
+    });
   } catch (err) {
+    if (err instanceof AssetNotFoundError) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
+    if (err instanceof NoBlueprintError) {
+      return NextResponse.json(
+        {
+          error: "asset_has_no_blueprint",
+          message: "Ativo não tem blueprint associado — informe blueprintId.",
+        },
+        { status: 422 },
+      );
+    }
     if (err instanceof InspectionTemplateResolutionError) {
       return NextResponse.json(
         { error: "no_inspection_template_mapped", message: err.message },
@@ -108,36 +95,17 @@ export async function POST(req: NextRequest) {
     return internalError(err);
   }
 
-  const id = crypto.randomUUID();
-  const { error: insertError } = await scope.db.from("inspections").insert({
-    id,
-    tenant_id: scope.tenantId,
-    branch_id: asset.branch_id,
-    asset_id: body.assetId,
-    asset_type_id: asset.asset_type_id,
-    contract_id: body.contractId ?? null,
-    operation_id: body.operationId ?? null,
-    customer_id: body.customerId ?? null,
-    operator_id: body.operatorId ?? null,
-    responsible_user_id: scope.userId,
-    template_id: template.id,
-    type: body.type,
-    status: "draft",
-    linked_inspection_id: body.linkedInspectionId ?? null,
-  });
-  if (insertError) return internalError(insertError);
-
   void logActivity(scope.db, {
     tenantId: scope.tenantId,
     actorId: scope.userId,
     entityType: "inspection",
-    entityId: id,
+    entityId: inspection.id,
     action: "created",
-    metadata: { assetId: body.assetId, type: body.type, templateId: template.id },
+    metadata: { assetId: body.assetId, type: body.type, templateId: inspection.templateId },
   });
 
   return NextResponse.json(
-    { data: { id, templateId: template.id, status: "draft" } },
+    { data: { id: inspection.id, templateId: inspection.templateId, status: "draft" } },
     { status: 201 },
   );
 }

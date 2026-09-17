@@ -67,6 +67,17 @@ export const createAssetTool: AgentMutationTool<Args> = {
   async summarize(args) {
     return `Criar ativo "${args.name}" (categoria: ${args.category}${args.serial_number ? `, série: ${args.serial_number}` : ""}).`;
   },
+  // Agent Runtime v3, Wave 4 -- this was missing since Wave 1 introduced
+  // resultEntity() (create_organization got it, create_asset didn't),
+  // which meant "esse ativo"/"esse ônibus" could never resolve to a
+  // just-created asset -- exactly the master prompt's own Maintenance
+  // example ("esse ônibus está fazendo um barulho estranho, abre uma
+  // manutenção"). ASSET already maps to CURRENT_ASSET in
+  // entity-context.ts's DOMAIN_TO_RELATION (used since Wave 1 for READ
+  // tools), just never populated by a CREATE tool before this.
+  resultEntity(_data, args) {
+    return args.name ? { entityType: "ASSET", displayName: args.name } : null;
+  },
   async execute(args, _ctx, scope) {
     const ownership = validateOwnership({});
     if ("error" in ownership) return { ok: false, error: ownership.error };

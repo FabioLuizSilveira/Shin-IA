@@ -60,6 +60,46 @@ describe("Wave 1 — resolveReferentialExpression: the real reported case", () =
   });
 });
 
+describe("Wave 4 — 'esse ativo'/'esse veículo' resolves to CURRENT_ASSET (the master prompt's own Maintenance example)", () => {
+  function assetEntity(
+    overrides: Partial<ConversationEntityReference> = {},
+  ): ConversationEntityReference {
+    return entity({
+      entityType: "ASSET",
+      entityId: "22222222-2222-2222-2222-222222222222",
+      displayName: "Honda CG",
+      relation: "CURRENT_ASSET",
+      ...overrides,
+    });
+  }
+
+  it("'esse ônibus está fazendo um barulho estranho' resolves the recent CURRENT_ASSET", () => {
+    const recent = [assetEntity()];
+    const result = resolveReferentialExpression(
+      "esse ônibus está fazendo um barulho estranho, abre uma manutenção",
+      recent,
+    );
+    expect(result.status).toBe("RESOLVED");
+    expect(result.entity?.entityId).toBe(assetEntity().entityId);
+  });
+
+  it("'esse ativo'/'esse veículo' also resolve", () => {
+    const recent = [assetEntity()];
+    expect(resolveReferentialExpression("esse ativo precisa de manutenção", recent).status).toBe(
+      "RESOLVED",
+    );
+    expect(resolveReferentialExpression("vamos vistoriar esse veículo", recent).status).toBe(
+      "RESOLVED",
+    );
+  });
+
+  it("no recent ASSET entity -> NONE, never resolved against an unrelated entity", () => {
+    const recent = [entity()]; // only a CURRENT_CUSTOMER
+    const result = resolveReferentialExpression("esse ativo precisa de manutenção", recent);
+    expect(result.status).toBe("NONE");
+  });
+});
+
 describe("Wave 1 — ambiguity is never silently guessed (spec section 10)", () => {
   it("two customers named the same -> name-echo match is AMBIGUOUS, not an arbitrary pick", () => {
     const recent = [

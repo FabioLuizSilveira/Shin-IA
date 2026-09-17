@@ -137,6 +137,13 @@ Campos possíveis: "passengerCount" (número), "scheduledStartsAt" (ISO 8601, da
 Campos possíveis: "scheduledStartsAt" (ISO 8601, data/hora do atendimento), "scheduledEndsAt" (ISO 8601, data/hora estimada de término — se não disponível, estime 2 horas após o início), "origin" (string, local de origem), "destination" (string, destino).`,
   CREATE_RENTAL: `Extraia o período de uma locação (aluguel) de veículo a partir da mensagem do usuário.
 Campos possíveis: "scheduledStartsAt" (ISO 8601, data/hora de retirada do veículo), "scheduledEndsAt" (ISO 8601, data/hora de devolução do veículo). Nunca invente um veículo ou cliente — isso não é extraído daqui.`,
+  // Agent Runtime v3, Wave 4 -- mirrors maintenance-service.ts's real
+  // MaintenanceOrderType, never invents a value outside this set.
+  CREATE_MAINTENANCE_REQUEST: `Extraia dados de uma abertura de ordem de manutenção a partir da mensagem do usuário.
+Campos possíveis: "maintenanceType" (um de: "preventive", "corrective", "predictive", "emergency" -- escolha "corrective" se o usuário descreve um problema/barulho/defeito já existente, "emergency" se for urgente, "preventive" se for manutenção de rotina/agendada), "description" (string, breve descrição do problema ou serviço), "scheduledAt" (ISO 8601, data/hora agendada, se mencionada).`,
+  // Mirrors inspection-service.ts's real InspectionType/InspectionPurpose.
+  CREATE_INSPECTION: `Extraia dados de uma vistoria/inspeção a partir da mensagem do usuário.
+Campos possíveis: "inspectionType" (um de: "pre_delivery", "check_in", "check_out", "return", "periodic", "maintenance", "damage", "custom" -- escolha "check_out" para vistoria antes de entregar/liberar o veículo, "check_in" para vistoria no retorno/devolução), "purpose" (um de: "check_in", "check_out" -- geralmente o mesmo sentido do inspectionType).`,
 };
 
 // Extraction never invents a tenant-configurable timezone (no such
@@ -152,6 +159,11 @@ interface RawExtraction {
   scheduledEndsAt?: unknown;
   origin?: unknown;
   destination?: unknown;
+  maintenanceType?: unknown;
+  description?: unknown;
+  scheduledAt?: unknown;
+  inspectionType?: unknown;
+  purpose?: unknown;
 }
 
 function parseExtraction(text: string): Record<string, unknown> | null {
@@ -169,6 +181,11 @@ function parseExtraction(text: string): Record<string, unknown> | null {
     if (typeof raw.scheduledEndsAt === "string") out.scheduledEndsAt = raw.scheduledEndsAt;
     if (typeof raw.origin === "string") out.origin = raw.origin;
     if (typeof raw.destination === "string") out.destination = raw.destination;
+    if (typeof raw.maintenanceType === "string") out.maintenanceType = raw.maintenanceType;
+    if (typeof raw.description === "string") out.description = raw.description;
+    if (typeof raw.scheduledAt === "string") out.scheduledAt = raw.scheduledAt;
+    if (typeof raw.inspectionType === "string") out.inspectionType = raw.inspectionType;
+    if (typeof raw.purpose === "string") out.purpose = raw.purpose;
     return out;
   } catch {
     return null;

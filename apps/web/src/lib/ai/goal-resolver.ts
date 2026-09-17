@@ -5,10 +5,18 @@
 // message means; this classifies WHAT the user is trying to accomplish
 // across the whole conversation). Wave 2 started with only Towing/
 // Transport (real domain services already existed for those); Wave 3
-// adds CREATE_RENTAL now that Wave 2.5 built the real Rental domain
-// (rental-service.ts) it needs to wire to.
+// added CREATE_RENTAL once Wave 2.5 built the real Rental domain
+// (rental-service.ts). Wave 4 ("Multi-Domain") adds
+// CREATE_MAINTENANCE_REQUEST/CREATE_INSPECTION, wired to real domain
+// services newly extracted from their HTTP routes (maintenance-service.ts,
+// inspection-service.ts) rather than a parallel Agent-only engine.
 
-export type GoalType = "CREATE_TOWING_REQUEST" | "CREATE_TRANSPORT_REQUEST" | "CREATE_RENTAL";
+export type GoalType =
+  | "CREATE_TOWING_REQUEST"
+  | "CREATE_TRANSPORT_REQUEST"
+  | "CREATE_RENTAL"
+  | "CREATE_MAINTENANCE_REQUEST"
+  | "CREATE_INSPECTION";
 
 interface GoalRule {
   type: GoalType;
@@ -18,24 +26,49 @@ interface GoalRule {
 // Tight-ish patterns (not the wide-gap style) — same lesson Wave 5 v2
 // learned the hard way: keep the trigger word close to its real meaning
 // rather than letting arbitrary text between words cause a false match.
+//
+// ORDER MATTERS (Wave 4 real bug, live-tested): resolveGoalType returns
+// the FIRST matching rule. CREATE_TRANSPORT_REQUEST's pattern is a bare
+// vehicle-noun mention ("ônibus"/"van"), the weakest signal of the whole
+// set -- a real message like "esse ônibus está fazendo um barulho
+// estranho, abre uma manutenção" mentions the vehicle AND the actual
+// intent word ("manutenção") in the same sentence, and used to resolve
+// to CREATE_TRANSPORT_REQUEST simply because that rule came first in
+// the array, even though the user never asked for a transport service.
+// Every other rule matches on a specific ACTION/INTENT word (guincho,
+// locação, manutenção, vistoria), so they're ordered before the generic
+// vehicle-noun rule, which stays last as the catch-all.
 const GOAL_RULES: GoalRule[] = [
   {
     type: "CREATE_TOWING_REQUEST",
     pattern: /\b(guincho|reboqu\w*|rebocar)\b/i,
   },
   {
+    type: "CREATE_RENTAL",
+    pattern: /\b(alug\w*|loca[cç][aã]o|locar)\b/i,
+  },
+  {
+    type: "CREATE_MAINTENANCE_REQUEST",
+    pattern: /\b(manuten[cç][aã]o|conserto|consertar)\b/i,
+  },
+  {
+    // No leading \b before [ií]nspe... would be fine here (plain ASCII
+    // "i"), but keeping the same accented-vowel caution this file has
+    // twice already paid for the hard way: "vistoria"/"inspecao" both
+    // start/end in plain ASCII letters, so a normal \b works on both
+    // ends.
+    type: "CREATE_INSPECTION",
+    pattern: /\b(vistoria|inspe[cç][aã]o|inspecionar)\b/i,
+  },
+  {
     // No leading \b before [oô]nibus — "ô" isn't a \w character in a
     // plain JS regex (same lesson intent-router.ts's "onde está" fix
     // learned in Wave 6 v2), so \b right before it can never match. The
     // trailing \b after "nibus"/"van"/"passageiros" is fine (those end
-    // in plain ASCII letters).
+    // in plain ASCII letters). Kept LAST — see the ordering note above.
     type: "CREATE_TRANSPORT_REQUEST",
     pattern:
       /([oô]nibus|micro[- ]?[oô]nibus|\bvan\b|transporte\s+de\s+passageiros|\d+\s*passageiros)\b/i,
-  },
-  {
-    type: "CREATE_RENTAL",
-    pattern: /\b(alug\w*|loca[cç][aã]o|locar)\b/i,
   },
 ];
 
@@ -127,12 +160,47 @@ export const GOAL_REQUIREMENTS: Record<GoalType, GoalRequirementSpec[]> = {
     { key: "scheduledStartsAt", required: true, label: "a data/hora de retirada" },
     { key: "scheduledEndsAt", required: true, label: "a data/hora de devolução" },
   ],
+  // Mirrors maintenance-service.ts's real CreateMaintenanceOrderInput
+  // (Wave 4) — assetId is usually already known via Wave 1's entity
+  // resolver ("esse ônibus" → recent/current Asset, per the master
+  // prompt's own example) rather than searched fresh; the searchTool
+  // hint is the fallback for when it isn't.
+  CREATE_MAINTENANCE_REQUEST: [
+    {
+      key: "assetId",
+      required: true,
+      label: "o veículo/ativo",
+      hint: "chame list_assets para encontrar o ativo e pergunte ao usuário qual é, a menos que já tenha sido resolvido pelo contexto da conversa — nunca escolha sozinho se houver mais de uma opção",
+      searchTool: "list_assets",
+    },
+    {
+      key: "maintenanceType",
+      required: true,
+      label: "o tipo de manutenção (preventiva, corretiva, preditiva ou emergência)",
+    },
+    { key: "description", required: true, label: "uma breve descrição do problema ou serviço" },
+    { key: "scheduledAt", required: false, label: "a data/hora agendada" },
+  ],
+  // Mirrors inspection-service.ts's real CreateInspectionInput (Wave 4).
+  CREATE_INSPECTION: [
+    {
+      key: "assetId",
+      required: true,
+      label: "o veículo/ativo",
+      hint: "chame list_assets para encontrar o ativo e pergunte ao usuário qual é, a menos que já tenha sido resolvido pelo contexto da conversa — nunca escolha sozinho se houver mais de uma opção",
+      searchTool: "list_assets",
+    },
+    { key: "inspectionType", required: true, label: "o tipo de vistoria" },
+    { key: "purpose", required: true, label: "a finalidade da vistoria (entrada ou saída)" },
+  ],
 };
 
 export const GOAL_MUTATION_TOOL: Record<GoalType, string> = {
   CREATE_TRANSPORT_REQUEST: "create_transport_request",
   CREATE_TOWING_REQUEST: "create_towing_request",
   CREATE_RENTAL: "create_rental",
+  CREATE_MAINTENANCE_REQUEST: "create_maintenance_request",
+  CREATE_INSPECTION: "create_inspection",
 };
 
 /** The `agent_goals.domain` value for each goal type — reuses the same
@@ -142,6 +210,8 @@ export const GOAL_DOMAIN: Record<GoalType, string> = {
   CREATE_TRANSPORT_REQUEST: "PASSENGER_TRANSPORT",
   CREATE_TOWING_REQUEST: "TOWING",
   CREATE_RENTAL: "RENTAL",
+  CREATE_MAINTENANCE_REQUEST: "MAINTENANCE",
+  CREATE_INSPECTION: "INSPECTION",
 };
 
 export type NextBestAction =
