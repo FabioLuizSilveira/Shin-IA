@@ -16,6 +16,12 @@ import { classifyIntent } from "@/lib/ai/intent-router";
 import { filterToolsByIntent } from "@/lib/ai/capability-router";
 import { resolveAgentModelTier, resolveModelForTier } from "@/lib/ai/model-router";
 import {
+  ensureConversation,
+  getRecentEntities,
+  resolveReferentialExpression,
+  buildEntityContextNote,
+} from "@/lib/ai/entity-context";
+import {
   runAiGateway,
   AiPolicyError,
   InsufficientCreditsError,
@@ -84,6 +90,11 @@ export async function POST(req: NextRequest) {
     currentModule?: string;
     currentResource?: { type: string; id: string };
     attachments?: AgentAttachmentInput[];
+    // Agent Runtime v3, Wave 1 — client-generated (crypto.randomUUID()),
+    // stable for the lifetime of one drawer session. Optional so an
+    // older client (or any caller that predates this wave) keeps working
+    // exactly as before, just without conversation memory.
+    conversationId?: string;
   };
   if (!body.query?.trim()) {
     return NextResponse.json({ error: "query is required" }, { status: 400 });
@@ -140,7 +151,65 @@ export async function POST(req: NextRequest) {
   const availableMutationTools = await mutationRegistry.listAvailable(scope, ctx);
   const mutationToolNames = new Set(availableMutationTools.map((t) => t.name));
 
-  const queryText = documentText ? `${body.query.trim()}\n\n${documentText}` : body.query.trim();
+  let queryText = documentText ? `${body.query.trim()}\n\n${documentText}` : body.query.trim();
+
+  // Agent Runtime v3, Wave 1 (spec sections 7-10) — the real fix for
+  // "esse cliente que acabamos de cadastrar": resolve any referential
+  // expression against this conversation's recently created/selected
+  // entities BEFORE the model ever sees the message, and inject the
+  // resolved entity's FRESH data (never the remembered snapshot — spec
+  // section 43) so the model has what it needs this turn instead of
+  // asking again. An ambiguous match short-circuits with a clarifying
+  // question (spec section 10: never choose silently) rather than
+  // spending an LLM call on a guess.
+  let conversationId: string | null = null;
+  if (body.conversationId) {
+    conversationId = await ensureConversation(
+      scope.db,
+      scope.tenantId,
+      scope.userId,
+      body.conversationId,
+    );
+    const recentEntities = await getRecentEntities(scope.db, scope.tenantId, conversationId);
+    const resolution = resolveReferentialExpression(queryText, recentEntities);
+
+    if (resolution.status === "AMBIGUOUS" && resolution.candidates) {
+      void logActivity(scope.db, {
+        tenantId: scope.tenantId,
+        actorId: scope.userId,
+        entityType: "ai_agent",
+        entityId: crypto.randomUUID(),
+        action: AI_AGENT_EVENTS.ENTITY_AMBIGUOUS,
+        metadata: { candidateCount: resolution.candidates.length },
+      });
+      const names = resolution.candidates.map((c) => `"${c.displayName}"`).join(", ");
+      return NextResponse.json({
+        data: {
+          text: `Encontrei mais de uma opção que pode ser essa: ${names}. Qual delas você quer dizer?`,
+          toolsUsed: [],
+          creditsConsumed: 0,
+        },
+      });
+    }
+
+    if (resolution.status === "RESOLVED" && resolution.entity) {
+      const note = await buildEntityContextNote(scope.db, scope.tenantId, resolution.entity);
+      if (note) {
+        queryText = `${queryText}\n\n${note}`;
+        void logActivity(scope.db, {
+          tenantId: scope.tenantId,
+          actorId: scope.userId,
+          entityType: "ai_agent",
+          entityId: crypto.randomUUID(),
+          action: AI_AGENT_EVENTS.ENTITY_RESOLVED,
+          metadata: {
+            entityType: resolution.entity.entityType,
+            relation: resolution.entity.relation,
+          },
+        });
+      }
+    }
+  }
 
   // Agent Runtime Architecture v2, Wave 2 — Intent Router + Capability
   // Router + Dynamic Tool Filter (spec sections 8-11), behind a feature
@@ -359,6 +428,7 @@ export async function POST(req: NextRequest) {
             ctx,
             scope,
             availableMutationTools,
+            conversationId ?? undefined,
           );
           toolsUsed.push(toolUse.name);
 

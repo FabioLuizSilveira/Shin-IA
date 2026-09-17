@@ -99,6 +99,10 @@ export class MutationToolRegistry {
     ctx: AgentContext,
     scope: TenantScope,
     available: AgentMutationTool[],
+    // Agent Runtime v3, Wave 1 -- optional so every existing caller
+    // (tests included) keeps working unchanged; only route.ts passes a
+    // real one once a conversationId exists for the request.
+    conversationId?: string,
   ): Promise<{ ok: true; plan: ProposedPlan } | { ok: false; error: string }> {
     const tool = available.find((t) => t.name === name);
     if (!tool)
@@ -158,6 +162,7 @@ export class MutationToolRegistry {
         args,
         summary,
         payload_hash: payloadHash,
+        conversation_id: conversationId ?? null,
       })
       .select("id")
       .single();

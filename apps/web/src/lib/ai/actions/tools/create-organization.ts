@@ -86,6 +86,9 @@ export const createOrganizationTool: AgentMutationTool<Args> = {
     if (args.phone?.trim()) fields.push({ label: "Telefone", value: args.phone });
     return fields;
   },
+  resultEntity(_data, args) {
+    return args.name ? { entityType: "ORGANIZATION", displayName: args.name } : null;
+  },
   async execute(args, _ctx, scope) {
     const { data: created, error: insertError } = await scope.db
       .from("organizations")

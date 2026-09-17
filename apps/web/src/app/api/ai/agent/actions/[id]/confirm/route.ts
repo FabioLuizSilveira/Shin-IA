@@ -6,6 +6,7 @@ import { buildMutationToolRegistry } from "@/lib/ai/actions/tools";
 import { AI_ACTION_EVENTS } from "@/lib/ai/audit-events";
 import { logActivity } from "@/lib/activity-log";
 import { hasValidStepUp } from "@/lib/auth/require-step-up";
+import { recordEntityReference, relationForDomain } from "@/lib/ai/entity-context";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ interface PlanRow {
   args: Record<string, unknown>;
   status: string;
   expires_at: string;
+  conversation_id: string | null;
 }
 
 // The ONLY place a Wave 6 mutation actually runs — the tool loop
@@ -35,7 +37,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: plan, error: fetchError } = await scope.db
     .from("agent_action_plans")
-    .select("id, tool_name, risk_level, requires_aal2, args, status, expires_at")
+    .select("id, tool_name, risk_level, requires_aal2, args, status, expires_at, conversation_id")
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
@@ -118,5 +120,26 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   });
 
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 422 });
+
+  // Agent Runtime v3, Wave 1 (spec sections 8-9, 35) — the moment a
+  // mutation actually succeeds is the ONLY correct moment to remember its
+  // entity: before this, it doesn't exist yet; a failed execute() must
+  // never populate conversation memory with something that was never
+  // really created.
+  if (row.conversation_id && tool.resultEntity) {
+    const described = tool.resultEntity(result.data, row.args);
+    const relation = described ? relationForDomain(described.entityType) : null;
+    const entityId = (result.data as { id?: string } | undefined)?.id;
+    if (described && relation && entityId) {
+      void recordEntityReference(scope.db, scope.tenantId, row.conversation_id, {
+        entityType: described.entityType,
+        entityId,
+        displayName: described.displayName,
+        relation,
+        source: "CREATED_IN_CONVERSATION",
+      });
+    }
+  }
+
   return NextResponse.json({ data: result.data });
 }

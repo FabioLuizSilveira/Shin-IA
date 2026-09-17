@@ -54,6 +54,15 @@ export interface AgentMutationTool<TArgs = Record<string, unknown>> {
     ctx: AgentContext,
     scope: TenantScope,
   ): Promise<{ label: string; value: string }[]>;
+  /** Agent Runtime v3, Wave 1 (spec sections 8-9, 35) — for a tool whose
+   * successful execute() brings a genuinely new/resolvable entity into
+   * existence (create_organization, create_asset, ...), names it so the
+   * confirm route can remember it for this conversation ("esse cliente
+   * que acabamos de cadastrar" needs SOMETHING to resolve against).
+   * Returns null when the result doesn't represent a rememberable entity
+   * (e.g. mark_notifications_read). Optional — a tool without this
+   * simply produces no conversation memory, same as before this wave. */
+  resultEntity?(data: unknown, args: TArgs): { entityType: ToolDomain; displayName: string } | null;
   /** The real mutation. Only ever invoked by the confirm endpoint. */
   execute(args: TArgs, ctx: AgentContext, scope: TenantScope): Promise<ToolResult>;
 }

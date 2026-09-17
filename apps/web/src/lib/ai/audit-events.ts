@@ -26,6 +26,13 @@ export const AI_AGENT_EVENTS = {
   // model name, so the pilot's real tier distribution can be audited
   // without re-deriving it from ai_gateway_usage rows.
   MODEL_ROUTED: "AI_AGENT_MODEL_ROUTED",
+  // Agent Runtime v3, Wave 1 (spec section 45) — only fired when the
+  // request carries a conversationId. Never logs the entity's own data,
+  // only its type/relation — the agent_conversation_entities row itself
+  // is the auditable record of which entity, this is just the resolver's
+  // own decision trail.
+  ENTITY_RESOLVED: "AGENT_ENTITY_RESOLVED",
+  ENTITY_AMBIGUOUS: "AGENT_ENTITY_AMBIGUOUS",
 } as const;
 
 // Wave 6 — Guided Actions. PROPOSED fires from the tool loop (never a

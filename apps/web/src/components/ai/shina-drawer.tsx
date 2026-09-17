@@ -101,6 +101,14 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  // Agent Runtime v3, Wave 1 — one stable id per drawer session (lazy
+  // useState initializer, computed once on mount), sent with every
+  // request so the server can remember entities across messages ("esse
+  // cliente que acabamos de cadastrar"). Never persisted beyond this
+  // component's lifetime — closing and reopening the drawer starts a
+  // fresh conversation, matching the master prompt's own "goal
+  // continuity" scope (session-level, not indefinite).
+  const [conversationId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
@@ -255,6 +263,7 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
           query: query || "Veja o(s) anexo(s) enviado(s).",
           currentModule,
           currentResource,
+          conversationId,
           attachments: pendingAttachments.length
             ? pendingAttachments.map(({ name, mimeType, dataBase64 }) => ({
                 name,
