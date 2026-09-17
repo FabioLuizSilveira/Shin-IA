@@ -29,7 +29,15 @@ export type ToolDomain =
   | "INTELLIGENCE"
   | "PLATFORM_HELP"
   | "OPERATION"
-  | "NOTIFICATION";
+  | "NOTIFICATION"
+  // Agent Runtime v3, Wave 2 — distinct from the generic "OPERATION"
+  // domain above (which stays unused so far): Towing and Passenger
+  // Transport are real, purpose-built business processes with their own
+  // domain services (towing-service.ts, trip-service.ts), not a generic
+  // scheduled task. Kept as their own domains for clarity, matching how
+  // the master prompt itself treats them as distinct goal domains.
+  | "TOWING"
+  | "PASSENGER_TRANSPORT";
 
 export type ToolIntent =
   | "SEARCH"
@@ -58,6 +66,8 @@ export const TOOL_DOMAINS: readonly ToolDomain[] = [
   "PLATFORM_HELP",
   "OPERATION",
   "NOTIFICATION",
+  "TOWING",
+  "PASSENGER_TRANSPORT",
 ];
 
 export const TOOL_INTENTS: readonly ToolIntent[] = [

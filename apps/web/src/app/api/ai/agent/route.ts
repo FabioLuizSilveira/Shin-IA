@@ -6,7 +6,7 @@ import { buildAgentContext } from "@/lib/ai/agent-context";
 import { buildAgentToolRegistry } from "@/lib/ai/tools";
 import { buildMutationToolRegistry } from "@/lib/ai/actions/tools";
 import type { ProposedPlan } from "@/lib/ai/actions/mutation-registry";
-import { AI_AGENT_EVENTS, AI_ACTION_EVENTS } from "@/lib/ai/audit-events";
+import { AI_AGENT_EVENTS, AI_ACTION_EVENTS, AI_GOAL_EVENTS } from "@/lib/ai/audit-events";
 import {
   AttachmentError,
   processAttachments,
@@ -21,6 +21,14 @@ import {
   resolveReferentialExpression,
   buildEntityContextNote,
 } from "@/lib/ai/entity-context";
+import { resolveGoalType, computeNextBestAction, GOAL_MUTATION_TOOL } from "@/lib/ai/goal-resolver";
+import {
+  getActiveGoal,
+  createGoal,
+  updateGoalState,
+  extractGoalSlots,
+  type AgentGoal,
+} from "@/lib/ai/agent-goal";
 import {
   runAiGateway,
   AiPolicyError,
@@ -148,7 +156,12 @@ export async function POST(req: NextRequest) {
   const registry = buildAgentToolRegistry();
   const availableTools = await registry.listAvailable(scope, ctx);
   const mutationRegistry = buildMutationToolRegistry();
-  const availableMutationTools = await mutationRegistry.listAvailable(scope, ctx);
+  // Agent Runtime v3, Wave 2 — mutable: the goal orchestrator below may
+  // remove a goal's own mutation tool from this list for a turn where
+  // NextBestAction isn't EXECUTE yet (structural guard, not just a
+  // prompt instruction — see the block below for why a prompt-only
+  // "don't call this yet" was live-verified NOT to work).
+  let availableMutationTools = await mutationRegistry.listAvailable(scope, ctx);
   const mutationToolNames = new Set(availableMutationTools.map((t) => t.name));
 
   let queryText = documentText ? `${body.query.trim()}\n\n${documentText}` : body.query.trim();
@@ -163,6 +176,18 @@ export async function POST(req: NextRequest) {
   // question (spec section 10: never choose silently) rather than
   // spending an LLM call on a guess.
   let conversationId: string | null = null;
+  let activeGoal: AgentGoal | null = null;
+  // Moved up from the v2 dynamic-routing block below (spec section 34:
+  // the goal orchestrator's own forcing takes PRIORITY over the general
+  // Intent/Capability Router's forcing — see the guard where that block
+  // sets this further down, it only applies if still null).
+  let forcedToolName: string | null = null;
+  // Declared here (not with the other per-turn accumulators further
+  // down) so both the Wave 2 goal-slot extraction call below and the
+  // Wave 2 v2 Intent Router's own classification call — real, metered AI
+  // Gateway calls in their own right (spec section 41) — fold into the
+  // same total the response reports, never an untracked cost.
+  let totalCreditsConsumed = 0;
   if (body.conversationId) {
     conversationId = await ensureConversation(
       scope.db,
@@ -192,7 +217,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    let resolvedCustomerOrgId: string | null = null;
     if (resolution.status === "RESOLVED" && resolution.entity) {
+      if (resolution.entity.relation === "CURRENT_CUSTOMER") {
+        resolvedCustomerOrgId = resolution.entity.entityId;
+      }
       const note = await buildEntityContextNote(scope.db, scope.tenantId, resolution.entity);
       if (note) {
         queryText = `${queryText}\n\n${note}`;
@@ -209,6 +238,128 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+
+    // Agent Runtime v3, Wave 2 (spec sections 4, 11-15) — Goal Resolution
+    // + Workflow Orchestration, validated against Towing and Passenger
+    // Transport per explicit decision (real domain services already
+    // exist for these two; Rental does not yet — see this wave's
+    // report). Resumes an already-ACTIVE goal for this conversation
+    // before trying to start a new one (spec section 6: a follow-up
+    // message like "o Mobi" or "amanhã às 9" never re-triggers the
+    // keyword classifier, it just keeps feeding the same goal).
+    activeGoal = await getActiveGoal(scope.db, scope.tenantId, conversationId);
+    if (activeGoal) {
+      void logActivity(scope.db, {
+        tenantId: scope.tenantId,
+        actorId: scope.userId,
+        entityType: "agent_goal",
+        entityId: activeGoal.id,
+        action: AI_GOAL_EVENTS.RESUMED,
+        metadata: { type: activeGoal.type },
+      });
+    } else {
+      const goalType = resolveGoalType(queryText);
+      if (goalType) {
+        const domain = goalType === "CREATE_TOWING_REQUEST" ? "TOWING" : "PASSENGER_TRANSPORT";
+        activeGoal = await createGoal(
+          scope.db,
+          scope.tenantId,
+          scope.userId,
+          conversationId,
+          goalType,
+          domain,
+        );
+        void logActivity(scope.db, {
+          tenantId: scope.tenantId,
+          actorId: scope.userId,
+          entityType: "agent_goal",
+          entityId: activeGoal.id,
+          action: AI_GOAL_EVENTS.CREATED,
+          metadata: { type: goalType },
+        });
+      }
+    }
+
+    if (activeGoal) {
+      const extraction = await extractGoalSlots(
+        scope.db,
+        { workspaceId: ctx.workspaceId, tenantId: ctx.tenantId, userId: ctx.userId },
+        activeGoal.type,
+        queryText,
+        activeGoal.state,
+      );
+      totalCreditsConsumed += extraction.creditsConsumed ?? 0;
+      const patch = { ...extraction.slots };
+      if (resolvedCustomerOrgId && !activeGoal.state.customerOrganizationId) {
+        patch.customerOrganizationId = resolvedCustomerOrgId;
+      }
+      // Defensive second layer, never trust extraction alone: a new
+      // scheduledEndsAt that would land at/before the already-known (or
+      // just-extracted) scheduledStartsAt is dropped rather than
+      // persisted — better to ask again than silently store an invalid
+      // window the real domain service would reject anyway.
+      const effectiveStart = (patch.scheduledStartsAt ?? activeGoal.state.scheduledStartsAt) as
+        | string
+        | undefined;
+      if (
+        typeof patch.scheduledEndsAt === "string" &&
+        effectiveStart &&
+        new Date(patch.scheduledEndsAt) <= new Date(effectiveStart)
+      ) {
+        delete patch.scheduledEndsAt;
+      }
+      const mergedState = await updateGoalState(
+        scope.db,
+        scope.tenantId,
+        activeGoal.id,
+        activeGoal.state,
+        patch,
+      );
+      activeGoal = { ...activeGoal, state: mergedState };
+
+      const nextAction = computeNextBestAction(activeGoal.type, activeGoal.state);
+      void logActivity(scope.db, {
+        tenantId: scope.tenantId,
+        actorId: scope.userId,
+        entityType: "agent_goal",
+        entityId: activeGoal.id,
+        action: AI_GOAL_EVENTS.NEXT_ACTION_SELECTED,
+        metadata: {
+          action: nextAction.action,
+          missingKey: nextAction.action === "ASK_USER" ? nextAction.missingKey : undefined,
+        },
+      });
+
+      const knownEntries = Object.entries(activeGoal.state);
+      const knownSummary =
+        knownEntries.length > 0
+          ? knownEntries.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ")
+          : "nenhum ainda";
+      const goalToolName = GOAL_MUTATION_TOOL[activeGoal.type];
+      if (nextAction.action === "ASK_USER") {
+        const hint = nextAction.hint ? ` (${nextAction.hint})` : "";
+        queryText += `\n\n[Contexto do objetivo em andamento (${activeGoal.type}): dados já conhecidos: ${knownSummary}. Ainda falta: ${nextAction.label}${hint}. NÃO peça de novo os dados já conhecidos acima.]`;
+        // Structural guard, not just a prompt instruction — live-verified
+        // that telling the model "don't call this tool yet" in text
+        // alone did NOT work (gpt-4o-mini repeatedly called
+        // create_transport_request with incomplete/hallucinated args
+        // anyway, same class of unreliability this session's Wave 2 of
+        // Agent Runtime v2 already found and fixed structurally for the
+        // tool catalog in general). Physically removing the goal's own
+        // mutation tool from what's offered this turn makes it
+        // impossible to call, not just discouraged.
+        availableMutationTools = availableMutationTools.filter((t) => t.name !== goalToolName);
+        mutationToolNames.delete(goalToolName);
+        if (nextAction.searchTool) forcedToolName = nextAction.searchTool;
+      } else if (nextAction.action === "EXECUTE") {
+        queryText += `\n\n[Contexto do objetivo em andamento (${activeGoal.type}): todos os dados obrigatórios já estão disponíveis (${knownSummary}). Chame agora a ferramenta "${nextAction.toolName}" com esses dados — não pergunte de novo, não peça confirmação em texto.]`;
+        // Same structural approach in the other direction: force the
+        // exact tool via the existing Wave 2 v2 tool_choice mechanism
+        // (see the guard further down that keeps this from being
+        // overwritten by the general Intent Router's own forcing).
+        forcedToolName = goalToolName;
+      }
+    }
   }
 
   // Agent Runtime Architecture v2, Wave 2 — Intent Router + Capability
@@ -219,17 +370,11 @@ export async function POST(req: NextRequest) {
   // classified {domain, intent} — this never replaces the IAM filter
   // above (spec section 13), it only runs after it.
   const dynamicRoutingEnabled = await isFeatureEnabled(scope, "agent.dynamic_tool_routing");
-  let forcedToolName: string | null = null;
   let routedToolDefinitions: OpenAiToolDefinition[] | null = null;
   // Wave 4 -- Model Router. Stays undefined (gateway's bare default,
   // unchanged behavior) unless dynamic routing is on AND actually
   // computes a tier below from the real filter outcome.
   let agentModel: string | undefined;
-  // Declared here (not with the other per-turn accumulators below) so the
-  // Intent Router's own cheap classification call — a real, metered AI
-  // Gateway call in its own right (spec section 41) — is folded into the
-  // same total the response reports, never a separate untracked cost.
-  let totalCreditsConsumed = 0;
   if (dynamicRoutingEnabled) {
     const classification = await classifyIntent(
       scope.db,
@@ -275,7 +420,10 @@ export async function POST(req: NextRequest) {
     });
 
     routedToolDefinitions = filterResult.candidates.map((c) => c.def);
-    if (filterResult.forced) forcedToolName = filterResult.forcedToolName;
+    // Guarded so the goal orchestrator's own forcing (set earlier, above)
+    // always wins — a goal in progress must never be pre-empted by the
+    // general classifier forcing some OTHER tool mid-flow.
+    if (filterResult.forced && !forcedToolName) forcedToolName = filterResult.forcedToolName;
 
     const agentTier = resolveAgentModelTier(filterResult);
     agentModel = resolveModelForTier(agentTier);
@@ -289,10 +437,30 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const allToolDefinitions = routedToolDefinitions ?? [
+  let allToolDefinitions = routedToolDefinitions ?? [
     ...registry.toDefinitions(availableTools),
     ...mutationRegistry.toDefinitions(availableMutationTools),
   ];
+  // Agent Runtime v3, Wave 2 — safety net: forcedToolName may have been
+  // set by the goal orchestrator (above) BEFORE the Capability Router
+  // narrowed the catalog for its own, unrelated classification of this
+  // turn's text. If that narrowing didn't happen to include the goal's
+  // tool, tool_choice would reference a function absent from `tools` —
+  // an OpenAI API error, not a graceful fallback. Make sure the forced
+  // tool's definition is always present, regardless of what the general
+  // classifier decided.
+  if (forcedToolName && !allToolDefinitions.some((t) => t.function.name === forcedToolName)) {
+    const forcedMutationTool = availableMutationTools.find((t) => t.name === forcedToolName);
+    const forcedReadTool = availableTools.find((t) => t.name === forcedToolName);
+    if (forcedMutationTool) {
+      allToolDefinitions = [
+        ...allToolDefinitions,
+        mutationRegistry.toDefinitions([forcedMutationTool])[0],
+      ];
+    } else if (forcedReadTool) {
+      allToolDefinitions = [...allToolDefinitions, registry.toDefinitions([forcedReadTool])[0]];
+    }
+  }
   // Recomputed per turn below, dropping DISCOVERY_TOOL_NAMES once their
   // budget is spent — a live-verified stronger guarantee than telling the
   // model "stop calling this" via a tool result: gpt-4o-mini kept calling
@@ -429,6 +597,7 @@ export async function POST(req: NextRequest) {
             scope,
             availableMutationTools,
             conversationId ?? undefined,
+            activeGoal?.id,
           );
           toolsUsed.push(toolUse.name);
 

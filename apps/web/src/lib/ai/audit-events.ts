@@ -35,6 +35,19 @@ export const AI_AGENT_EVENTS = {
   ENTITY_AMBIGUOUS: "AGENT_ENTITY_AMBIGUOUS",
 } as const;
 
+// Agent Runtime v3, Wave 2 (spec section 45) — goal/workflow lifecycle.
+// Never logs slot VALUES (customer names, dates, ids) in metadata, only
+// type/status/key names — the agent_goals row itself is the auditable
+// record of the real state.
+export const AI_GOAL_EVENTS = {
+  CREATED: "AGENT_GOAL_CREATED",
+  RESUMED: "AGENT_GOAL_RESUMED",
+  UPDATED: "AGENT_GOAL_UPDATED",
+  COMPLETED: "AGENT_GOAL_COMPLETED",
+  CANCELLED: "AGENT_GOAL_CANCELLED",
+  NEXT_ACTION_SELECTED: "AGENT_NEXT_ACTION_SELECTED",
+} as const;
+
 // Wave 6 — Guided Actions. PROPOSED fires from the tool loop (never a
 // mutation), the rest from the confirm/cancel routes.
 export const AI_ACTION_EVENTS = {

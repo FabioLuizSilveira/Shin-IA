@@ -103,6 +103,10 @@ export class MutationToolRegistry {
     // (tests included) keeps working unchanged; only route.ts passes a
     // real one once a conversationId exists for the request.
     conversationId?: string,
+    // Agent Runtime v3, Wave 2 -- links this plan back to the goal whose
+    // NextBestAction=EXECUTE proposed it, so the confirm route can mark
+    // the goal COMPLETED once the mutation actually succeeds.
+    goalId?: string,
   ): Promise<{ ok: true; plan: ProposedPlan } | { ok: false; error: string }> {
     const tool = available.find((t) => t.name === name);
     if (!tool)
@@ -163,6 +167,7 @@ export class MutationToolRegistry {
         summary,
         payload_hash: payloadHash,
         conversation_id: conversationId ?? null,
+        goal_id: goalId ?? null,
       })
       .select("id")
       .single();

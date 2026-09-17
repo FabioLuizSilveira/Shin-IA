@@ -7,6 +7,8 @@ import { AI_ACTION_EVENTS } from "@/lib/ai/audit-events";
 import { logActivity } from "@/lib/activity-log";
 import { hasValidStepUp } from "@/lib/auth/require-step-up";
 import { recordEntityReference, relationForDomain } from "@/lib/ai/entity-context";
+import { setGoalStatus } from "@/lib/ai/agent-goal";
+import { AI_GOAL_EVENTS } from "@/lib/ai/audit-events";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,7 @@ interface PlanRow {
   status: string;
   expires_at: string;
   conversation_id: string | null;
+  goal_id: string | null;
 }
 
 // The ONLY place a Wave 6 mutation actually runs — the tool loop
@@ -37,7 +40,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: plan, error: fetchError } = await scope.db
     .from("agent_action_plans")
-    .select("id, tool_name, risk_level, requires_aal2, args, status, expires_at, conversation_id")
+    .select(
+      "id, tool_name, risk_level, requires_aal2, args, status, expires_at, conversation_id, goal_id",
+    )
     .eq("id", id)
     .eq("tenant_id", scope.tenantId)
     .maybeSingle();
@@ -139,6 +144,23 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         source: "CREATED_IN_CONVERSATION",
       });
     }
+  }
+
+  // Agent Runtime v3, Wave 2 (spec section 15) — NextBestAction=EXECUTE
+  // proposed this plan as the goal's completion step; a successful
+  // confirm here IS the goal completing. A failed execute() (handled by
+  // the early return above) never marks the goal done — it stays
+  // WAITING_CONFIRMATION/ACTIVE so the user can retry.
+  if (row.goal_id) {
+    await setGoalStatus(scope.db, scope.tenantId, row.goal_id, "COMPLETED");
+    void logActivity(scope.db, {
+      tenantId: scope.tenantId,
+      actorId: scope.userId,
+      entityType: "agent_goal",
+      entityId: row.goal_id,
+      action: AI_GOAL_EVENTS.COMPLETED,
+      metadata: { tool: row.tool_name },
+    });
   }
 
   return NextResponse.json({ data: result.data });

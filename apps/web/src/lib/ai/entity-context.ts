@@ -40,6 +40,8 @@ const DOMAIN_TO_RELATION: Partial<Record<ToolDomain, EntityRelation>> = {
   ORGANIZATION: "CURRENT_CUSTOMER",
   ASSET: "CURRENT_ASSET",
   CONTRACT: "CURRENT_CONTRACT",
+  PASSENGER_TRANSPORT: "CURRENT_TRIP",
+  TOWING: "CURRENT_SERVICE_REQUEST",
 };
 
 export function relationForDomain(domain: ToolDomain): EntityRelation | null {

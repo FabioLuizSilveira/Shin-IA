@@ -74,11 +74,20 @@ describe("Wave 1 — Tool Registry v2 baseline", () => {
     expect(names).toContain("list_available_tools");
   });
 
-  it("mutation tool names (create_asset, create_organization, mark_notifications_read) are exported for list_available_tools to merge in — the actual root cause of the original bug: it used to report read tools only, so a model asking itself 'what can I do?' concluded actions like create_organization didn't exist even though they were in the real tools schema", () => {
+  it("mutation tool names (create_asset, create_organization, mark_notifications_read, create_transport_request, create_towing_request) are exported for list_available_tools to merge in — the actual root cause of the original bug: it used to report read tools only, so a model asking itself 'what can I do?' concluded actions like create_organization didn't exist even though they were in the real tools schema", () => {
     expect(allMutationToolNames).toEqual(
-      expect.arrayContaining(["create_asset", "create_organization", "mark_notifications_read"]),
+      expect.arrayContaining([
+        "create_asset",
+        "create_organization",
+        "mark_notifications_read",
+        "create_transport_request",
+        "create_towing_request",
+      ]),
     );
-    expect(allMutationToolNames).toHaveLength(3);
+    // Agent Runtime v3, Wave 2 added the 2 transport/towing tools — this
+    // count is expected to keep growing as more goal types get real
+    // mutation tools; update it deliberately, not by deleting the check.
+    expect(allMutationToolNames).toHaveLength(5);
   });
 
   it("create_organization and the customer read tools carry ORGANIZATION domain metadata (Tool Registry v2, spec section 4)", () => {
