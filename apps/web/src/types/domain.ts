@@ -10,7 +10,25 @@ export interface Tenant {
   created_at: string;
 }
 
-export type OperationType = "delivery" | "pickup" | "maintenance" | "inspection" | "transfer";
+// The `operations` table's real Postgres enum grew well past this
+// original 5-value set (Multi-Operation Architecture + Agent Runtime v3
+// waves each added one via `alter type operation_type add value`) but
+// this TS union was never updated to match — the real, silent cause of
+// raw enum strings ("vehicle_rental") leaking into the UI instead of a
+// PT-BR label, since every TYPE_LABEL dict keyed off this type simply
+// never had an entry for a value TypeScript didn't know existed.
+export type OperationType =
+  | "delivery"
+  | "pickup"
+  | "maintenance"
+  | "inspection"
+  | "transfer"
+  | "passenger_trip"
+  | "towing_service_request"
+  | "water_tank_service_request"
+  | "bulk_material_service_request"
+  | "concrete_mixer_service_request"
+  | "vehicle_rental";
 export type OperationStatus = "pending" | "in_progress" | "completed" | "cancelled" | "failed";
 
 export interface Operation {

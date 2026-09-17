@@ -20,10 +20,10 @@ import { createBillingProvider } from "@shina/billing-platform";
 // tenant_roles.tenant_id, so role *keys* resolved by accident — but the row
 // itself belonged to a different tenant entirely).
 const SYSTEM_ROLES = [
-  { key: "tenant_owner", name: "Tenant Owner" },
-  { key: "tenant_admin", name: "Tenant Administrator" },
-  { key: "fleet_manager", name: "Fleet Manager" },
-  { key: "operations_manager", name: "Operations Manager" },
+  { key: "tenant_owner", name: "Proprietário do Tenant" },
+  { key: "tenant_admin", name: "Administrador do Tenant" },
+  { key: "fleet_manager", name: "Gerente de Frota" },
+  { key: "operations_manager", name: "Gerente de Operações" },
 ] as const;
 
 // Present only for the public, login-first onboarding flow (Unified

@@ -32,6 +32,12 @@ const TYPE_LABEL: Record<OperationType, string> = {
   maintenance: "Manutenção",
   inspection: "Inspeção",
   transfer: "Transferência",
+  passenger_trip: "Transporte de Passageiros",
+  towing_service_request: "Solicitação de Guincho",
+  water_tank_service_request: "Serviço de Caminhão-Pipa",
+  bulk_material_service_request: "Transporte de Material a Granel",
+  concrete_mixer_service_request: "Serviço de Betoneira",
+  vehicle_rental: "Locação de Veículo",
 };
 
 const STATUS_LABEL: Record<OperationStatus, string> = {

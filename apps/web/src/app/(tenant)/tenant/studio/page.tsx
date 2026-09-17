@@ -14,6 +14,22 @@ interface TenantRole {
   permission_count: number;
 }
 
+// The 4 system roles' `name` column was seeded in English for every
+// tenant created before this fix (tenant-provisioning.ts's SYSTEM_ROLES
+// now seeds PT-BR names for new tenants, but existing tenants' rows
+// still hold the old English text) — this dictionary fixes the DISPLAY
+// for every tenant immediately, without a data migration. Keyed off the
+// stable `key` column (never the mutable `name`), same pattern as
+// ENTITY_LABEL/ACTION_LABEL on tenant/activity/page.tsx. A custom,
+// tenant-created role has no entry here and simply falls back to
+// whatever name the tenant actually typed — never overridden.
+const ROLE_LABEL: Record<string, string> = {
+  tenant_owner: "Proprietário do Tenant",
+  tenant_admin: "Administrador do Tenant",
+  fleet_manager: "Gerente de Frota",
+  operations_manager: "Gerente de Operações",
+};
+
 interface TenantPermission {
   id: string;
   key: string;
@@ -206,7 +222,7 @@ export default function TenantStudioPage() {
                       <div className="flex items-center gap-2">
                         <Shield className="w-3.5 h-3.5 text-shina-blue shrink-0" />
                         <p className="text-sm font-medium text-slate-900 dark:text-slate-50 truncate">
-                          {role.name}
+                          {(role.key && ROLE_LABEL[role.key]) ?? role.name}
                         </p>
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">
@@ -223,7 +239,9 @@ export default function TenantStudioPage() {
           <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {selectedRole ? `Permissões de ${selectedRole.name}` : "Selecione um papel"}
+                {selectedRole
+                  ? `Permissões de ${(selectedRole.key && ROLE_LABEL[selectedRole.key]) ?? selectedRole.name}`
+                  : "Selecione um papel"}
               </h3>
               <button
                 type="button"

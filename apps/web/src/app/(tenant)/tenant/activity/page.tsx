@@ -50,6 +50,14 @@ const ENTITY_LABEL: Record<string, string> = {
   notification: "Notificação",
   resource_location: "Localização de recurso",
   mobile_device: "Dispositivo móvel",
+  // Agent Runtime v2/v3 — the entityType values logActivity() actually
+  // gets called with from apps/web/src/app/api/ai/agent/* and
+  // agent-automations code, none of which had a label before (fell back
+  // to the raw snake_case string).
+  ai_agent: "Assistente Shinã",
+  agent_goal: "Objetivo do assistente",
+  agent_action_plan: "Plano de ação do assistente",
+  agent_automation: "Automação do assistente",
 };
 
 const ACTION_LABEL: Record<string, string> = {
@@ -116,6 +124,44 @@ const ACTION_LABEL: Record<string, string> = {
   signature_cancelled: "Assinatura eletrônica cancelada",
   signature_expired: "Assinatura eletrônica expirada",
   signature_failed: "Assinatura eletrônica falhou",
+  // Agent Runtime v2/v3 (apps/web/src/lib/ai/audit-events.ts) — every
+  // constant in AI_AGENT_EVENTS/AI_GOAL_EVENTS/AI_ACTION_EVENTS/
+  // AI_CREDIT_EVENTS, none of which had a PT-BR label before (rendered
+  // as the raw "AI_AGENT_TOOL_EXECUTED"-style constant value).
+  AI_AGENT_REQUEST: "Pergunta enviada à Shinã",
+  AI_AGENT_RESPONSE: "Resposta da Shinã",
+  AI_AGENT_TOOL_REQUESTED: "Ferramenta solicitada",
+  AI_AGENT_TOOL_EXECUTED: "Ferramenta executada",
+  AI_AGENT_TOOL_DENIED: "Ferramenta negada",
+  AI_AGENT_TOOL_FAILED: "Ferramenta falhou",
+  AI_VOICE_TRANSCRIBED: "Áudio transcrito",
+  AI_AGENT_ATTACHMENT_PROCESSED: "Anexo processado",
+  AI_AGENT_INTENT_CLASSIFIED: "Intenção classificada",
+  AI_AGENT_TOOLS_FILTERED: "Ferramentas filtradas",
+  AI_AGENT_MODEL_ROUTED: "Modelo de IA selecionado",
+  AGENT_ENTITY_RESOLVED: "Entidade identificada",
+  AGENT_ENTITY_AMBIGUOUS: "Entidade ambígua",
+  AGENT_GOAL_CREATED: "Objetivo criado",
+  AGENT_GOAL_RESUMED: "Objetivo retomado",
+  AGENT_GOAL_UPDATED: "Objetivo atualizado",
+  AGENT_GOAL_COMPLETED: "Objetivo concluído",
+  AGENT_GOAL_CANCELLED: "Objetivo cancelado",
+  AGENT_NEXT_ACTION_SELECTED: "Próxima ação definida",
+  AGENT_WORKFLOW_STARTED: "Fluxo iniciado",
+  AGENT_WORKFLOW_RESUMED: "Fluxo retomado",
+  AGENT_WORKFLOW_STEP_COMPLETED: "Etapa do fluxo concluída",
+  AI_ACTION_PROPOSED: "Ação proposta",
+  AI_ACTION_CONFIRMED: "Ação confirmada",
+  AI_ACTION_EXECUTED: "Ação executada",
+  AI_ACTION_EXECUTION_FAILED: "Execução da ação falhou",
+  AI_ACTION_CANCELLED: "Ação cancelada",
+  AI_ACTION_DENIED: "Ação negada",
+  AI_CREDIT_RESERVED: "Créditos reservados",
+  AI_CREDIT_USAGE: "Créditos utilizados",
+  AI_CREDIT_SETTLED: "Créditos liquidados",
+  AI_CREDIT_DENIED: "Créditos insuficientes",
+  AI_CREDIT_PURCHASED: "Créditos comprados",
+  AI_CREDIT_GRANTED: "Créditos concedidos",
 };
 
 function formatDateTime(dt: string) {

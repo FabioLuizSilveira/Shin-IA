@@ -33,6 +33,27 @@ const OPERATION_TYPE_LABEL: Record<string, string> = {
   maintenance: "Manutenção",
   inspection: "Inspeção",
   transfer: "Transferência",
+  passenger_trip: "Transporte de Passageiros",
+  towing_service_request: "Solicitação de Guincho",
+  water_tank_service_request: "Serviço de Caminhão-Pipa",
+  bulk_material_service_request: "Transporte de Material a Granel",
+  concrete_mixer_service_request: "Serviço de Betoneira",
+  vehicle_rental: "Locação de Veículo",
+};
+
+// Same PT-BR wording as tenant/operations/page.tsx's own STATUS_LABEL —
+// duplicated (not shared) because that's the pre-existing convention
+// between these two pages, but MUST stay in sync: without this, the
+// dashboard widget fell back to StatusBadge's generic per-category label
+// ("Erro" for both "cancelled" AND "failed"), while the operations list
+// showed the real, distinct status ("Cancelada") for the exact same row
+// — a real inconsistency bug, not just a missing translation.
+const OPERATION_STATUS_LABEL: Record<string, string> = {
+  pending: "Pendente",
+  in_progress: "Em andamento",
+  completed: "Concluída",
+  cancelled: "Cancelada",
+  failed: "Falhou",
 };
 
 function operationStatusToUi(
@@ -166,7 +187,10 @@ export default function TenantDashboardPage() {
                     })}
                   </p>
                 </div>
-                <StatusBadge status={operationStatusToUi(op.status)} />
+                <StatusBadge
+                  status={operationStatusToUi(op.status)}
+                  label={OPERATION_STATUS_LABEL[op.status]}
+                />
               </li>
             ))}
           </ul>
