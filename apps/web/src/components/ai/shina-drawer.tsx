@@ -23,6 +23,7 @@ import {
   Circle,
 } from "lucide-react";
 import { useToast, RadioCard } from "@shina/design-system";
+import styles from "./shina-drawer.module.css";
 
 interface ActionPlanField {
   label: string;
@@ -525,7 +526,7 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
                   state regardless (a stale tap on an old render is safely
                   rejected, never silently accepted). */}
               {m.offeredOptions && i === messages.length - 1 && (
-                <div className="max-w-[85%] w-full space-y-2">
+                <div className={`max-w-[85%] w-full space-y-2 ${styles.scope}`}>
                   {m.offeredOptions.options.map((option) => (
                     <RadioCard
                       key={option.id}

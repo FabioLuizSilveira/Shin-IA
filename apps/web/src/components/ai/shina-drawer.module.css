@@ -1,0 +1,76 @@
+/*
+ * Agent Runtime v3, Wave 5 fix -- RadioCard (@shina/design-system) reads
+ * its colors from --shina-* CSS custom properties, but nothing in
+ * apps/web defines them globally (mounting @shina/theme's
+ * ShinaThemeProvider app-wide isn't done here either -- same reasoning
+ * already documented in discovery.module.css: it writes onto
+ * document.documentElement with no unmount cleanup, so it would repaint
+ * every other page for as long as any one route needed it). Without a
+ * scope defining them, RadioCard's text/border colors resolve to
+ * nothing and the chips render illegible.
+ *
+ * Unlike discovery.module.css (light-only, that wizard has no dark
+ * mode), this drawer already supports both via Tailwind's `dark:`
+ * classes -- so both blocks are provided here, toggled by the SAME
+ * `.dark` class Tailwind's darkMode: "class" strategy already keys off
+ * (tailwind.config.ts). Values are the real @shina/theme output
+ * (themeToCssVariables(createTheme({ mode, product: "platform" }))),
+ * light block copied verbatim from discovery.module.css's own hand-tuned
+ * light values (including its documented semantic-color darkening for
+ * contrast on white) -- never re-derived by hand a second time.
+ */
+.scope {
+  --shina-primary: #2563eb;
+  --shina-primary-hover: #2563eb;
+  --shina-primary-pressed: #1e40af;
+  --shina-accent: #2563eb;
+
+  --shina-text-title: #0f172a;
+  --shina-text-primary: #0f172a;
+  --shina-text-secondary: #475569;
+  --shina-text-tertiary: #64748b;
+  --shina-text-disabled: #94a3b8;
+
+  --shina-surface-background: #ffffff;
+  --shina-surface-deep: #f8fafc;
+  --shina-surface-raised: #ffffff;
+  --shina-surface-glass: #f8fafc;
+  --shina-surface-glass-hover: #f1f5f9;
+  --shina-surface-overlay: rgba(15, 23, 42, 0.4);
+
+  --shina-border-subtle: #f1f5f9;
+  --shina-border-default: #e2e8f0;
+  --shina-border-strong: #cbd5e1;
+  --shina-border-focus: #2563eb66;
+
+  --shina-gradient: linear-gradient(135deg, #2563eb, #06b6d4);
+  --shina-glow: none;
+}
+
+:global(.dark) .scope {
+  --shina-primary: #2563eb;
+  --shina-primary-hover: #3b82f6;
+  --shina-primary-pressed: #1d4ed8;
+  --shina-accent: #60a5fa;
+
+  --shina-text-title: #ffffff;
+  --shina-text-primary: #e2e8f0;
+  --shina-text-secondary: #94a3b8;
+  --shina-text-tertiary: #64748b;
+  --shina-text-disabled: #475569;
+
+  --shina-surface-background: #0f172a;
+  --shina-surface-deep: #020617;
+  --shina-surface-raised: #1e293b;
+  --shina-surface-glass: rgba(255, 255, 255, 0.04);
+  --shina-surface-glass-hover: rgba(255, 255, 255, 0.07);
+  --shina-surface-overlay: rgba(2, 6, 23, 0.6);
+
+  --shina-border-subtle: rgba(255, 255, 255, 0.05);
+  --shina-border-default: rgba(255, 255, 255, 0.08);
+  --shina-border-strong: rgba(255, 255, 255, 0.16);
+  --shina-border-focus: #2563eb66;
+
+  --shina-gradient: linear-gradient(135deg, #2563eb, #06b6d4);
+  --shina-glow: radial-gradient(circle, #2563eb1a 0%, transparent 70%);
+}
