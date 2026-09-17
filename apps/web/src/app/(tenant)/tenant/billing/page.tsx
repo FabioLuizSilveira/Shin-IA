@@ -8,7 +8,8 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { InvoiceDetail } from "@/components/ui/invoice-detail";
 import { ExportButton } from "@/components/ui/export-button";
-import { CreditCard } from "lucide-react";
+import { Link2 } from "lucide-react";
+import { useToast } from "@shina/design-system";
 import type { Invoice, InvoiceStatus } from "@/types/domain";
 
 const brl = (v: number) =>
@@ -42,6 +43,7 @@ const invoiceStatusLabel: Record<InvoiceStatus, string> = {
 type InvoiceRow = Invoice & Record<string, unknown>;
 
 export default function TenantBillingPage() {
+  const { show } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -63,16 +65,35 @@ export default function TenantBillingPage() {
     void load();
   }, [load]);
 
-  async function handlePay(id: string) {
+  // These invoices are issued BY this tenant TO one of ITS OWN customers
+  // (organizations) — the checkout route builds the Asaas charge using
+  // the ORGANIZATION's own document/email/phone (api/invoices/[id]/checkout),
+  // never the tenant staff member's. Redirecting the staff's own browser
+  // there (the previous behavior) put them on a checkout page addressed
+  // to their customer — confusing, and not something staff should "pay"
+  // themselves. The real action here is generating the payment link and
+  // handing it to the customer (WhatsApp, e-mail, etc.), so this now
+  // creates the charge, copies the real link, and stays on this page —
+  // same "create a link, copy it, tell the user" pattern already
+  // established by inspection-detail.tsx's createShareLink().
+  async function handleGeneratePaymentLink(id: string) {
     setPayingId(id);
     setError(null);
     try {
       const res = await fetch(`/api/invoices/${id}/checkout`, { method: "POST" });
       const json = (await res.json()) as { data?: { url: string }; error?: string };
-      if (!res.ok || !json.data?.url) throw new Error(json.error ?? "Falha ao iniciar pagamento");
-      window.location.href = json.data.url;
+      if (!res.ok || !json.data?.url)
+        throw new Error(json.error ?? "Falha ao gerar link de pagamento");
+      await navigator.clipboard.writeText(json.data.url).catch(() => {});
+      show({
+        message: "Link de pagamento copiado! Envie para o cliente para que ele possa pagar.",
+        variant: "success",
+      });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro inesperado");
+      const message = e instanceof Error ? e.message : "Erro inesperado";
+      setError(message);
+      show({ message, variant: "danger" });
+    } finally {
       setPayingId(null);
     }
   }
@@ -127,12 +148,13 @@ export default function TenantBillingPage() {
           {(row.status === "issued" || row.status === "overdue") && (
             <button
               type="button"
-              onClick={() => void handlePay(row.id)}
+              onClick={() => void handleGeneratePaymentLink(row.id)}
               disabled={payingId === row.id}
+              title="Gera o link de pagamento do cliente e copia para a área de transferência"
               className="flex items-center gap-1.5 text-xs text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-2.5 py-1 rounded-lg font-medium border-0 cursor-pointer"
             >
-              <CreditCard className="w-3.5 h-3.5" />
-              {payingId === row.id ? "Redirecionando..." : "Pagar fatura"}
+              <Link2 className="w-3.5 h-3.5" />
+              {payingId === row.id ? "Gerando link..." : "Copiar link de pagamento"}
             </button>
           )}
         </div>
