@@ -7,9 +7,26 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { InvoiceDetail } from "@/components/ui/invoice-detail";
 import { ExportButton } from "@/components/ui/export-button";
-import { Link2 } from "lucide-react";
+import { Link2, Plus, Trash2, X } from "lucide-react";
 import { useToast } from "@shina/design-system";
 import type { Invoice, InvoiceStatus } from "@/types/domain";
+
+interface FinancialEntry {
+  id: string;
+  type: "expense" | "revenue";
+  description: string;
+  category: string | null;
+  amount_cents: number;
+  currency: string;
+  entry_date: string;
+  notes: string | null;
+  created_at: string;
+}
+
+const ENTRY_TYPE_LABEL: Record<FinancialEntry["type"], string> = {
+  revenue: "Receita",
+  expense: "Despesa",
+};
 
 const brl = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
@@ -49,6 +66,19 @@ export default function TenantBillingPage() {
   const [payingId, setPayingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [entries, setEntries] = useState<FinancialEntry[]>([]);
+  const [entriesLoading, setEntriesLoading] = useState(true);
+  const [showEntryForm, setShowEntryForm] = useState(false);
+  const [entryType, setEntryType] = useState<FinancialEntry["type"]>("expense");
+  const [entryDescription, setEntryDescription] = useState("");
+  const [entryCategory, setEntryCategory] = useState("");
+  const [entryAmount, setEntryAmount] = useState("");
+  const [entryDate, setEntryDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [entryNotes, setEntryNotes] = useState("");
+  const [entrySubmitting, setEntrySubmitting] = useState(false);
+  const [entryFormError, setEntryFormError] = useState<string | null>(null);
+  const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -60,9 +90,80 @@ export default function TenantBillingPage() {
     }
   }, []);
 
+  const loadEntries = useCallback(async () => {
+    setEntriesLoading(true);
+    try {
+      const res = await fetch("/api/financial-entries");
+      const json = (await res.json()) as { data?: FinancialEntry[] };
+      setEntries(json.data ?? []);
+    } finally {
+      setEntriesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadEntries();
+  }, [load, loadEntries]);
+
+  function resetEntryForm() {
+    setEntryType("expense");
+    setEntryDescription("");
+    setEntryCategory("");
+    setEntryAmount("");
+    setEntryDate(new Date().toISOString().slice(0, 10));
+    setEntryNotes("");
+    setEntryFormError(null);
+  }
+
+  async function handleCreateEntry(e: React.FormEvent) {
+    e.preventDefault();
+    setEntrySubmitting(true);
+    setEntryFormError(null);
+    try {
+      const amount = Number(entryAmount.replace(",", "."));
+      const res = await fetch("/api/financial-entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: entryType,
+          description: entryDescription,
+          category: entryCategory || undefined,
+          amount,
+          entry_date: entryDate,
+          notes: entryNotes || undefined,
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Falha ao adicionar lançamento");
+      setShowEntryForm(false);
+      resetEntryForm();
+      await loadEntries();
+      show({ message: "Lançamento adicionado.", variant: "success" });
+    } catch (e) {
+      setEntryFormError(e instanceof Error ? e.message : "Erro inesperado");
+    } finally {
+      setEntrySubmitting(false);
+    }
+  }
+
+  async function handleDeleteEntry(id: string) {
+    setDeletingEntryId(id);
+    try {
+      const res = await fetch(`/api/financial-entries/${id}`, { method: "DELETE" });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Falha ao excluir lançamento");
+      await loadEntries();
+      show({ message: "Lançamento excluído.", variant: "success" });
+    } catch (e) {
+      show({
+        message: e instanceof Error ? e.message : "Erro inesperado",
+        variant: "danger",
+      });
+    } finally {
+      setDeletingEntryId(null);
+    }
+  }
 
   // These invoices are issued BY this tenant TO one of ITS OWN customers
   // (organizations) — the checkout route builds the Asaas charge using
@@ -161,6 +262,58 @@ export default function TenantBillingPage() {
     },
   ];
 
+  type EntryRow = FinancialEntry & Record<string, unknown>;
+
+  const entryColumns = [
+    {
+      key: "type",
+      label: "Tipo",
+      render: (row: EntryRow) => (
+        <StatusBadge
+          status={row.type === "revenue" ? "active" : "error"}
+          label={ENTRY_TYPE_LABEL[row.type]}
+        />
+      ),
+    },
+    { key: "description", label: "Descrição", render: (row: EntryRow) => row.description },
+    {
+      key: "category",
+      label: "Categoria",
+      render: (row: EntryRow) => row.category ?? "—",
+    },
+    {
+      key: "entry_date",
+      label: "Data",
+      render: (row: EntryRow) => new Date(`${row.entry_date}T00:00:00`).toLocaleDateString("pt-BR"),
+    },
+    {
+      key: "amount_cents",
+      label: "Valor",
+      render: (row: EntryRow) => (
+        <span
+          className={`font-semibold ${row.type === "revenue" ? "text-emerald-600" : "text-red-600"}`}
+        >
+          {row.type === "revenue" ? "+" : "-"} {brl(row.amount_cents / 100)}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      label: "",
+      render: (row: EntryRow) => (
+        <button
+          type="button"
+          onClick={() => void handleDeleteEntry(row.id)}
+          disabled={deletingEntryId === row.id}
+          title="Excluir lançamento"
+          className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-60 border-0 bg-transparent cursor-pointer"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      ),
+    },
+  ];
+
   return (
     <AppShell title="Faturamento">
       <SectionHeader
@@ -181,11 +334,165 @@ export default function TenantBillingPage() {
         <p className="text-sm text-slate-500 mt-4 text-center">Nenhuma fatura ainda.</p>
       )}
 
+      <div className="mt-8">
+        <SectionHeader
+          title="Lançamentos"
+          description="Despesas e receitas registradas manualmente."
+          action={
+            <button
+              type="button"
+              onClick={() => setShowEntryForm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-shina-blue text-white hover:bg-blue-600 transition border-0 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Adicionar lançamento
+            </button>
+          }
+        />
+
+        <DataTable columns={entryColumns} data={entries as EntryRow[]} loading={entriesLoading} />
+
+        {!entriesLoading && entries.length === 0 && (
+          <p className="text-sm text-slate-500 mt-4 text-center">Nenhum lançamento ainda.</p>
+        )}
+      </div>
+
       <InvoiceDetail
         invoiceId={selectedId}
         onClose={() => setSelectedId(null)}
         onStatusChange={() => void load()}
       />
+
+      {showEntryForm && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/20 z-40"
+            onClick={() => {
+              setShowEntryForm(false);
+              resetEntryForm();
+            }}
+          />
+          <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl z-50 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
+                Adicionar lançamento
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEntryForm(false);
+                  resetEntryForm();
+                }}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => void handleCreateEntry(e)}
+              className="flex-1 overflow-y-auto px-6 py-6 space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Tipo</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEntryType("expense")}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium border cursor-pointer ${
+                      entryType === "expense"
+                        ? "bg-red-50 border-red-300 text-red-700"
+                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    Despesa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntryType("revenue")}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium border cursor-pointer ${
+                      entryType === "revenue"
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    Receita
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Descrição</label>
+                <input
+                  required
+                  value={entryDescription}
+                  onChange={(e) => setEntryDescription(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">
+                  Categoria (opcional)
+                </label>
+                <input
+                  value={entryCategory}
+                  onChange={(e) => setEntryCategory(e.target.value)}
+                  placeholder="Combustível, Aluguel, Salários..."
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Valor (R$)
+                  </label>
+                  <input
+                    required
+                    inputMode="decimal"
+                    value={entryAmount}
+                    onChange={(e) => setEntryAmount(e.target.value)}
+                    placeholder="0,00"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Data</label>
+                  <input
+                    required
+                    type="date"
+                    value={entryDate}
+                    onChange={(e) => setEntryDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">
+                  Observações (opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={entryNotes}
+                  onChange={(e) => setEntryNotes(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 resize-none"
+                />
+              </div>
+
+              {entryFormError && (
+                <div className="px-3 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                  {entryFormError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={entrySubmitting}
+                className="w-full px-4 py-2.5 bg-shina-blue hover:bg-blue-600 disabled:opacity-60 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer"
+              >
+                {entrySubmitting ? "Adicionando..." : "Adicionar lançamento"}
+              </button>
+            </form>
+          </div>
+        </>
+      )}
     </AppShell>
   );
 }

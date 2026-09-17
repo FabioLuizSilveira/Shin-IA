@@ -58,6 +58,7 @@ const ENTITY_LABEL: Record<string, string> = {
   agent_goal: "Objetivo do assistente",
   agent_action_plan: "Plano de ação do assistente",
   agent_automation: "Automação do assistente",
+  financial_entry: "Lançamento financeiro",
 };
 
 const ACTION_LABEL: Record<string, string> = {

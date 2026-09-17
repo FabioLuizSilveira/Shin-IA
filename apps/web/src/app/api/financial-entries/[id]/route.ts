@@ -1,0 +1,42 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { internalError } from "@/lib/api-error";
+import { requireTenantScope, isReadOnlyScope } from "@/lib/tenant-context";
+import { logActivity } from "@/lib/activity-log";
+
+export const dynamic = "force-dynamic";
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const scope = await requireTenantScope();
+  if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
+  if (isReadOnlyScope(scope)) {
+    return NextResponse.json({ error: "Read-only impersonation session" }, { status: 403 });
+  }
+
+  const { data: existing } = await scope.db
+    .from("financial_entries")
+    .select("id")
+    .eq("id", id)
+    .eq("tenant_id", scope.tenantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!existing) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  const { error } = await scope.db
+    .from("financial_entries")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("tenant_id", scope.tenantId);
+  if (error) return internalError(error);
+
+  void logActivity(scope.db, {
+    tenantId: scope.tenantId,
+    actorId: scope.userId,
+    entityType: "financial_entry",
+    entityId: id,
+    action: "deleted",
+    metadata: {},
+  });
+
+  return NextResponse.json({ data: { ok: true } });
+}
