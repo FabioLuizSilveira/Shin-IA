@@ -137,3 +137,159 @@ export async function getRoutingMetrics(
 
   return metrics;
 }
+
+// Agent Runtime v3, Wave 6 (spec section 46 — this metric list is named
+// explicitly in the master prompt, "duplicate_question_rate deve ser
+// medido" in particular) — the goal/workflow/entity counterpart to
+// getRoutingMetrics() above, same real-evidence-not-a-one-off-test
+// posture (spec section 57: "Do not falsify metrics. Report actual
+// results."). Reads back the AGENT_GOAL_*/AGENT_ENTITY_*/
+// AGENT_WORKFLOW_* events Wave 1-6 have been logging since they were
+// introduced — no new table, no parallel metrics store.
+
+export interface GoalMetrics {
+  windowHours: number;
+  goalsStarted: number;
+  goalsCompleted: number;
+  goalCompletionRate: number;
+  averageTurnsPerGoal: number;
+  /** A goal asking for the SAME missing field twice in a row without any
+   * real progress in between — the master prompt's own regression
+   * definition ("perguntar novamente nome/documento de um Customer já
+   * resolvido é regressão"). Structurally rare by design
+   * (computeNextBestAction only ever asks for a genuinely still-missing
+   * field), so a non-zero rate here is a real signal something's wrong,
+   * not just a KPI to watch. */
+  duplicateQuestionRate: number;
+  entityResolutionSuccessRate: number;
+  entityAmbiguityRate: number;
+  workflowResumeSuccessRate: number;
+}
+
+function emptyGoalMetrics(windowHours: number): GoalMetrics {
+  return {
+    windowHours,
+    goalsStarted: 0,
+    goalsCompleted: 0,
+    goalCompletionRate: 0,
+    averageTurnsPerGoal: 0,
+    duplicateQuestionRate: 0,
+    entityResolutionSuccessRate: 0,
+    entityAmbiguityRate: 0,
+    workflowResumeSuccessRate: 0,
+  };
+}
+
+interface GoalActivityRow {
+  action: string;
+  entity_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export async function getGoalMetrics(
+  db: SupabaseClient,
+  tenantId: string,
+  windowHours = 24,
+): Promise<GoalMetrics> {
+  const since = new Date(Date.now() - windowHours * 3_600_000).toISOString();
+  const { data } = await db
+    .from("tenant_activity_log")
+    .select("action, entity_id, metadata, created_at")
+    .eq("tenant_id", tenantId)
+    .in("action", [
+      "AGENT_WORKFLOW_STARTED",
+      "AGENT_WORKFLOW_RESUMED",
+      "AGENT_WORKFLOW_STEP_COMPLETED",
+      "AGENT_GOAL_COMPLETED",
+      "AGENT_NEXT_ACTION_SELECTED",
+      "AGENT_ENTITY_RESOLVED",
+      "AGENT_ENTITY_AMBIGUOUS",
+    ])
+    .gte("created_at", since)
+    .order("created_at", { ascending: true })
+    .limit(5000);
+
+  const metrics = emptyGoalMetrics(windowHours);
+  const rows = (data ?? []) as GoalActivityRow[];
+  if (rows.length === 0) return metrics;
+
+  let entityResolved = 0;
+  let entityAmbiguous = 0;
+  const startedGoalIds = new Set<string>();
+  const completedGoalIds = new Set<string>();
+  const resumedGoalIds = new Set<string>();
+  const progressedAfterResumeGoalIds = new Set<string>();
+  const turnsPerGoal = new Map<string, number>();
+  // Per-goal ordered ASK_USER history — detects the SAME missingKey
+  // asked twice with no WORKFLOW_STEP_COMPLETED in between.
+  const lastAskedKeyPerGoal = new Map<string, string>();
+  const stepSeenSinceLastAsk = new Set<string>();
+  let askUserEvents = 0;
+  let duplicateAskEvents = 0;
+
+  for (const row of rows) {
+    const m = row.metadata ?? {};
+    const goalId = row.entity_id;
+    switch (row.action) {
+      case "AGENT_ENTITY_RESOLVED":
+        entityResolved++;
+        break;
+      case "AGENT_ENTITY_AMBIGUOUS":
+        entityAmbiguous++;
+        break;
+      case "AGENT_WORKFLOW_STARTED":
+        if (goalId) startedGoalIds.add(goalId);
+        break;
+      case "AGENT_WORKFLOW_RESUMED":
+        if (goalId) resumedGoalIds.add(goalId);
+        break;
+      case "AGENT_GOAL_COMPLETED":
+        if (goalId) completedGoalIds.add(goalId);
+        break;
+      case "AGENT_WORKFLOW_STEP_COMPLETED":
+        if (goalId) {
+          stepSeenSinceLastAsk.add(goalId);
+          if (resumedGoalIds.has(goalId)) progressedAfterResumeGoalIds.add(goalId);
+        }
+        break;
+      case "AGENT_NEXT_ACTION_SELECTED":
+        if (goalId) {
+          turnsPerGoal.set(goalId, (turnsPerGoal.get(goalId) ?? 0) + 1);
+          if (m.action === "ASK_USER" && typeof m.missingKey === "string") {
+            askUserEvents++;
+            const lastKey = lastAskedKeyPerGoal.get(goalId);
+            if (lastKey === m.missingKey && !stepSeenSinceLastAsk.has(goalId)) {
+              duplicateAskEvents++;
+            }
+            lastAskedKeyPerGoal.set(goalId, m.missingKey);
+            stepSeenSinceLastAsk.delete(goalId);
+          }
+        }
+        break;
+    }
+  }
+
+  metrics.goalsStarted = startedGoalIds.size;
+  metrics.goalsCompleted = completedGoalIds.size;
+  metrics.goalCompletionRate =
+    startedGoalIds.size > 0
+      ? Math.round((completedGoalIds.size / startedGoalIds.size) * 1000) / 1000
+      : 0;
+  const totalTurns = [...turnsPerGoal.values()].reduce((a, b) => a + b, 0);
+  metrics.averageTurnsPerGoal =
+    turnsPerGoal.size > 0 ? Math.round((totalTurns / turnsPerGoal.size) * 10) / 10 : 0;
+  metrics.duplicateQuestionRate =
+    askUserEvents > 0 ? Math.round((duplicateAskEvents / askUserEvents) * 1000) / 1000 : 0;
+  const entityTotal = entityResolved + entityAmbiguous;
+  metrics.entityResolutionSuccessRate =
+    entityTotal > 0 ? Math.round((entityResolved / entityTotal) * 1000) / 1000 : 0;
+  metrics.entityAmbiguityRate =
+    entityTotal > 0 ? Math.round((entityAmbiguous / entityTotal) * 1000) / 1000 : 0;
+  metrics.workflowResumeSuccessRate =
+    resumedGoalIds.size > 0
+      ? Math.round((progressedAfterResumeGoalIds.size / resumedGoalIds.size) * 1000) / 1000
+      : 0;
+
+  return metrics;
+}

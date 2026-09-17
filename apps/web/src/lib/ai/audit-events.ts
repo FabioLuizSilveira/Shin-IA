@@ -46,6 +46,18 @@ export const AI_GOAL_EVENTS = {
   COMPLETED: "AGENT_GOAL_COMPLETED",
   CANCELLED: "AGENT_GOAL_CANCELLED",
   NEXT_ACTION_SELECTED: "AGENT_NEXT_ACTION_SELECTED",
+  // Agent Runtime v3, Wave 6 (spec section 45's own literal event list) —
+  // distinct from CREATED/RESUMED: those log the AgentGoal row's own
+  // lifecycle; these log the WORKFLOW's (fired at the same moments,
+  // since this repo has no separate workflow-instance entity — Wave 1's
+  // audit confirmed no generic Workflow Engine exists to track one
+  // separately from AgentGoal). STEP_COMPLETED is narrower than
+  // NEXT_ACTION_SELECTED (which fires every turn, including a turn that
+  // turned out to be an unrelated interruption) — it only fires when the
+  // turn actually advanced the goal's known state.
+  WORKFLOW_STARTED: "AGENT_WORKFLOW_STARTED",
+  WORKFLOW_RESUMED: "AGENT_WORKFLOW_RESUMED",
+  WORKFLOW_STEP_COMPLETED: "AGENT_WORKFLOW_STEP_COMPLETED",
 } as const;
 
 // Wave 6 — Guided Actions. PROPOSED fires from the tool loop (never a

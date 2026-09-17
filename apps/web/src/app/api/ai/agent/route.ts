@@ -328,6 +328,14 @@ export async function POST(req: NextRequest) {
     // message like "o Mobi" or "amanhã às 9" never re-triggers the
     // keyword classifier, it just keeps feeding the same goal).
     activeGoal = await getActiveGoal(scope.db, scope.tenantId, conversationId);
+    // Agent Runtime v3, Wave 6 (spec section 52, "EVAL — INTERRUPTION") —
+    // only true for the turn that actually creates a NEW goal via a real
+    // keyword trigger match; false when resuming an already-ACTIVE goal.
+    // A resumed goal's own turn still needs to prove THIS message
+    // actually relates to it (see `contributedToGoal` below) before this
+    // turn's tool gets structurally forced — a just-created goal always
+    // gets to force, since the trigger match itself is strong evidence.
+    let goalJustCreated = false;
     if (activeGoal) {
       void logActivity(scope.db, {
         tenantId: scope.tenantId,
@@ -335,6 +343,14 @@ export async function POST(req: NextRequest) {
         entityType: "agent_goal",
         entityId: activeGoal.id,
         action: AI_GOAL_EVENTS.RESUMED,
+        metadata: { type: activeGoal.type },
+      });
+      void logActivity(scope.db, {
+        tenantId: scope.tenantId,
+        actorId: scope.userId,
+        entityType: "agent_goal",
+        entityId: activeGoal.id,
+        action: AI_GOAL_EVENTS.WORKFLOW_RESUMED,
         metadata: { type: activeGoal.type },
       });
     } else {
@@ -349,12 +365,21 @@ export async function POST(req: NextRequest) {
           goalType,
           domain,
         );
+        goalJustCreated = true;
         void logActivity(scope.db, {
           tenantId: scope.tenantId,
           actorId: scope.userId,
           entityType: "agent_goal",
           entityId: activeGoal.id,
           action: AI_GOAL_EVENTS.CREATED,
+          metadata: { type: goalType },
+        });
+        void logActivity(scope.db, {
+          tenantId: scope.tenantId,
+          actorId: scope.userId,
+          entityType: "agent_goal",
+          entityId: activeGoal.id,
+          action: AI_GOAL_EVENTS.WORKFLOW_STARTED,
           metadata: { type: goalType },
         });
       }
@@ -431,6 +456,33 @@ export async function POST(req: NextRequest) {
       ) {
         delete patch.scheduledEndsAt;
       }
+      // Agent Runtime v3, Wave 6 (spec section 52) — the real bug this
+      // wave found and fixed: before this, an ACTIVE goal's own tool got
+      // forced via tool_choice on EVERY turn while a slot was still
+      // missing, even when the turn's message had nothing to do with the
+      // goal at all ("ele tem alguma cobrança pendente?" while a rental
+      // was still missing its vehicle would have force-called
+      // list_assets instead of letting the model answer the real
+      // question). `patch` being non-empty is the real, already-computed
+      // signal that THIS turn actually fed the goal (slot extraction,
+      // offered-selection, or entity auto-fill all populate it) — never
+      // an extra classifier call, no new cost. The goal itself is never
+      // touched/reset when this is false (`updateGoalState` with an
+      // empty patch is a no-op merge), so it resumes correctly the next
+      // time the user actually continues it.
+      const contributedToGoal = Object.keys(patch).length > 0;
+      // A plain "continue" message ("beleza, continua a locação" — the
+      // master prompt's OWN resumption phrase) extracts no new slot
+      // either, so `contributedToGoal` alone isn't enough to justify
+      // forcing — also treat the goal's own trigger keyword re-matching
+      // as a legitimate continuation signal (free: resolveGoalType is
+      // the same cheap regex check already used to CREATE a goal, just
+      // re-applied). Kept SEPARATE from `contributedToGoal` because the
+      // audit trail below (UPDATED/WORKFLOW_STEP_COMPLETED) must only
+      // fire when the goal's state actually changed, not merely when
+      // the user said a trigger word with nothing new to record.
+      const looksLikeContinuation =
+        contributedToGoal || resolveGoalType(queryText) === activeGoal.type;
       const mergedState = await updateGoalState(
         scope.db,
         scope.tenantId,
@@ -439,8 +491,32 @@ export async function POST(req: NextRequest) {
         patch,
       );
       activeGoal = { ...activeGoal, state: mergedState };
+      if (contributedToGoal) {
+        // Metadata carries only the KEYS that changed, never their
+        // values (spec section 45: "não colocar PII desnecessária" —
+        // the agent_goals row itself is the auditable record of the
+        // real state, this is only the decision trail).
+        const changedKeys = Object.keys(patch);
+        void logActivity(scope.db, {
+          tenantId: scope.tenantId,
+          actorId: scope.userId,
+          entityType: "agent_goal",
+          entityId: activeGoal.id,
+          action: AI_GOAL_EVENTS.UPDATED,
+          metadata: { type: activeGoal.type, changedKeys },
+        });
+        void logActivity(scope.db, {
+          tenantId: scope.tenantId,
+          actorId: scope.userId,
+          entityType: "agent_goal",
+          entityId: activeGoal.id,
+          action: AI_GOAL_EVENTS.WORKFLOW_STEP_COMPLETED,
+          metadata: { type: activeGoal.type, changedKeys },
+        });
+      }
 
       const nextAction = computeNextBestAction(activeGoal.type, activeGoal.state);
+      const likelyInterruption = !goalJustCreated && !looksLikeContinuation;
       void logActivity(scope.db, {
         tenantId: scope.tenantId,
         actorId: scope.userId,
@@ -450,6 +526,7 @@ export async function POST(req: NextRequest) {
         metadata: {
           action: nextAction.action,
           missingKey: nextAction.action === "ASK_USER" ? nextAction.missingKey : undefined,
+          forced: !likelyInterruption,
         },
       });
 
@@ -473,7 +550,12 @@ export async function POST(req: NextRequest) {
         // impossible to call, not just discouraged.
         availableMutationTools = availableMutationTools.filter((t) => t.name !== goalToolName);
         mutationToolNames.delete(goalToolName);
-        if (nextAction.searchTool) {
+        // Only force the search when this turn actually looks like a
+        // real continuation (see `likelyInterruption` above) — an
+        // unrelated question still gets the context note (the model MAY
+        // still choose to act on it) but is never structurally railroaded
+        // into a tool call that can't possibly answer what was asked.
+        if (nextAction.searchTool && !likelyInterruption) {
           forcedToolName = nextAction.searchTool;
           pendingOfferedField = nextAction.missingKey;
         }
@@ -482,8 +564,10 @@ export async function POST(req: NextRequest) {
         // Same structural approach in the other direction: force the
         // exact tool via the existing Wave 2 v2 tool_choice mechanism
         // (see the guard further down that keeps this from being
-        // overwritten by the general Intent Router's own forcing).
-        forcedToolName = goalToolName;
+        // overwritten by the general Intent Router's own forcing) —
+        // guarded the same way: an unrelated question must never
+        // force-propose a plan the user never asked to finalize.
+        if (!likelyInterruption) forcedToolName = goalToolName;
       }
     }
   }

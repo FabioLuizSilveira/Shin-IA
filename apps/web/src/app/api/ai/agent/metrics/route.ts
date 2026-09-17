@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireTenantScope, isTenantAdmin } from "@/lib/tenant-context";
-import { getRoutingMetrics } from "@/lib/ai/observability";
+import { getRoutingMetrics, getGoalMetrics } from "@/lib/ai/observability";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +21,9 @@ export async function GET(req: NextRequest) {
     Number(req.nextUrl.searchParams.get("hours") ?? 24) || 24,
     MAX_WINDOW_HOURS,
   );
-  const metrics = await getRoutingMetrics(scope.db, scope.tenantId, hours);
-  return NextResponse.json({ data: metrics });
+  const [routing, goals] = await Promise.all([
+    getRoutingMetrics(scope.db, scope.tenantId, hours),
+    getGoalMetrics(scope.db, scope.tenantId, hours),
+  ]);
+  return NextResponse.json({ data: { ...routing, goals } });
 }
