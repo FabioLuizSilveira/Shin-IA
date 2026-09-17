@@ -302,3 +302,21 @@ export function resolveOfferedSelection(
   if (matches.length > 1) return { status: "AMBIGUOUS", candidates: matches };
   return { status: "NONE" };
 }
+
+// Agent Runtime v3, Wave 5 ("UX + Channels") — spec section 39's own
+// requirement: "Botão deve enviar entityId estruturado quando possível.
+// Não depender do LLM reinterpretar o texto do botão." When the client
+// is a UI that rendered `offeredOptions` as tappable chips (see
+// route.ts), the tap submits the option's real id directly instead of
+// its name as free text -- this never runs the fuzzy name-matching
+// above, and it still never trusts the client blindly: the id must be
+// a member of the list this SAME goal turn actually offered, or it's
+// rejected as NONE (a stale/forged id from an old chip render is not
+// silently accepted).
+export function resolveStructuralOfferedSelection(
+  selectedId: string,
+  offered: OfferedOption[],
+): OfferedSelectionResult {
+  const match = offered.find((o) => o.id === selectedId);
+  return match ? { status: "RESOLVED", id: match.id } : { status: "NONE" };
+}

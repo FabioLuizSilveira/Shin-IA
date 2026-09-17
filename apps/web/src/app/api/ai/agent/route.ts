@@ -25,9 +25,12 @@ import {
   resolveGoalType,
   computeNextBestAction,
   resolveOfferedSelection,
+  resolveStructuralOfferedSelection,
+  GOAL_REQUIREMENTS,
   GOAL_MUTATION_TOOL,
   GOAL_DOMAIN,
   type OfferedOption,
+  type GoalType,
 } from "@/lib/ai/goal-resolver";
 import {
   getActiveGoal,
@@ -89,6 +92,53 @@ const DISCOVERY_TOOL_NAMES = new Set([
 ]);
 const MAX_DISCOVERY_CALLS = 1;
 
+// Agent Runtime v3, Wave 5 ("UX + Channels", spec sections 38-39) — the
+// SAME structured payload every channel's client receives; a text-only
+// channel (WhatsApp/voice, today) simply never reads these fields and
+// keeps working off `text` alone (which already spells out the same
+// info in prose), while Web/Mobile can render a real progress card and
+// tappable option chips instead of parsing prose. Computed from
+// `activeGoal` alone (never a duplicate source of truth) so it can
+// never drift from what actually drove this turn's tool routing.
+interface GoalProgressField {
+  key: string;
+  label: string;
+  required: boolean;
+  known: boolean;
+}
+interface GoalProgress {
+  type: GoalType;
+  fields: GoalProgressField[];
+}
+function buildGoalProgress(goal: AgentGoal | null): GoalProgress | undefined {
+  if (!goal) return undefined;
+  return {
+    type: goal.type,
+    fields: GOAL_REQUIREMENTS[goal.type].map((req) => ({
+      key: req.key,
+      label: req.label,
+      required: req.required,
+      known: !(
+        goal.state[req.key] === undefined ||
+        goal.state[req.key] === null ||
+        goal.state[req.key] === ""
+      ),
+    })),
+  };
+}
+
+interface OfferedOptionsPayload {
+  field: string;
+  options: OfferedOption[];
+}
+function buildOfferedOptions(goal: AgentGoal | null): OfferedOptionsPayload | undefined {
+  if (!goal) return undefined;
+  const options = goal.state.__offeredAssets as OfferedOption[] | undefined;
+  const field = goal.state.__offeredAssetsField as string | undefined;
+  if (!options?.length || !field) return undefined;
+  return { field, options };
+}
+
 export async function POST(req: NextRequest) {
   const scope = await requireTenantScope();
   if ("error" in scope) return NextResponse.json({ error: scope.error }, { status: scope.status });
@@ -110,6 +160,13 @@ export async function POST(req: NextRequest) {
     // older client (or any caller that predates this wave) keeps working
     // exactly as before, just without conversation memory.
     conversationId?: string;
+    // Agent Runtime v3, Wave 5 — set when `query` was produced by
+    // tapping a rendered chip/card for a pending `offeredOptions` list
+    // (spec section 39), not typed free text. `query` is still required
+    // and still sent (the option's own label, for a sane message
+    // history/transcript) but resolution of the offered field uses this
+    // id directly instead of fuzzy-matching `query`'s text.
+    selectedOptionId?: string;
   };
   if (!body.query?.trim()) {
     return NextResponse.json({ error: "query is required" }, { status: 400 });
@@ -315,7 +372,9 @@ export async function POST(req: NextRequest) {
       const offeredAssets = activeGoal.state.__offeredAssets as OfferedOption[] | undefined;
       const offeredField = activeGoal.state.__offeredAssetsField as string | undefined;
       if (offeredAssets && offeredField && !activeGoal.state[offeredField]) {
-        const selection = resolveOfferedSelection(queryText, offeredAssets);
+        const selection = body.selectedOptionId
+          ? resolveStructuralOfferedSelection(body.selectedOptionId, offeredAssets)
+          : resolveOfferedSelection(queryText, offeredAssets);
         if (selection.status === "AMBIGUOUS") {
           const names = selection.candidates.map((c) => `"${c.name}"`).join(", ");
           return NextResponse.json({
@@ -323,6 +382,7 @@ export async function POST(req: NextRequest) {
               text: `Encontrei mais de uma opção que pode ser essa: ${names}. Qual delas você quer dizer?`,
               toolsUsed: [],
               creditsConsumed: totalCreditsConsumed,
+              offeredOptions: { field: offeredField, options: selection.candidates },
             },
           });
         }
@@ -600,6 +660,8 @@ export async function POST(req: NextRequest) {
             toolsUsed,
             creditsConsumed: totalCreditsConsumed,
             pendingActionPlans: pendingActionPlans.length ? pendingActionPlans : undefined,
+            goalProgress: buildGoalProgress(activeGoal),
+            offeredOptions: buildOfferedOptions(activeGoal),
           },
         });
       }
@@ -767,6 +829,8 @@ export async function POST(req: NextRequest) {
         text: "Não consegui concluir isso automaticamente. Pode me dizer diretamente os dados (nome, documento, cidade, estado e o que mais for pedido) em texto, em vez de só no anexo?",
         toolsUsed,
         creditsConsumed: totalCreditsConsumed,
+        goalProgress: buildGoalProgress(activeGoal),
+        offeredOptions: buildOfferedOptions(activeGoal),
       },
     });
   } catch (e) {

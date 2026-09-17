@@ -9,8 +9,20 @@
 // feedback goes through it as normal.
 
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Sparkles, Paperclip, Mic, Square, Loader2, FileText, Image } from "lucide-react";
-import { useToast } from "@shina/design-system";
+import {
+  X,
+  Send,
+  Sparkles,
+  Paperclip,
+  Mic,
+  Square,
+  Loader2,
+  FileText,
+  Image,
+  Check,
+  Circle,
+} from "lucide-react";
+import { useToast, RadioCard } from "@shina/design-system";
 
 interface ActionPlanField {
   label: string;
@@ -26,10 +38,36 @@ interface ActionPlan {
   isDuplicate?: boolean;
 }
 
+// Agent Runtime v3, Wave 5 ("UX + Channels", spec sections 38-39) — the
+// SAME structured fields every channel's `/api/ai/agent` response now
+// carries; only this drawer renders them as UI so far (a text-only
+// channel keeps working off `text` alone, which already spells out the
+// same info in prose).
+interface GoalProgressField {
+  key: string;
+  label: string;
+  required: boolean;
+  known: boolean;
+}
+interface GoalProgress {
+  type: string;
+  fields: GoalProgressField[];
+}
+interface OfferedOption {
+  id: string;
+  name: string;
+}
+interface OfferedOptionsPayload {
+  field: string;
+  options: OfferedOption[];
+}
+
 interface ShinaMessage {
   role: "user" | "assistant";
   text: string;
   actionPlans?: ActionPlan[];
+  goalProgress?: GoalProgress;
+  offeredOptions?: OfferedOptionsPayload;
 }
 
 interface AgentApiResponse {
@@ -38,6 +76,8 @@ interface AgentApiResponse {
     toolsUsed: string[];
     creditsConsumed: number;
     pendingActionPlans?: ActionPlan[];
+    goalProgress?: GoalProgress;
+    offeredOptions?: OfferedOptionsPayload;
   };
   error?: string;
   code?: string;
@@ -238,19 +278,25 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
     }
   }
 
-  async function send() {
-    const query = input.trim();
-    if ((!query && attachments.length === 0) || sending) return;
-    const pendingAttachments = attachments;
-    setInput("");
-    setAttachments([]);
+  // Agent Runtime v3, Wave 5 — shared by both the normal typed-message
+  // submit and a chip tap (spec section 39: "Botão deve enviar entityId
+  // estruturado quando possível. Não depender do LLM reinterpretar o
+  // texto do botão."). `selectedOptionId` bypasses the backend's fuzzy
+  // name-matching entirely for that turn's offered-option field.
+  async function sendTurn(queryText: string, selectedOptionId?: string) {
+    if (sending) return;
+    const pendingAttachments = selectedOptionId ? [] : attachments;
+    if (!selectedOptionId) {
+      setInput("");
+      setAttachments([]);
+    }
     setMessages((m) => [
       ...m,
       {
         role: "user",
         text: pendingAttachments.length
-          ? `${query}${query ? "\n" : ""}📎 ${pendingAttachments.map((a) => a.name).join(", ")}`
-          : query,
+          ? `${queryText}${queryText ? "\n" : ""}📎 ${pendingAttachments.map((a) => a.name).join(", ")}`
+          : queryText,
       },
     ]);
     setSending(true);
@@ -260,10 +306,11 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          query: query || "Veja o(s) anexo(s) enviado(s).",
+          query: queryText || "Veja o(s) anexo(s) enviado(s).",
           currentModule,
           currentResource,
           conversationId,
+          selectedOptionId,
           attachments: pendingAttachments.length
             ? pendingAttachments.map(({ name, mimeType, dataBase64 }) => ({
                 name,
@@ -297,6 +344,8 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
           role: "assistant",
           text: json.data?.text ?? "",
           actionPlans: json.data?.pendingActionPlans,
+          goalProgress: json.data?.goalProgress,
+          offeredOptions: json.data?.offeredOptions,
         },
       ]);
     } catch {
@@ -304,6 +353,16 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
     } finally {
       setSending(false);
     }
+  }
+
+  async function send() {
+    const query = input.trim();
+    if (!query && attachments.length === 0) return;
+    await sendTurn(query);
+  }
+
+  async function selectOfferedOption(option: OfferedOption) {
+    await sendTurn(option.name, option.id);
   }
 
   async function resolvePlan(planId: string, action: "confirm" | "cancel") {
@@ -438,6 +497,46 @@ export function ShinaDrawer({ open, onClose, currentModule, currentResource }: S
                   </div>
                 );
               })}
+              {m.goalProgress && m.goalProgress.fields.length > 0 && (
+                <div className="max-w-[85%] w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 px-4 py-3 text-sm">
+                  <ul className="space-y-1">
+                    {m.goalProgress.fields.map((field) => (
+                      <li
+                        key={field.key}
+                        className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
+                      >
+                        {field.known ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        ) : (
+                          <Circle className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
+                        )}
+                        <span className={field.known ? "" : "text-slate-400 dark:text-slate-500"}>
+                          {field.label}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {/* Agent Runtime v3, Wave 5 (spec section 39) — only the LATEST
+                  assistant turn's offer is tappable; an older message's offer
+                  either got consumed or superseded by a later turn, and the
+                  backend re-validates membership against the CURRENT goal
+                  state regardless (a stale tap on an old render is safely
+                  rejected, never silently accepted). */}
+              {m.offeredOptions && i === messages.length - 1 && (
+                <div className="max-w-[85%] w-full space-y-2">
+                  {m.offeredOptions.options.map((option) => (
+                    <RadioCard
+                      key={option.id}
+                      title={option.name}
+                      selected={false}
+                      disabled={sending}
+                      onSelect={() => void selectOfferedOption(option)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           {sending && (

@@ -10,7 +10,12 @@ import {
   requestRecordingPermissionsAsync,
 } from "expo-audio";
 import { theme } from "../theme";
-import { recordAndAsk } from "../lib/voice-agent";
+import {
+  recordAndAsk,
+  selectOfferedOption,
+  type OfferedOption,
+  type AgentReply,
+} from "../lib/voice-agent";
 
 type State = "idle" | "recording" | "processing" | "result" | "error";
 
@@ -24,7 +29,33 @@ export function VoiceRecordButton() {
   const [state, setState] = useState<State>("idle");
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("");
+  const [offeredOptions, setOfferedOptions] = useState<OfferedOption[]>([]);
+  const [selecting, setSelecting] = useState(false);
   const [error, setError] = useState("");
+
+  function applyReply(r: AgentReply) {
+    setReply(r.text);
+    setOfferedOptions(r.offeredOptions?.options ?? []);
+    setState("result");
+  }
+
+  // Agent Runtime v3, Wave 5 (spec section 39) — tapping an offered
+  // option submits its real id, never asking the model to re-interpret
+  // a re-typed/re-spoken name. Mirrors shina-drawer.tsx's
+  // selectOfferedOption on web.
+  async function pickOption(option: OfferedOption) {
+    setSelecting(true);
+    setError("");
+    try {
+      const r = await selectOfferedOption(option);
+      applyReply(r);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Algo deu errado.");
+      setState("error");
+    } finally {
+      setSelecting(false);
+    }
+  }
 
   useEffect(() => {
     void (async () => {
@@ -38,6 +69,7 @@ export function VoiceRecordButton() {
     if (state !== "idle" && state !== "result" && state !== "error") return;
     setTranscript("");
     setReply("");
+    setOfferedOptions([]);
     setError("");
     await recorder.prepareToRecordAsync();
     recorder.record();
@@ -56,8 +88,7 @@ export function VoiceRecordButton() {
     try {
       const { transcript: t, reply: r } = await recordAndAsk(uri);
       setTranscript(t);
-      setReply(r.text);
-      setState("result");
+      applyReply(r);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Algo deu errado.");
       setState("error");
@@ -78,6 +109,20 @@ export function VoiceRecordButton() {
             <>
               <Text style={styles.transcript}>"{transcript}"</Text>
               <Text style={styles.reply}>{reply}</Text>
+              {offeredOptions.length > 0 && (
+                <View style={styles.options}>
+                  {offeredOptions.map((option) => (
+                    <Pressable
+                      key={option.id}
+                      disabled={selecting}
+                      onPress={() => void pickOption(option)}
+                      style={styles.optionChip}
+                    >
+                      <Text style={styles.optionChipText}>{option.name}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
             </>
           )}
           {state === "error" && <Text style={styles.error}>{error}</Text>}
@@ -140,4 +185,13 @@ const styles = StyleSheet.create({
   cardText: { color: theme.colors.onSurfaceSecondary, fontSize: theme.font.sm },
   error: { color: "#F87171", fontSize: theme.font.sm },
   dismiss: { position: "absolute", top: 6, right: 6 },
+  options: { marginTop: theme.spacing.sm, gap: theme.spacing.xs },
+  optionChip: {
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  optionChipText: { color: theme.colors.onSurfaceSecondary, fontSize: theme.font.sm },
 });
