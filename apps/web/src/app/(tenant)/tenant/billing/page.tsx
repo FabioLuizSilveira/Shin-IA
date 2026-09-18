@@ -409,7 +409,7 @@ export default function TenantBillingPage() {
               onClick={() => setShowEntryForm(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-shina-blue text-white hover:bg-blue-600 transition border-0 cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" /> Adicionar lançamento
+              <Plus className="w-3.5 h-3.5" /> Novo cadastro
             </button>
           }
         />
@@ -507,7 +507,7 @@ export default function TenantBillingPage() {
           <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl z-50 flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
               <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
-                Adicionar lançamento
+                Novo cadastro
               </h2>
               <button
                 type="button"
@@ -637,7 +637,7 @@ export default function TenantBillingPage() {
                 disabled={entrySubmitting}
                 className="w-full px-4 py-2.5 bg-shina-blue hover:bg-blue-600 disabled:opacity-60 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer"
               >
-                {entrySubmitting ? "Adicionando..." : "Adicionar lançamento"}
+                {entrySubmitting ? "Cadastrando..." : "Cadastrar"}
               </button>
             </form>
           </div>
