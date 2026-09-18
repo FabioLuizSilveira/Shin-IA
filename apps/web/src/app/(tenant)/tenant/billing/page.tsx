@@ -20,7 +20,14 @@ interface FinancialEntry {
   currency: string;
   entry_date: string;
   notes: string | null;
+  organization_id: string | null;
+  organizations: { id: string; name: string } | null;
   created_at: string;
+}
+
+interface OrganizationOption {
+  id: string;
+  name: string;
 }
 
 const ENTRY_TYPE_LABEL: Record<FinancialEntry["type"], string> = {
@@ -68,16 +75,28 @@ export default function TenantBillingPage() {
 
   const [entries, setEntries] = useState<FinancialEntry[]>([]);
   const [entriesLoading, setEntriesLoading] = useState(true);
+  const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
   const [showEntryForm, setShowEntryForm] = useState(false);
   const [entryType, setEntryType] = useState<FinancialEntry["type"]>("expense");
   const [entryDescription, setEntryDescription] = useState("");
   const [entryCategory, setEntryCategory] = useState("");
+  const [entryOrganizationId, setEntryOrganizationId] = useState("");
   const [entryAmount, setEntryAmount] = useState("");
   const [entryDate, setEntryDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [entryNotes, setEntryNotes] = useState("");
   const [entrySubmitting, setEntrySubmitting] = useState(false);
   const [entryFormError, setEntryFormError] = useState<string | null>(null);
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
+
+  // Filters (spec: "filtrar por cliente, categoria, valor, etc") — all
+  // optional and combinable, applied server-side by loadEntries below.
+  const [filterType, setFilterType] = useState<"" | FinancialEntry["type"]>("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterOrganizationId, setFilterOrganizationId] = useState("");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+  const [filterMinAmount, setFilterMinAmount] = useState("");
+  const [filterMaxAmount, setFilterMaxAmount] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,27 +112,67 @@ export default function TenantBillingPage() {
   const loadEntries = useCallback(async () => {
     setEntriesLoading(true);
     try {
-      const res = await fetch("/api/financial-entries");
+      const qs = new URLSearchParams();
+      if (filterType) qs.set("type", filterType);
+      if (filterCategory.trim()) qs.set("category", filterCategory.trim());
+      if (filterOrganizationId) qs.set("organization_id", filterOrganizationId);
+      if (filterFrom) qs.set("from", filterFrom);
+      if (filterTo) qs.set("to", filterTo);
+      if (filterMinAmount) qs.set("min_amount", filterMinAmount);
+      if (filterMaxAmount) qs.set("max_amount", filterMaxAmount);
+      const res = await fetch(`/api/financial-entries?${qs.toString()}`);
       const json = (await res.json()) as { data?: FinancialEntry[] };
       setEntries(json.data ?? []);
     } finally {
       setEntriesLoading(false);
     }
+  }, [
+    filterType,
+    filterCategory,
+    filterOrganizationId,
+    filterFrom,
+    filterTo,
+    filterMinAmount,
+    filterMaxAmount,
+  ]);
+
+  const loadOrganizations = useCallback(async () => {
+    const res = await fetch("/api/organizations");
+    const json = (await res.json()) as { data?: OrganizationOption[] };
+    setOrganizations(json.data ?? []);
   }, []);
 
   useEffect(() => {
     void load();
+    void loadOrganizations();
+  }, [load, loadOrganizations]);
+
+  // Separate effect (not the mount-only one above) so changing any filter
+  // re-queries automatically, same "controlled input drives the fetch"
+  // pattern as assets/crm's own search filters.
+  useEffect(() => {
     void loadEntries();
-  }, [load, loadEntries]);
+  }, [loadEntries]);
 
   function resetEntryForm() {
     setEntryType("expense");
     setEntryDescription("");
     setEntryCategory("");
+    setEntryOrganizationId("");
     setEntryAmount("");
     setEntryDate(new Date().toISOString().slice(0, 10));
     setEntryNotes("");
     setEntryFormError(null);
+  }
+
+  function clearFilters() {
+    setFilterType("");
+    setFilterCategory("");
+    setFilterOrganizationId("");
+    setFilterFrom("");
+    setFilterTo("");
+    setFilterMinAmount("");
+    setFilterMaxAmount("");
   }
 
   async function handleCreateEntry(e: React.FormEvent) {
@@ -129,6 +188,7 @@ export default function TenantBillingPage() {
           type: entryType,
           description: entryDescription,
           category: entryCategory || undefined,
+          organization_id: entryOrganizationId || undefined,
           amount,
           entry_date: entryDate,
           notes: entryNotes || undefined,
@@ -282,6 +342,11 @@ export default function TenantBillingPage() {
       render: (row: EntryRow) => row.category ?? "—",
     },
     {
+      key: "organization",
+      label: "Cliente",
+      render: (row: EntryRow) => row.organizations?.name ?? "—",
+    },
+    {
       key: "entry_date",
       label: "Data",
       render: (row: EntryRow) => new Date(`${row.entry_date}T00:00:00`).toLocaleDateString("pt-BR"),
@@ -349,10 +414,78 @@ export default function TenantBillingPage() {
           }
         />
 
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 mb-4">
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as "" | FinancialEntry["type"])}
+            className="px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100"
+          >
+            <option value="">Todos os tipos</option>
+            <option value="revenue">Receita</option>
+            <option value="expense">Despesa</option>
+          </select>
+          <input
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            placeholder="Categoria"
+            className="px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100"
+          />
+          <select
+            value={filterOrganizationId}
+            onChange={(e) => setFilterOrganizationId(e.target.value)}
+            className="px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100"
+          >
+            <option value="">Todos os clientes</option>
+            {organizations.map((org) => (
+              <option key={org.id} value={org.id}>
+                {org.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={filterFrom}
+            onChange={(e) => setFilterFrom(e.target.value)}
+            title="De"
+            className="px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100"
+          />
+          <input
+            type="date"
+            value={filterTo}
+            onChange={(e) => setFilterTo(e.target.value)}
+            title="Até"
+            className="px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100"
+          />
+          <input
+            inputMode="decimal"
+            value={filterMinAmount}
+            onChange={(e) => setFilterMinAmount(e.target.value)}
+            placeholder="Valor mín."
+            className="px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100"
+          />
+          <div className="flex gap-2">
+            <input
+              inputMode="decimal"
+              value={filterMaxAmount}
+              onChange={(e) => setFilterMaxAmount(e.target.value)}
+              placeholder="Valor máx."
+              className="min-w-0 flex-1 px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100"
+            />
+            <button
+              type="button"
+              onClick={clearFilters}
+              title="Limpar filtros"
+              className="px-2.5 py-2 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer shrink-0"
+            >
+              Limpar
+            </button>
+          </div>
+        </div>
+
         <DataTable columns={entryColumns} data={entries as EntryRow[]} loading={entriesLoading} />
 
         {!entriesLoading && entries.length === 0 && (
-          <p className="text-sm text-slate-500 mt-4 text-center">Nenhum lançamento ainda.</p>
+          <p className="text-sm text-slate-500 mt-4 text-center">Nenhum lançamento encontrado.</p>
         )}
       </div>
 
@@ -438,6 +571,23 @@ export default function TenantBillingPage() {
                   placeholder="Combustível, Aluguel, Salários..."
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">
+                  Cliente (opcional)
+                </label>
+                <select
+                  value={entryOrganizationId}
+                  onChange={(e) => setEntryOrganizationId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+                >
+                  <option value="">Nenhum</option>
+                  {organizations.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
